@@ -164,6 +164,7 @@ button.alt{background:var(--paper)}
   <h2>IMPERIUM</h2>
   <div class="civsel"><label for="civ0">TÚ</label><select id="civ0"></select></div>
   <div class="civsel"><label for="civ1">RIVAL</label><select id="civ1"></select></div>
+  <div class="civsel"><label for="geo">MAPA</label><select id="geo"></select></div>
   <div class="diff"><button type="button" data-d="easy">FÁCIL</button><button type="button" data-d="normal">NORMAL</button><button type="button" data-d="hard">DIFÍCIL</button></div>
   <button id="go" type="button">JUGAR</button>
   <button id="howBtn" type="button" class="alt">INSTRUCCIONES</button>
@@ -175,6 +176,7 @@ button.alt{background:var(--paper)}
     <li>Pulsa el <b>CUARTEL</b> (el edificio de madera de tu fortaleza) para reclutar desde la barra inferior.</li>
     <li>Los <span class="g">pueblos</span> dan oro, tienen una torre y se pueden mejorar. Los caminos dan velocidad y el río solo se cruza por los vados.</li>
     <li>Los dos <b>CAMPAMENTOS</b> tienen guardianes neutrales. Derrótalos y conquístalos: te darán jinetes arqueros, hasta 20 por campamento.</li>
+    <li>Elige el <b>MAPA</b>: once geografías (río, cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto y caldera). Los pantanos y bajíos frenan, sobre todo a los jinetes; el bosque denso no se atraviesa; los arqueros desde dos niveles por encima llegan más lejos y hacen más daño; la cima de la meseta da oro doble.</li>
     <li>Elige tu <b>CIVILIZACIÓN</b> y la del rival en el menú (o al azar). Todas juegan igual: cambian el aspecto, los edificios y los nombres de las tropas.</li>
     <li>Invoca un <b>HÉROE</b> en el altar. Asígnale hasta 50 tropas: formarán delante de él en bloque, línea o cuña.</li>
     <li>La niebla de guerra oculta lo que no has explorado. Las tropas suben de rango al matar y se curan en tus regiones.</li>
@@ -287,13 +289,20 @@ function vnoise(x, y, z) {
 function fbm(x, y, z, oct) { let a = .5, f = 1, s = 0, n = 0; for (let o = 0; o < oct; o++) { s += a*vnoise(x*f, y*f, z*f); n += a; a *= .5; f *= 2.03; } return s/n; }
 const smooth01 = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 // Escenarios: una región pequeña a escala, no un mundo entero
-const SCEN = { costa: 'COSTA', monte: 'MONTAÑA', islas: 'ISLAS', rio: 'RÍO' }, SCEN_KEYS = Object.keys(SCEN);
+const SCEN = { costa: 'COSTA', monte: 'MONTAÑA', islas: 'ISLAS', rio: 'RÍO' };
 const SCEN_FOREST = { costa: 1.2, monte: .8, islas: 1, rio: 1.3 };
-let scen = 'rio', wantScen = 'rio';   // de momento, un único mapa: el río
+let scen = 'rio', wantScen = 'random', geoR = null, geoRiver = true, GEOT = null;
+try { wantScen = localStorage.getItem('imperium-geo') || 'random'; } catch (e) {}
 const n2 = (x, z, f, oct = 4, o = 0) => fbm(x * f + o * 17.3, 3.1 + o, z * f - o * 9.7, oct);
 const segDist = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, t = THREE.MathUtils.clamp(((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz), 0, 1); return Math.hypot(px - ax - dx * t, pz - az - dz * t); };
 const plains = (x, z) => 2.2 + Math.max(0, n2(x, z, .03, 3, 1) - .5) * 4.5;   // llanura con pocas lomas, anchas y suaves
 function baseGround(rng) {
+  GEOT = new Uint8Array(N); geoR = null; geoRiver = scen === 'rio'; RIVX.fill(MW / 2);
+  if (scen !== 'rio') {
+    geoR = GEO.build(scen, (rng() * 1e9 | 0) + 1); EL.set(geoR.HM); GEOT = geoR.TT; geoRiver = geoR.river;
+    for (let z = 0; z < MD; z++) RIVX[z] = geoR.div ? geoR.div(z + .5) : MW / 2;   // divisoria del reparto 50/50
+    return;
+  }
   const ph = rng() * 6.28, side = rng() < .5;
   let isl = [], bridges = [];
   if (scen === 'islas') {   // islas repartidas, unidas por bancos de arena (árbol de expansión mínima)
@@ -338,6 +347,147 @@ function baseGround(rng) {
   }
 }
 
+// ---------- Geografías ----------
+// Diez generadores de terreno irregulares (más el río clásico). Trabajan en unidades de 192×128 (la mitad del mapa) sobre la rejilla completa,
+// así que las formas salen al doble de tamaño y los acantilados siguen siendo de verdad. Tipos de casilla: 0 normal · 1 bosque denso (no se cruza) · 2 pantano o bajío (lento) · 3 arena · 4 oasis
+const GEO = (() => {
+  const W = 192, H = 128;
+  const hsh = (x, z, s) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263) ^ Math.imul(s | 0, 2246822519); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };
+  function vn(x, z, s) { const xi = Math.floor(x), zi = Math.floor(z), u = x - xi, v = z - zi, a = hsh(xi, zi, s), b = hsh(xi + 1, zi, s), c = hsh(xi, zi + 1, s), d = hsh(xi + 1, zi + 1, s), su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v); return a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv; }
+  const fbm = (x, z, s, o = 4) => { let a = .5, f = 1, t = 0, n = 0; for (let i = 0; i < o; i++) { t += a * vn(x * f, z * f, s + i * 13); n += a; a *= .5; f *= 2.03; } return t / n; };
+  const sm = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+  // ===== utilidades de generación irregular =====
+  const rngOf = s => { s = (s * 9301 + 49297) % 2147483647 || 1; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const segD = (x, z, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L)); return Math.hypot(x - ax - dx * t, z - az - dz * t); };
+  const polyD = (x, z, P) => { let m = 1e9; for (let i = 0; i + 1 < P.length; i++) m = Math.min(m, segD(x, z, P[i][0], P[i][1], P[i + 1][0], P[i + 1][1])); return m; };
+  // línea que serpentea de A a B (paseo aleatorio suavizado, perpendicular a la dirección)
+  function wander(r, ax, az, bx, bz, amp = 10, n = 14) {
+    const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1, px = -dz / L, pz = dx / L, P = []; let off = 0, v = 0;
+    for (let i = 0; i <= n; i++) { const t = i / n, damp = Math.sin(t * Math.PI); v += (r() - .5) * amp * .6; v *= .7; off += v; off *= .92; P.push([ax + dx * t + px * off * damp, az + dz * t + pz * off * damp]); }
+    return P;
+  }
+  // blob irregular: radio por ángulo con ruido
+  const blobR = (cx, cz, rx, rz, jit, s) => (x, z) => { const a = Math.atan2((z - cz) / rz, (x - cx) / rx), k = 1 + (fbm(Math.cos(a) * 1.3 + 7, Math.sin(a) * 1.3 + 3, s, 3) - .5) * jit; return Math.hypot((x - cx) / rx, (z - cz) / rz) / k; };
+  // árbol de expansión mínima entre puntos
+  function mst(pts) { const inT = [0], E = []; while (inT.length < pts.length) { let b = null, bd = 1e9; for (const i of inT) for (let j = 0; j < pts.length; j++) if (!inT.includes(j)) { const d = Math.hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1]); if (d < bd) { bd = d; b = [i, j]; } } inT.push(b[1]); E.push(b); } return E; }
+  function scatter(r, n, minD, box, ok = () => true, pre = []) { const P = [...pre]; for (let t = 0; P.length < n + pre.length && t < 3000; t++) { const p = [box[0] + r() * (box[2] - box[0]), box[1] + r() * (box[3] - box[1])]; if (ok(p) && P.every(q => Math.hypot(q[0] - p[0], q[1] - p[1]) > minD)) P.push(p); } return P.slice(pre.length); }
+
+  // fortalezas: cada una en su extremo pero en posiciones distintas (no en espejo)
+  function fortsFor(r) { return [[16 + r() * 14, 30 + r() * 68], [W - 16 - r() * 14, 30 + r() * 68]]; }
+
+  // Cada geografía rellena HM (altura; ≤0 agua) y TT (0 normal · 1 bosque denso · 2 pantano/bajío · 3 arena · 4 oasis) para todo el mapa, y devuelve los puntos de paso.
+  const GEN = {
+    cordillera(M, r, s, F) {
+      const cx = z => 96 + (fbm(.5, z * .018, s, 3) - .5) * 70 + Math.sin(z * .05 + s) * 8, wd = z => 8 + fbm(3.3, z * .03, s + 1, 2) * 12;
+      const pz = scatter(r, 3, 26, [0, 12, 1, H - 12]).map(p => p[1]).sort((a, b) => a - b), pass = pz.map(z => [cx(z), z]); M.div = cx;
+      M.each((x, z) => { const d = Math.abs(x - cx(z)); let h = 2 + Math.max(0, fbm(x * .05, z * .05, s + 2) - .5) * 6;
+        const spur = Math.pow(1 - Math.abs(2 * fbm(x * .03, z * .03, s + 3) - 1), 3) * 5 * Math.max(0, 1 - d / 40);
+        h += sm(1 - (d - 2) / wd(z)) * (6 + fbm(x * .09, z * .09, s + 4) * 3) + spur;
+        for (const [px, p] of pass) { const k = sm(1 - (Math.abs(z - p - (fbm(x * .05, 1, s + 5) - .5) * 8) - 2.5) / 5) * sm(1 - (Math.abs(x - px) - 10) / 20); h = h * (1 - k) + Math.min(h, 3) * k; }
+        return [h, 0]; });
+      return pass;
+    },
+    istmo(M, r, s, F) {
+      const xc = 96 + (r() - .5) * 50, zc = 64 + (r() - .5) * 20;
+      const w = (x, k) => 9 + Math.pow(Math.abs(x - xc) / 100, 1.3) * 62 + (fbm(x * .025, k, s + k, 3) - .5) * 34;
+      const isl = scatter(r, 5, 18, [20, 6, W - 20, H - 6]);
+      M.each((x, z) => { const dn = (zc - w(x, 1)) - z, ds = z - (zc + w(x, 2)), d = Math.max(dn, ds);
+        let v = -1; for (const [ix, iz] of isl) v = Math.max(v, 1 - Math.hypot(x - ix, z - iz) / (4 + fbm(ix, iz, s, 2) * 6));
+        if (d > 0 && v <= 0) return [d < 2.5 ? 1 : -1 - Math.min(4, d * .3), 0];
+        return [2 + Math.max(0, fbm(x * .06, z * .06, s + 6) - .5) * 5, d > -4 ? 3 : 0]; });
+      return [[xc, zc]];
+    },
+    archipielago(M, r, s, F) {
+      const isl = [[F[0][0] + 4, F[0][1], 18], [F[1][0] - 4, F[1][1], 18], ...scatter(r, 10, 26, [40, 10, W - 40, H - 10], p => F.every(f => Math.hypot(f[0] - p[0], f[1] - p[1]) > 30)).map(p => [...p, 7 + r() * 8])];
+      const links = mst(isl).map(([a, b]) => wander(r, isl[a][0], isl[a][1], isl[b][0], isl[b][1], 9, 10));
+      for (let k = 0; k < 2; k++) { const a = r() * isl.length | 0, b = r() * isl.length | 0; if (a !== b && Math.hypot(isl[a][0] - isl[b][0], isl[a][1] - isl[b][1]) < 70) links.push(wander(r, isl[a][0], isl[a][1], isl[b][0], isl[b][1], 9, 10)); }
+      const fs = isl.map(([cx, cz, rr], i) => blobR(cx, cz, rr * (1 + (i % 3) * .2), rr, .6, s + i));
+      M.each((x, z) => { let v = 9; for (const f of fs) v = Math.min(v, f(x, z));
+        if (v < 1) return [1 + Math.min(1, (1 - v) * 3) * (1 + fbm(x * .07, z * .07, s + 7) * 2.5), 0];
+        if (links.some(P => polyD(x, z, P) < 2 + fbm(x * .2, z * .2, s + 8) * 1.6)) return [1, 2]; return [-2, 0]; });
+      return links.map(P => P[P.length >> 1]).filter(p => Math.abs(p[0] - 96) < 50).slice(0, 4);
+    },
+    barrancos(M, r, s, F) {
+      const ramps = [];
+      M.each((x, z) => { const c1 = Math.abs(fbm(x * .02, z * .02, s + 9, 3) - .5), c2 = Math.abs(fbm(x * .016, z * .026, s + 10, 3) - .5); const cut = Math.min(c1, c2 * 1.3);
+        return [cut < .03 && F.every(f => Math.hypot(x - f[0], z - f[1]) > 16) ? 1 : 4 + fbm(x * .05, z * .05, s + 11) * 1.6, cut < .012 ? 2 : 0]; });
+      const cand = []; M.each((x, z, h) => { if (h === 1 && hsh(x, z, s) < .02) cand.push([x, z]); return null; });
+      for (const p of cand) if (ramps.every(q => Math.hypot(q[0] - p[0], q[1] - p[1]) > 28) && ramps.length < 7) ramps.push(p);
+      M.each((x, z, h, t) => { for (const [px, pz] of ramps) { const d = Math.hypot(x - px, z - pz); if (d < 5) return [Math.min(Math.max(h, 2 + Math.floor(d / 1.6)), 4), 0]; } return null; });
+      return ramps;
+    },
+    meseta(M, r, s, F) {
+      const cx = 96 + (r() - .5) * 36, cz = 64 + (r() - .5) * 34, f = blobR(cx, cz, 30 + r() * 10, 22 + r() * 8, .7, s + 12);
+      const angs = [0, 1, 2, 3].map(i => i * Math.PI / 2 + (r() - .5) * 1.1), ramps = angs.map(a => { let k = .5; while (k < 3 && f(cx + Math.cos(a) * k * 10, cz + Math.sin(a) * k * 10) < 1) k += .05; return [cx + Math.cos(a) * k * 10, cz + Math.sin(a) * k * 10]; });
+      M.each((x, z) => { const v = f(x, z); let h = v < 1 ? 6 + fbm(x * .1, z * .1, s + 13) : v < 1.12 ? 3 : 2 + Math.max(0, fbm(x * .05, z * .05, s + 14) - .45) * 6;
+        for (const [px, pz] of ramps) { const d = Math.hypot(x - px, z - pz); if (d < 6 && v < 1.3) h = Math.min(6, 3 + Math.max(0, (v < 1 ? 3 : 2) - d * .4)); }
+        return [h, 0]; });
+      M.special = [[cx, cz]]; return ramps;
+    },
+    afluentes(M, r, s, F) {
+      const main = wander(r, 96 + (r() - .5) * 30, -4, 96 + (r() - .5) * 30, H + 4, 28, 18), tribs = [];
+      M.div = z => { for (let i = 0; i + 1 < main.length; i++) { const [ax, az] = main[i], [bx, bz] = main[i + 1]; if ((az - z) * (bz - z) <= 0) return ax + (bx - ax) * ((z - az) / ((bz - az) || 1)); } return 96; };
+      for (let k = 0; k < 5; k++) { const west = k % 2 === 0, j = main[2 + (r() * (main.length - 4) | 0)], sx = west ? r() * 50 : W - r() * 50, sz = r() < .5 ? -4 : H + 4; tribs.push(wander(r, r() < .4 ? (west ? -4 : W + 4) : sx, r() < .4 ? 10 + r() * (H - 20) : sz, j[0], j[1], 16, 12)); }
+      const fords = [...scatter(r, 4, 22, [0, 8, 1, H - 8]).map(p => { let b = main[0], bd = 1e9; for (const q of main) { const d = Math.abs(q[1] - p[1]); if (d < bd) { bd = d; b = q; } } return b; }), ...tribs.map(P => P[(P.length * (.3 + r() * .4)) | 0])];
+      M.each((x, z) => { const dm = polyD(x, z, main), dt = Math.min(...tribs.map(P => polyD(x, z, P))), d = Math.min(dm - 1.2, dt) + (fbm(x * .12, z * .12, s + 15) - .5) * 2;
+        const ford = fords.some(([px, pz]) => Math.hypot(x - px, z - pz) < 4);
+        if (d < 2.2) return [ford ? 1 : -1, 0]; if (d < 3.6) return [1, 3]; return [2 + Math.max(0, fbm(x * .05, z * .05, s + 16) - .5) * 6, 0]; });
+      return fords;
+    },
+    delta(M, r, s, F) {
+      const ridges = []; for (const f of F) for (let k = 0; k < 3; k++) ridges.push(wander(r, f[0], f[1], 70 + r() * 52, 10 + r() * 108, 18, 12));
+      M.each((x, z) => { const ch = Math.min(Math.abs(fbm(x * .03, z * .05, s + 17, 3) - .5), Math.abs(fbm(x * .05, z * .025, s + 18, 3) - .5) * 1.3), m = fbm(x * .07, z * .07, s + 19);
+        if (F.some(f => Math.hypot(x - f[0], z - f[1]) < 14) || ridges.some(P => polyD(x, z, P) < 2.4 + fbm(x * .2, z * .2, s + 20))) return [2, 0];
+        if (ch < .03) return [-1, 0]; return [m > .5 ? 2 : 1, m > .5 ? 0 : 2]; });
+      return ridges.map(P => P[P.length - 1]).filter(p => Math.abs(p[0] - 96) < 40).slice(0, 4);
+    },
+    bosque(M, r, s, F) {
+      const cl = [...F.map(f => [...f, 15]), ...scatter(r, 11, 22, [30, 10, W - 30, H - 10]).map(p => [...p, 5 + r() * 6])];
+      const lanes = mst(cl).map(([a, b]) => wander(r, cl[a][0], cl[a][1], cl[b][0], cl[b][1], 10, 12));
+      for (let k = 0; k < 3; k++) { const a = r() * cl.length | 0, b = r() * cl.length | 0; if (a !== b && Math.hypot(cl[a][0] - cl[b][0], cl[a][1] - cl[b][1]) < 60) lanes.push(wander(r, cl[a][0], cl[a][1], cl[b][0], cl[b][1], 10, 12)); }
+      const fs = cl.map(([cx, cz, rr], i) => blobR(cx, cz, rr * 1.2, rr, .7, s + 30 + i));
+      M.each((x, z) => { const open = fs.some(f => f(x, z) < 1) || lanes.some(P => polyD(x, z, P) < 1.8 + fbm(x * .15, z * .15, s + 21) * 1.4) || fbm(x * .05, z * .05, s + 22) < .3;
+        return [2 + Math.max(0, fbm(x * .05, z * .05, s + 23) - .5) * 5, open ? 0 : 1]; });
+      return lanes.filter(P => Math.abs(P[P.length >> 1][0] - 96) < 30).map(P => P[P.length >> 1]).slice(0, 5);
+    },
+    oasis(M, r, s, F) {
+      const oa = scatter(r, 9, 24, [30, 10, W - 30, H - 10], p => F.every(f => Math.hypot(f[0] - p[0], f[1] - p[1]) > 26));
+      const mesas = scatter(r, 6, 20, [20, 8, W - 20, H - 8], p => oa.every(o => Math.hypot(o[0] - p[0], o[1] - p[1]) > 14)).map((p, i) => blobR(p[0], p[1], 4 + r() * 6, 3 + r() * 5, .8, s + 40 + i));
+      M.each((x, z) => { for (const [ox, oz] of oa) { const d = Math.hypot(x - ox, z - oz) / (1 + (fbm(x * .2, z * .2, s + 24) - .5) * .6); if (d < 2.6) return [-1, 0]; if (d < 7) return [2, 4]; }
+        if (mesas.some(f => f(x, z) < 1)) return [5, 3];
+        const warp = fbm(x * .02, z * .02, s + 25) * 9, dune = Math.abs(Math.sin((x * .8 + z * .35) * .11 + warp)); return [2 + (dune > .82 ? (dune - .82) * 12 : 0), 3]; });
+      M.special = oa; return [];
+    },
+    lago(M, r, s, F) {
+      const cx = 96 + (r() - .5) * 30, cz = 64 + (r() - .5) * 24, f = blobR(cx, cz, 42 + r() * 12, 24 + r() * 8, .8, s + 26);
+      const islands = scatter(r, 2, 16, [cx - 25, cz - 12, cx + 25, cz + 12]), gaps = [0, 1, 2].map(i => (i / 3) * Math.PI * 2 + r() * 1.6);
+      const dykeTo = islands[0], dyke = dykeTo && wander(r, dykeTo[0], dykeTo[1], dykeTo[0] + (r() < .5 ? -1 : 1) * 30, dykeTo[1] + (r() - .5) * 40, 5, 8);
+      M.each((x, z) => { const v = f(x, z);
+        if (islands.some(([ix, iz]) => Math.hypot(x - ix, z - iz) < 5 + fbm(x * .2, z * .2, s, 2) * 3)) return [2, 0];
+        if (v < 1) return dyke && polyD(x, z, dyke) < 1.6 ? [1, 3] : [v < .85 ? -2 : -1, 0];
+        if (v < 1.08) return [1, 3];
+        const a = Math.atan2(z - cz, x - cx), gap = gaps.some(g => Math.abs(((a - g + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < .22);
+        if (v < 1.45 && !gap) return [4 + fbm(x * .1, z * .1, s + 27) * 3, 0];
+        return [2 + Math.max(0, fbm(x * .05, z * .05, s + 28) - .5) * 5, 0]; });
+      M.special = islands.slice(0, 1);
+      return gaps.map(g => { let k = 1; while (k < 1.6 && f(cx + Math.cos(g) * 40 * k, cz + Math.sin(g) * 25 * k) < 1.25) k += .02; return [cx + Math.cos(g) * 40 * k, cz + Math.sin(g) * 25 * k]; });
+    },
+  };
+
+
+  const LIST = { rio: 'RÍO', cordillera: 'CORDILLERA', istmo: 'ISTMO', archipielago: 'ARCHIPIÉLAGO', barrancos: 'BARRANCOS', meseta: 'MESETA', afluentes: 'AFLUENTES', delta: 'DELTA', bosque: 'BOSQUE', oasis: 'DESIERTO', lago: 'CALDERA' };
+  function build(id, seed) {
+    const r = rngOf(seed), s = seed % 997, F = fortsFor(r), HMg = new Float32Array(MW * MD), TTg = new Uint8Array(MW * MD);
+    const M = { each(fn) { for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, o = fn((gx + .5) / 2, (gz + .5) / 2, HMg[i], TTg[i]); if (o) { HMg[i] = Math.min(12, Math.round(o[0])); TTg[i] = o[1]; } } } };
+    const passes = GEN[id](M, r, s, F) || [];
+    for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 11 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
+    const up = p => [p[0] * 2, p[1] * 2];
+    return { HM: HMg, TT: TTg, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z / 2) * 2 : null,
+      sea: id === 'istmo' || id === 'archipielago', river: id === 'afluentes', goldTop: id === 'meseta', oasis: id === 'oasis' };
+  }
+  return { build, LIST, keys: Object.keys(LIST) };
+})();
+
 // ---------- Mapa de alturas ----------
 const N = MW * MD, idx = (x, z) => z * MW + x;
 const RIVX = new Float32Array(MD).fill(MW / 2);   // x del río en cada fila: separa las dos mitades del mapa
@@ -379,7 +529,7 @@ function canStep(x, z, nx, nz) {
 }
 function buildNav() {
   walk = new Uint8Array(N); inMain = new Uint8Array(N);
-  for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) { const i = idx(x, z); walk[i] = HM[i] >= 1 && !wallHit(x + .5, z + .5) ? 1 : 0; }
+  for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) { const i = idx(x, z); walk[i] = HM[i] >= 1 && GEOT[i] !== 1 && !wallHit(x + .5, z + .5) ? 1 : 0; }
   const comp = new Int32Array(N).fill(-1); let best = -1, bestN = 0, cid = 0, landN = 0;
   for (let i = 0; i < N; i++) {
     if (!walk[i] || comp[i] >= 0) continue;
@@ -496,13 +646,13 @@ function groundPaint(x, z) {   // patio de la fortaleza, pie de muralla, caminos
 // color de la cara superior de una casilla: pocas manchas grandes (personalidad) sin ruido por vóxel
 function sideAt(x, z) {   // 0 = orilla oeste (tu civilización), 1 = orilla este; borde ruidoso de ~24 casillas
   const d = x - RIVX[THREE.MathUtils.clamp(z | 0, 0, MD - 1)] + (n2(x, z, .08, 2, 61) - .5) * 26, t = THREE.MathUtils.clamp(d / 24 + .5, 0, 1);
-  return t <= 0 ? 0 : t >= 1 ? 1 : hash((x | 0) >> 1, 5, (z | 0) >> 1) < t ? 1 : 0;
+  return t <= 0 ? 0 : t >= 1 ? 1 : n2(x, z, .11, 2, 63) < t ? 1 : 0;   // manchas irregulares en la franja de mezcla, sin damero
 }
 const biomeAt = (x, z) => civOf(sideAt(x, z)).map;
 // rasgo de paisaje de cada bioma (solo color de suelo; Galos y mexicas añaden piezas en buildVoxels)
 function featureAt(x, z, side, B) {
   const cx = x + .5, cz = z + .5, f = n2(cx, cz, .055, 3, 33 + side * 8);
-  if (B.feature === 'nile') { const dr = Math.abs(cx - RIVX[z]); if (dr < 17) return z % 4 ? 0x86ac58 : 0x76a04c; return f < .3 ? 0xecdaa6 : -1; }
+  if (B.feature === 'nile') { if (geoRiver && Math.abs(cx - RIVX[z]) < 17) return z % 4 ? 0x86ac58 : 0x76a04c; return f < .3 ? 0xecdaa6 : -1; }
   if (f >= .22) return -1;
   switch (B.feature) {
     case 'vine': return z % 3 === 0 ? 0x4f7a3a : 0x9ab868;
@@ -516,25 +666,30 @@ function featureAt(x, z, side, B) {
 function terrainColor(x, z) {
   const i = idx(x, z), h = HM[i], cx = x + .5, cz = z + .5;
   const pc = groundPaint(cx, cz); if (pc >= 0) return pc;
-  const side = sideAt(cx, cz), B = civOf(side).map;
+  const side = sideAt(cx, cz), B = civOf(side).map, gt = GEOT[i];
   if (roadCell && roadCell[i]) return h <= 1 ? TP.ford : B.road;
+  if (gt === 1) return B.lush;
+  if (gt === 2) { const w = n2(cx, cz, .12, 2, 71) > .55; return h <= 1 ? (w ? 0xb8ccc0 : 0xd6cca0) : (w ? 0x6c9a92 : 0x6a8a5a); }   // bajío / pantano: manchas grandes, sin moteado
+  if (gt === 3) return B.sand;
+  if (gt === 4) return mixHex(B.ground[0], 0x4f9a3a, .45);
   if (h <= 1) return B.sand;
   if (treeCell && treeCell[i]) return B.lush;
   const fc = featureAt(x, z, side, B); if (fc >= 0) return fc;
   const m = n2(cx, cz, .045, 3, 21 + side * 7) + (h - 2) * .05, tone = THREE.MathUtils.clamp(Math.floor((m - .34) / .09), 0, 3);
+  if (h >= 6) return h >= 9 ? 0xe4e2da : mixHex(B.ground[tone], 0x9a9488, Math.min(1, (h - 5) / 3));   // alturas: la hierba pasa a roca y, en las cumbres, a nieve
   return B.ground[tone];
 }
 let meshes = [], spots = [];
-function generate(newSeed) {
+function generate(newSeed, tries = 0) {
   seed = newSeed;
   meshes.forEach(m => { m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); }); meshes = [];
   EL = new Float32Array(N); G = new Float32Array(N); HM = new Int8Array(N);
   const rng = rngOf(seed);
-  scen = wantScen === 'random' ? SCEN_KEYS[rng() * SCEN_KEYS.length | 0] : wantScen;
+  scen = wantScen === 'random' ? GEO.keys[rng() * GEO.keys.length | 0] : (GEO.LIST[wantScen] ? wantScen : 'rio');
   baseGround(rng);
   flats = []; forts = [];
   computeHM();
-  if (buildNav() < .55) return generate(newSeed + 7919);
+  if (buildNav() < .55) return generate(newSeed + 7919, tries + 1);
   const plateau = (x, z, rad) => { let s = 0, n = 0; for (let dz = -rad; dz <= rad; dz++) for (let dx = -rad; dx <= rad; dx++) { const cx = Math.floor(x) + dx, cz = Math.floor(z) + dz; if (cx < 0 || cz < 0 || cx >= MW || cz >= MD || dx * dx + dz * dz > rad * rad) continue; const g = G[idx(cx, cz)]; if (g > .5) { s += g; n++; } } return THREE.MathUtils.clamp(Math.round(n ? s / n : 2), 2, 4) + .2; };
   const pick = (x0, x1) => {   // sitio llano para la fortaleza en un extremo del mapa
     let best = -1, bs = -1e9;
@@ -546,8 +701,10 @@ function generate(newSeed) {
     }
     return best;
   };
-  const A = pick(.1, .2), B = pick(.8, .9);
-  if (A < 0 || B < 0) return generate(newSeed + 104729);
+  let A, B;
+  if (geoR) { const fi = ([x, z]) => { const n = nearestNode(x, z); return Math.hypot(cellX(n) - x, cellZ(n) - z) < 12 ? n : -1; }; A = fi(geoR.F[0]); B = fi(geoR.F[1]); }
+  else { A = pick(.1, .2); B = pick(.8, .9); }
+  if (A < 0 || B < 0) return generate(newSeed + 104729, tries + 1);
   const mkFort = (i, side) => {
     const x = cellX(i), z = cellZ(i), tb = Math.atan2(MD / 2 - z, MW / 2 - x), M = civOf(side).map, pts = M.shape();
     const maxR = Math.max(...pts.map(([a, b]) => Math.hypot(a, b))), k = 12.3 / maxR, n = 96;
@@ -561,13 +718,17 @@ function generate(newSeed) {
     return { kind: kind === 'castle' ? 'base' : kind, side: sd, x: f.x + lx * Math.cos(a) - lz * Math.sin(a), z: f.z + lx * Math.sin(a) + lz * Math.cos(a), ry, sc }; };
   spots = [lay(0, 'castle'), lay(1, 'castle'), lay(0, 'barracks'), lay(1, 'barracks'), lay(0, 'altar'), lay(1, 'altar')];
   const names = [...TOWN_NAMES].sort(() => rng() - .5);
-  const pool = mainList.filter(i => HM[i] <= 5 && cellX(i) > 10 && cellX(i) < MW - 10 && cellZ(i) > 10 && cellZ(i) < MD - 10);
-  for (let k = 0; k < GAME.towns; k++) {
+  let pool = mainList.filter(i => HM[i] <= 7 && cellX(i) > 10 && cellX(i) < MW - 10 && cellZ(i) > 10 && cellZ(i) < MD - 10);
+  if (geoR?.oasis) pool = pool.filter(i => GEOT[i] === 4);   // en el desierto, los pueblos están en los oasis
+  const addTown = (x, z, extra = {}) => { spots.push({ kind: 'town', x, z, name: names[spots.length % names.length], owner: -1, ...extra }); flats.push({ kind: 'town', x, z, r0: 4.8, r1: 8.5, h: plateau(x, z, 4) }); };
+  for (const [x, z] of geoR?.special || []) { const n = nearestNode(x, z); if (Math.hypot(cellX(n) - x, cellZ(n) - z) < 8) addTown(cellX(n), cellZ(n), geoR.goldTop ? { special: true } : {}); }
+  const halves = [pool.filter(i => cellX(i) < MW / 2), pool.filter(i => cellX(i) >= MW / 2)];
+  while (spots.filter(s => s.kind === 'town').length < GAME.towns) {   // mismo número de pueblos en cada mitad
+    const cnt = [0, 1].map(h => spots.filter(s => s.kind === 'town' && (s.x >= MW / 2) === !!h).length), half = cnt[0] <= cnt[1] ? 0 : 1;
     let bi = -1, bs = -1;
-    for (const i of pool) { const x = cellX(i), z = cellZ(i); let m = 1e9; for (const s of spots) m = Math.min(m, (s.x - x) ** 2 + (s.z - z) ** 2); if (m > bs) { bs = m; bi = i; } }
-    const x = cellX(bi), z = cellZ(bi);
-    spots.push({ kind: 'town', x, z, name: names[k], owner: -1 });
-    flats.push({ kind: 'town', x, z, r0: 4.8, r1: 8.5, h: plateau(x, z, 4) });
+    for (const i of halves[half]) { const x = cellX(i), z = cellZ(i); let m = 1e9; for (const s of spots) m = Math.min(m, (s.x - x) ** 2 + (s.z - z) ** 2); if (m > bs) { bs = m; bi = i; } }
+    if (bi < 0) break;
+    addTown(cellX(bi), cellZ(bi));
   }
   // dos pueblos (uno a cada lado del río, cerca del centro) son campamentos con guardianes neutrales
   for (const half of [0, 1]) {
@@ -576,9 +737,15 @@ function generate(newSeed) {
   }
   computeHM(); buildNav();
   for (const s of spots) s.node = nearestNode(s.x, s.z);
+  // equilibrio: distancia por camino de cada fortaleza a sus 3 pueblos más cercanos de su mitad; si difiere más de un 18 %, otra semilla
+  if (geoR && tries < 8) {
+    const near = sd => { const f = bfs([spots[sd].node]), d = spots.filter(s => s.kind === 'town' && !s.camp && (s.x >= MW / 2) === !!sd).map(s => f[s.node]).sort((a, b) => a - b).slice(0, 3); return d.length ? d.reduce((a, b) => a + b, 0) / d.length : 1e9; };
+    const a = near(0), b = near(1), reach = bfs([spots[BASE0].node])[spots[BASE1].node];
+    if (reach >= 1e9 || a >= 1e8 || b >= 1e8 || Math.abs(a - b) / Math.max(a, b) > .18) return generate(newSeed + 15485863, tries + 1);
+  }
   regions = spots.filter(s => s.kind === 'base' || s.kind === 'town');
   regions.forEach((s, r) => { s.region = r; });
-  ocean.material.color.setHex(scen === 'costa' || scen === 'islas' ? 0x1e4a8a : TP.outside);
+  ocean.material.color.setHex(geoR?.sea ? 0x2f6fa8 : TP.outside);
   regionCell = new Int8Array(N);
   for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) regionCell[idx(x, z)] = regionAt(x + .5, z + .5);
   buildRoads();
@@ -627,11 +794,13 @@ function buildVoxels() {
   treeCell = new Uint8Array(N);
   for (let z = 1; z < MD - 1; z++) for (let x = 1; x < MW - 1; x++) {
     const i = idx(x, z), h = HM[i], cx = x + .5, cz = z + .5;
+    if (GEOT[i] === 1) { if ((x + z) % 2 === 0 && !nearFlat(cx, cz, 1)) treeCell[i] = 2; continue; }
+    if (GEOT[i] === 3 || GEOT[i] === 2) continue;   // sin árboles en arena, pantano ni bajío
     if (h < 2 || h > 4 || nearFlat(cx, cz, 3)) continue;
     let ok = true; for (let dz = -2; dz <= 2 && ok; dz++) for (let dx = -2; dx <= 2; dx++) { const j = idx(x + dx, z + dz); if (hAt(x + dx, z + dz) <= 1 || (Math.abs(dx) <= 1 && Math.abs(dz) <= 1 && roadCell[j])) { ok = false; break; } }
     if (!ok) continue;
     const f = n2(cx, cz, .055, 3, 22), side = sideAt(cx, cz), B = civOf(side).map;
-    if (B.feature === 'nile' && Math.abs(cx - RIVX[z]) > 22) continue;   // en Egipto, solo palmerales junto al río
+    if (B.feature === 'nile' && geoRiver && Math.abs(cx - RIVX[z]) > 22) continue;   // en Egipto, solo palmerales junto al río
     if (featureAt(x, z, side, B) >= 0 && B.feature !== 'nile') continue;
     if (f > .62 && hash(x * 3, 1, z * 11) < (.4 + (f - .62) * 2.5) * B.dens) treeCell[i] = 1;
   }
@@ -658,7 +827,8 @@ function buildVoxels() {
     tileV[t] = L.quad(2, x, x + 1, h, h, z, z + 1, col);
     const sc = h <= 1 ? TP.cliffS : TP.cliff, lip = mixHex(col, 0x10203a, .14);   // escalón de 1: color del suelo; más hondo: ladera
     for (const [a, b, f] of H4) { const hn = Math.max(0, hAt(x + a, z + b)); if (hn >= h) continue; L.quad(f, x, x + 1, h - 1, h, z, z + 1, h <= 1 ? sc : lip); if (hn < h - 1) L.quad(f, x, x + 1, hn, h - 1, z, z + 1, sc); }
-    if (treeCell[i]) { const B = biomeAt(cx, cz), r2 = hash(x * 5, 7, z * 3); treeBoxes(L, B.trees[r2 > .55 ? 1 : 0], cx, h, cz, r2); }
+    if (treeCell[i] === 2) { const B = biomeAt(cx, cz), r2 = hash(x * 5, 7, z * 3); L.box(cx, h + .5 + r2 * .15, cz, 1.6, .9 + r2 * .3, 1.6, B.treeCol); L.box(cx + .2, h + 1.1 + r2 * .3, cz - .2, .8, .4, .8, mixHex(B.treeCol, 0x9ad86a, .18)); }
+    else if (treeCell[i]) { const B = biomeAt(cx, cz), r2 = hash(x * 5, 7, z * 3); treeBoxes(L, B.trees[r2 > .55 ? 1 : 0], cx, h, cz, r2); }
     else if (!nearFlat(cx, cz, 1) && !roadCell[i] && h > 1) {   // piezas pequeñas del paisaje
       const side = sideAt(cx, cz), B = civOf(side).map;
       if (B.feature === 'rocks' && featureAt(x, z, side, B) === 0x8a8e88 && hash(x, 9, z) < .18) { L.box(cx, h + .18, cz, .62, .36, .5, 0x8a8a86); L.box(cx + .15, h + .42, cz + .05, .34, .2, .3, 0x9a9a96); }
@@ -1194,7 +1364,9 @@ function place(u) {
 }
 const charging = u => (u.type === 'hero' ? u : u.leader)?.chargeT > 0;
 const roadK = u => roadCell && roadCell[u.node] ? 1.35 : 1;   // los caminos dan velocidad
-const spd = u => (u.leader ? Math.max(u.def.speed, u.leader.def.speed) : u.def.speed) * (charging(u) ? 1.6 : 1) * roadK(u);
+const MOUNTED = u => u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.side < 2 && civOf(u.side).id !== 'mexica');
+const slowK = u => GEOT && GEOT[u.node] === 2 ? (MOUNTED(u) ? .45 : .6) : 1;   // pantano y bajío: más lentos, sobre todo a caballo
+const spd = u => (u.leader ? Math.max(u.def.speed, u.leader.def.speed) : u.def.speed) * (charging(u) ? 1.6 : 1) * roadK(u) * slowK(u);
 function stepToward(u, tx, tz, s, dt) {
   const dx = tx - u.pos.x, dz = tz - u.pos.z, L = Math.hypot(dx, dz); if (L < 1e-4) return false;
   const st = Math.min(s * dt, L), nx = u.pos.x + dx / L * st, nz = u.pos.z + dz / L * st, b = cellOf(nx, nz), a = u.node;
@@ -1401,7 +1573,8 @@ function shoot(from, toPos, lift = 1.1) {
 }
 function strike(u, tgt, dt) {
   if (!alive(tgt)) return false;
-  const d = u.pos.distanceTo(tgt.pos), reach = u.def.range + (tgt.type === 'hero' ? .8 : 0);
+  const high = RANGED(u.type) && HM[u.node] - HM[tgt.node] >= 2;   // ventaja de altura: los tiradores desde dos niveles por encima llegan más lejos y hacen más daño
+  const d = u.pos.distanceTo(tgt.pos), reach = u.def.range + (high ? 2.5 : 0) + (tgt.type === 'hero' ? .8 : 0);
   if (d > reach) {
     if (!stepToward(u, tgt.pos.x, tgt.pos.z, spd(u), dt)) {
       if (!u.chase || (u.chaseT -= dt) <= 0) { u.chase = bfs([tgt.node]); u.chaseT = 1.2; }
@@ -1411,7 +1584,7 @@ function strike(u, tgt, dt) {
     u.fwd.set(tgt.pos.x - u.pos.x, 0, tgt.pos.z - u.pos.z).normalize(); u.combatT = 2;
     if (u.cd <= 0) {
       u.cd = u.def.cd; if (RANGED(u.type)) { shoot(u.pos, tgt.pos); if (u.vis) sfx('arrow'); } else u.lunge = 1;
-      const k = (u.def.vs[tgt.type] || 1) * (u.leader ? GAME.escortBonus : 1) * (charging(u) ? 1.5 : 1) * RANKS[u.rank].mul;
+      const k = (u.def.vs[tgt.type] || 1) * (u.leader ? GAME.escortBonus : 1) * (charging(u) ? 1.5 : 1) * RANKS[u.rank].mul * (high ? 1.25 : 1);
       damage(u, tgt, u.def.dmg * k * (.85 + Math.random() * .3));
     }
   }
@@ -1642,7 +1815,7 @@ function newGame(s) {
     $('loading').hidden = true; $('start').hidden = false; state = 'menu';
   }, 30));
 }
-function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; resetFog(true); selBld = null; selSpot = null; updateCtx(); track('game_start', { seed, diff, map: scen }); }
+function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; toast('MAPA: ' + GEO.LIST[scen]); resetFog(true); selBld = null; selSpot = null; updateCtx(); track('game_start', { seed, diff, map: scen }); }
 function endGame(win) {
   state = 'end'; $('ui').classList.add('hidden-ui'); $('toast').hidden = true; $('pause').hidden = true;
   const s = spots[win ? BASE1 : BASE0];
@@ -1663,7 +1836,7 @@ function toast(msg, kind = '', pos = null) {   // avisos en columna, arriba a la
 }
 
 const TOWN_LV = { cost: [0, 120, 220], inc: [1, 1.8, 2.6] };
-const townInc = s => s.camp ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1];
+const townInc = s => s.camp ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special ? 2 : 1);
 const incomeOf = sd => GAME.income + spots.reduce((a, s) => a + (s.kind === 'town' && s.owner === sd ? townInc(s) : 0), 0);
 const towerRange = s => GAME.towerRange + (s.lvl - 1) * 1.5, towerDmg = s => GAME.towerDmg * (1 + (s.lvl - 1) * .5);
 function upgradeTown(side, s) {
@@ -1825,7 +1998,7 @@ function panelContent() {
     let prog = '';
     if (own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; prog = `<div class="hpb"><b style="width:${pct(s.prog[sd])};background:${TEAM[sd].css}"></b><span>CONQUISTA ${pct(s.prog[sd])}</span></div>`; }
     if (own >= 0 && s.lose > 0) prog = `<div class="hpb"><b style="width:${pct(1 - s.lose)};background:${TEAM[own].css}"></b><span>RESISTE ${pct(1 - s.lose)}</span></div>`;
-    return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="info">${prog}<div class="stats"><span>NIVEL <b>${s.lvl}</b></span><span>ORO <b>+${String(Math.round(townInc(s) * 10) / 10).replace('.', ',')}/S</b></span><span>TORRE <b>${Math.round(towerDmg(s))}</b></span><span>ALCANCE <b>${towerRange(s)}</b></span></div><div class="note">${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : 'DEJA TROPAS EN EL CÍRCULO PARA CONQUISTARLO.'}</div></div>${own === 0 && s.lvl < 3 ? `<div class="act"><button type="button" class="y" data-act="upgrade" ${sideState[0].gold < TOWN_LV.cost[s.lvl] ? 'disabled' : ''} title="Más oro y torre más fuerte">MEJORAR A NIVEL ${s.lvl + 1} · ${TOWN_LV.cost[s.lvl]} ORO</button></div>` : ''}`;
+    return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="info">${prog}<div class="stats"><span>NIVEL <b>${s.lvl}</b></span><span>ORO <b>+${String(Math.round(townInc(s) * 10) / 10).replace('.', ',')}/S</b></span><span>TORRE <b>${Math.round(towerDmg(s))}</b></span><span>ALCANCE <b>${towerRange(s)}</b></span></div><div class="note${s.special ? ' g' : ''}">${s.special ? 'CIMA DE LA MESETA: ORO DOBLE. ' : ''}${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : 'DEJA TROPAS EN EL CÍRCULO PARA CONQUISTARLO.'}</div></div>${own === 0 && s.lvl < 3 ? `<div class="act"><button type="button" class="y" data-act="upgrade" ${sideState[0].gold < TOWN_LV.cost[s.lvl] ? 'disabled' : ''} title="Más oro y torre más fuerte">MEJORAR A NIVEL ${s.lvl + 1} · ${TOWN_LV.cost[s.lvl]} ORO</button></div>` : ''}`;
   }
   const list = [...sel].filter(alive);
   if (!list.length) return '';
@@ -2078,6 +2251,11 @@ for (const sd of [0, 1]) {
     civPick[sd] = el.value; try { localStorage.setItem('imperium-civs', JSON.stringify(civPick)); } catch (e) {}
     sfx('select'); newGame(seed);
   });
+}
+{ const el = $('geo');
+  el.innerHTML = '<option value="random">ALEATORIO</option>' + GEO.keys.map(k => `<option value="${k}">${GEO.LIST[k]}</option>`).join('');
+  el.value = GEO.LIST[wantScen] ? wantScen : 'random';
+  el.addEventListener('change', () => { wantScen = el.value; try { localStorage.setItem('imperium-geo', wantScen); } catch (e) {} sfx('select'); newGame(seed); });
 }
 $('howBtn').addEventListener('click', () => { sfx('select'); $('start').hidden = true; $('how').hidden = false; });
 $('howBack').addEventListener('click', () => { sfx('select'); $('how').hidden = true; $('start').hidden = false; });
