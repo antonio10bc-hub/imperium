@@ -237,7 +237,7 @@ const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post); quad.frustumCu
 
 const SKY = new THREE.Color(0x8ad8f0);
 const scene = new THREE.Scene(); scene.background = SKY; scene.fog = new THREE.Fog(SKY, 100, 300);
-const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 1200);
+const camera = new THREE.PerspectiveCamera(40, 1, 3, 1400);
 const sun = new THREE.DirectionalLight(0xfff6e8, 2.2); sun.position.set(-60, 120, 80);
 scene.add(sun, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25));
 
@@ -261,7 +261,7 @@ function ring(g, r1, r2, color, y = .06, o = 1) {
   const m = new THREE.Mesh(new THREE.RingGeometry(r1, r2, 28), basic(color, o)); m.rotation.x = -Math.PI / 2; m.position.y = y; g.add(m); return m;
 }
 // mar abierto alrededor del mapa
-const ocean = new THREE.Mesh(new THREE.PlaneGeometry(MW * 10, MD * 10), toon(0x1e4a8a)); ocean.rotation.x = -Math.PI / 2; ocean.position.set(MW / 2, -.02, MD / 2); scene.add(ocean);
+const ocean = new THREE.Mesh(new THREE.PlaneGeometry(MW * 10, MD * 10), toon(0x1e4a8a)); ocean.rotation.x = -Math.PI / 2; ocean.position.set(MW / 2, -3, MD / 2); scene.add(ocean);
 const world = new THREE.Group(); scene.add(world);
 
 // ---------- Ruido ----------
@@ -437,8 +437,8 @@ function terrainMat(water) {
     sh.uniforms.uFog = fogU.uFog; sh.uniforms.uTime = fogU.uTime;
     sh.vertexShader = 'varying vec2 vFogP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vFogP = (modelMatrix * vec4(transformed, 1.)).xz;');
     sh.fragmentShader = 'uniform sampler2D uFog; uniform float uTime; varying vec2 vFogP;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', `#include <dithering_fragment>
-      ${water ? 'float w = sin(vFogP.x * .5 + vFogP.y * .3 + uTime * 1.4) * sin(vFogP.y * .62 - vFogP.x * .2 - uTime * 1.05); gl_FragColor.rgb += step(.8, w) * .12 + w * .03;' : ''}
-      float fv = texture2D(uFog, vFogP / vec2(${MW}., ${MD}.)).r; vec3 fc = vec3(.075, .09, .12), dim = gl_FragColor.rgb * .58;
+      float fv = texture2D(uFog, vFogP / vec2(${MW}., ${MD}.)).r;
+      ${water ? 'float w = sin(vFogP.x * .35 + vFogP.y * .22 + uTime * .9) * sin(vFogP.y * .41 - vFogP.x * .15 - uTime * .7); gl_FragColor.rgb += smoothstep(.35, .95, w) * .07 * smoothstep(.6, 1., fv);' : ''} vec3 fc = vec3(.075, .09, .12), dim = gl_FragColor.rgb * .58;
       gl_FragColor.rgb = fv < .47 ? mix(fc, dim, smoothstep(.0, .47, fv)) : mix(dim, gl_FragColor.rgb, (fv - .47) / .53);`);
   };
   return m;
@@ -630,30 +630,44 @@ function buildMinimap() {
   miniDirty = true;
 }
 // ---------- Niebla de guerra ----------
-// rejilla de 2×2 casillas: 255 = a la vista, 120 = explorado, 0 = sin explorar (la textura se suaviza al interpolar)
-const FW = MW / 2, FH = MD / 2, fogData = new Uint8Array(FW * FH).fill(255), explored = new Uint8Array(FW * FH), seen = new Uint8Array(FW * FH);
+// resolución completa (una celda por casilla), borde de visión en degradado y desenfoque: 255 = a la vista, 120 = explorado, 0 = sin explorar
+const FW = MW, FH = MD, fogData = new Uint8Array(FW * FH).fill(255), seen = new Uint8Array(FW * FH), explored = new Uint8Array(FW * FH);
+const visF = new Float32Array(FW * FH), expF = new Float32Array(FW * FH), fogTgt = new Float32Array(FW * FH), fogB = new Float32Array(FW * FH);
 const fogTex = new THREE.DataTexture(fogData, FW, FH, THREE.RedFormat); fogTex.magFilter = fogTex.minFilter = THREE.LinearFilter; fogTex.needsUpdate = true; fogU.uFog.value = fogTex;
-const VISION = { sword: 10, bow: 13, horse: 15, harcher: 15, hero: 14 };
+const VISION = { sword: 10, bow: 13, horse: 15, harcher: 15, hero: 14 }, FOG_SOFT = 5;   // casillas de degradado en el borde de la visión
 let fogOn = false;
 function revealAt(x, z, r) {
-  const cx = x / 2, cz = z / 2, rr = r / 2;
-  for (let j = Math.max(0, Math.floor(cz - rr)); j <= Math.min(FH - 1, Math.ceil(cz + rr)); j++) for (let i = Math.max(0, Math.floor(cx - rr)); i <= Math.min(FW - 1, Math.ceil(cx + rr)); i++)
-    if ((i + .5 - cx) ** 2 + (j + .5 - cz) ** 2 <= rr * rr) seen[j * FW + i] = 1;
+  const R = r + FOG_SOFT * .5;
+  for (let j = Math.max(0, Math.floor(z - R)); j <= Math.min(FH - 1, Math.ceil(z + R)); j++) for (let i = Math.max(0, Math.floor(x - R)); i <= Math.min(FW - 1, Math.ceil(x + R)); i++) {
+    const d = Math.hypot(i + .5 - x, j + .5 - z), v = THREE.MathUtils.clamp((R - d) / FOG_SOFT, 0, 1), k = j * FW + i;
+    if (v > visF[k]) visF[k] = v;
+  }
+}
+function blurFog(src, dst, tmp) {   // desenfoque de caja separable, radio 2, dos pasadas
+  const r = 2, n = 2 * r + 1;
+  for (let pass = 0; pass < 2; pass++) {
+    const a = pass ? dst : src;
+    for (let z = 0; z < FH; z++) { let acc = 0; const o = z * FW; for (let x = -r; x <= r; x++) acc += a[o + THREE.MathUtils.clamp(x, 0, FW - 1)]; for (let x = 0; x < FW; x++) { tmp[o + x] = acc / n; acc += a[o + Math.min(FW - 1, x + r + 1)] - a[o + Math.max(0, x - r)]; } }
+    for (let x = 0; x < FW; x++) { let acc = 0; for (let z = -r; z <= r; z++) acc += tmp[THREE.MathUtils.clamp(z, 0, FH - 1) * FW + x]; for (let z = 0; z < FH; z++) { dst[z * FW + x] = acc / n; acc += tmp[Math.min(FH - 1, z + r + 1) * FW + x] - tmp[Math.max(0, z - r) * FW + x]; } }
+  }
 }
 function updateFog(snapTo) {
   if (!fogOn) return;
-  seen.fill(0);
+  visF.fill(0);
   for (const u of units) if (u.side === 0) revealAt(u.pos.x, u.pos.z, VISION[u.type]);
   for (const s of spots) if (s.kind === 'base' && s.side === 0) revealAt(s.x, s.z, 28); else if (s.kind === 'town' && s.owner === 0) revealAt(s.x, s.z, 14);
-  for (let k = 0; k < fogData.length; k++) { if (seen[k]) explored[k] = 1; const t = seen[k] ? 255 : explored[k] ? 120 : 0; fogData[k] = snapTo ? t : fogData[k] + Math.round((t - fogData[k]) * .5); }
+  for (let k = 0; k < visF.length; k++) { const v = visF[k]; if (v > expF[k]) expF[k] = v; seen[k] = v > .5 ? 1 : 0; if (expF[k] > .5) explored[k] = 1; fogTgt[k] = Math.max(v * 255, expF[k] * 120); }
+  blurFog(fogTgt, fogB, visF);   // visF se reutiliza como búfer temporal
+  for (let k = 0; k < fogData.length; k++) { const t = fogB[k]; fogData[k] = snapTo ? t : fogData[k] + (t - fogData[k]) * .5; }
   fogTex.needsUpdate = true; miniDirty = true;
   // lo que nunca has visto queda oculto: edificios, pueblos y murallas
   for (const sp of spots) if (sp.group) sp.group.visible = exploredAt(sp.x, sp.z);
   for (const d of decos) d.visible = exploredAt(d.position.x, d.position.z);
 }
-const exploredAt = (x, z) => !fogOn || explored[THREE.MathUtils.clamp(Math.floor(z) >> 1, 0, FH - 1) * FW + THREE.MathUtils.clamp(Math.floor(x) >> 1, 0, FW - 1)] === 1;
-const visibleAt = (x, z) => !fogOn || seen[THREE.MathUtils.clamp(z >> 1, 0, FH - 1) * FW + THREE.MathUtils.clamp(x >> 1, 0, FW - 1)] === 1;
-function resetFog(on) { fogOn = on; explored.fill(0); fogData.fill(255); if (on) updateFog(true); else { fogTex.needsUpdate = true; for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; } }
+const fogIdx = (x, z) => THREE.MathUtils.clamp(Math.floor(z), 0, FH - 1) * FW + THREE.MathUtils.clamp(Math.floor(x), 0, FW - 1);
+const exploredAt = (x, z) => !fogOn || explored[fogIdx(x, z)] === 1;
+const visibleAt = (x, z) => !fogOn || seen[fogIdx(x, z)] === 1;
+function resetFog(on) { fogOn = on; explored.fill(0); expF.fill(0); fogData.fill(255); if (on) updateFog(true); else { fogTex.needsUpdate = true; for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; } }
 
 function paintMinimap() {
   const d = miniImg.data;
@@ -664,7 +678,7 @@ function paintMinimap() {
       const edge = (x + 1 < MW && HM[i + 1] > 0 && regionCell[i + 1] !== r) || (z + 1 < MD && HM[i + MW] > 0 && regionCell[i + MW] !== r);
       c = edge ? (own < 0 ? 0xe8e8d8 : TEAM[own].c) : own >= 0 ? mixHex(c, TEAM[own].c, .28) : c;
     }
-    const fv = fogData[(z >> 1) * FW + (x >> 1)] / 255;
+    const fv = fogData[i] / 255;
     if (fv < .47) { const k = fv / .47; d[o] = 19 + ((c >> 16 & 255) * .58 - 19) * k; d[o+1] = 23 + ((c >> 8 & 255) * .58 - 23) * k; d[o+2] = 31 + ((c & 255) * .58 - 31) * k; }
     else { const k = .58 + .42 * (fv - .47) / .53; d[o] = (c >> 16 & 255) * k; d[o+1] = (c >> 8 & 255) * k; d[o+2] = (c & 255) * k; }
     d[o+3] = 255;
