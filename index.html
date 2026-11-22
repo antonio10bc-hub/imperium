@@ -5,7 +5,7 @@
 <style>
 /* Layout (PC): mapa a pantalla completa; oro arriba-izq, territorio arriba-centro, avisos arriba-der, héroes a la izquierda; barra inferior con minimapa, panel de selección y herramientas */
 :root{--ink:#0f0f1b;--paper:#e8f0d0;--paper2:#d4e0b8;--yellow:#e8c870;--cyan:#8ad8f0;--pink:#d83a4a;--blue:#3a6ad8;--red:#d83a4a;--gold:#e8c870;--mute:#5e5a54;
- --bar:#1c1e2b;--bar2:#262a3b;--bar3:#323850;--txt:#e8ecdc;--dim:#8f94a8;--barH:172px;
+ --bar:#1c1e2b;--bar2:#262a3b;--bar3:#323850;--txt:#e8ecdc;--dim:#8f94a8;--barH:86px;
  --font:'Silkscreen',ui-monospace,Menlo,monospace;color-scheme:dark}
 html,body{height:100%;background:#7fb85c;overflow:hidden;-webkit-user-select:none;user-select:none}
 #c{position:fixed;left:0;top:0;image-rendering:pixelated;display:block;cursor:default;touch-action:none}
@@ -68,55 +68,52 @@ kbd{font:400 12px/1 var(--font);border:2px solid currentColor;padding:2px 3px;ma
 #heroes .hc kbd{position:absolute;left:3px;top:3px;margin:0;border:0;padding:1px 3px;background:var(--ink);color:var(--paper);opacity:1;font-size:12px}
 #heroes .hc.off img{filter:grayscale(1) brightness(.6)}
 #heroes .hc .st{position:absolute;left:0;right:0;top:26px;text-align:center;color:var(--paper);font-size:12px;text-shadow:0 2px 0 var(--ink)}
-/* barra inferior */
-#bar{left:0;right:0;bottom:0;height:var(--barH);box-sizing:border-box;display:flex;gap:12px;padding:10px max(12px,env(safe-area-inset-right,0px)) 10px max(12px,env(safe-area-inset-left,0px));background:rgba(28,30,43,.99);border-top:3px solid var(--ink);box-shadow:inset 0 3px 0 var(--bar3);color:var(--txt);font-size:12px}
-#miniWrap{flex:none;border:3px solid var(--ink);line-height:0;align-self:center;background:#3d6e8f}
-#mini{display:block;width:216px;height:144px;image-rendering:pixelated;cursor:pointer}
-#panel{flex:1;min-width:0;background:var(--bar2);border:3px solid var(--ink);padding:10px 12px;overflow:hidden;display:flex;flex-direction:column;gap:8px}
+/* barra inferior: compacta, una sola fila */
+#bar{left:0;right:0;bottom:0;height:var(--barH);box-sizing:border-box;display:flex;gap:8px;align-items:center;padding:4px max(8px,env(safe-area-inset-right,0px)) 4px max(8px,env(safe-area-inset-left,0px));background:rgba(28,30,43,.99);border-top:3px solid var(--ink);box-shadow:inset 0 2px 0 var(--bar3);color:var(--txt);font-size:12px}
+#miniWrap{flex:none;border:3px solid var(--ink);line-height:0;background:#3d6e8f}
+#mini{display:block;width:102px;height:68px;image-rendering:pixelated;cursor:pointer}
+#panel{flex:1;min-width:0;height:100%;box-sizing:border-box;background:var(--bar2);border:2px solid var(--ink);padding:3px 8px;overflow:hidden;display:flex;align-items:center;gap:10px}
 #panel:empty{background:transparent;border-color:transparent}
-#panel .ph{display:flex;align-items:baseline;gap:14px;line-height:1}
-#panel .ph h3{margin:0;font:400 16px/1 var(--font);color:var(--txt)}
+#panel .ph{flex:none;display:flex;flex-direction:column;gap:5px;min-width:96px;max-width:170px;line-height:1}
+#panel .ph h3{margin:0;font:400 14px/1 var(--font);color:var(--txt);white-space:nowrap;display:flex;gap:6px;align-items:center}
 #panel .ph em{font-style:normal;color:var(--dim)}
-#panel .ph .sp{flex:1}
-#panel .row{display:flex;gap:10px;align-items:stretch;min-height:0}
-#panel button{color:var(--txt);background:var(--bar3);border:2px solid var(--ink);box-shadow:0 3px 0 var(--ink)}
-#panel button.y{background:var(--yellow);color:var(--ink)}
-.rc{position:relative;width:118px;display:grid;grid-template-columns:44px 1fr;column-gap:6px;align-items:center;text-align:left;padding:5px 6px}
-.rc img{grid-row:1/4;width:44px;height:44px;image-rendering:pixelated}
-.rc b{font-weight:400}
-.rc s{text-decoration:none;color:var(--yellow)}
-.rc em{font-style:normal;color:var(--dim);font-size:12px;grid-column:1/3;margin-top:4px}
-.rc kbd{position:absolute;left:3px;top:3px;margin:0;border:0;padding:1px 3px;background:var(--ink);color:var(--txt);opacity:.85}
-.qu{display:flex;gap:4px;align-items:center;flex-wrap:wrap;padding-left:6px;border-left:2px solid var(--bar3)}
-.qu .q{position:relative;width:40px;height:44px;padding:2px}
-.qu .q img{width:34px;height:34px;image-rendering:pixelated;display:block}
-.qu .q i{position:absolute;left:3px;right:3px;bottom:3px;height:4px;background:#11131c}
+#panel .act{flex:none;margin-left:auto}
+#panel button{color:var(--txt);background:var(--bar3);border:2px solid var(--ink);box-shadow:0 2px 0 var(--ink)}
+#panel button:active{transform:translateY(2px);box-shadow:none}
+#panel button.y{background:var(--yellow);color:var(--ink);padding:7px 8px 6px}
+.rc{position:relative;flex:none;width:100px;height:58px;display:grid;grid-template-columns:36px 1fr;column-gap:5px;align-items:center;text-align:left;padding:3px 5px}
+.rc img{grid-row:1/3;width:36px;height:36px;image-rendering:pixelated}
+.rc b{font-weight:400;align-self:end}
+.rc s{text-decoration:none;color:var(--yellow);align-self:start}
+.rc kbd{position:absolute;left:2px;top:2px;margin:0;border:0;padding:1px 3px;background:var(--ink);color:var(--txt);opacity:.85}
+.qu{display:flex;gap:3px;align-items:center;flex-wrap:wrap;padding-left:8px;border-left:2px solid var(--bar3);min-height:40px}
+.qu .q{position:relative;width:32px;height:38px;padding:1px}
+.qu .q img{width:28px;height:28px;image-rendering:pixelated;display:block}
+.qu .q i{position:absolute;left:2px;right:2px;bottom:2px;height:3px;background:#11131c}
 .qu .q i b{display:block;height:100%;background:var(--yellow)}
 .qu .none{color:var(--dim)}
-.ud{display:flex;gap:12px;align-items:flex-start}
-.ud .big{width:84px;height:84px;image-rendering:pixelated;background:var(--bar3);border:2px solid var(--ink)}
-.ud .info{display:flex;flex-direction:column;gap:7px;min-width:220px}
-.ud h3{margin:0;font:400 16px/1 var(--font);display:flex;gap:8px;align-items:center}
-.ud .rkn{font-size:12px;padding:2px 5px;color:var(--ink)}
-.hpb{position:relative;height:14px;width:240px;background:#11131c;border:2px solid var(--ink)}
+.big{flex:none;width:56px;height:56px;image-rendering:pixelated;background:var(--bar3);border:2px solid var(--ink)}
+.info{display:flex;flex-direction:column;gap:6px;min-width:200px;flex:none}
+.rkn{font-size:12px;padding:2px 4px;color:var(--ink)}
+.hpb{position:relative;height:12px;width:200px;background:#11131c;border:2px solid var(--ink)}
 .hpb b{display:block;height:100%}
-.hpb span{position:absolute;inset:0;text-align:center;line-height:14px;font-size:12px;color:#fff;text-shadow:0 1px 0 #000}
-.stats{display:flex;gap:14px;flex-wrap:wrap;color:var(--dim)}
+.hpb span{position:absolute;inset:0;text-align:center;line-height:12px;font-size:12px;color:#fff;text-shadow:0 1px 0 #000}
+.stats{display:flex;gap:12px;flex-wrap:nowrap;white-space:nowrap;color:var(--dim)}
 .stats span b{font-weight:400;color:var(--txt)}
-.note{color:var(--dim)}
+.note{color:var(--dim);white-space:nowrap}
 .note.g{color:var(--yellow)}
-.grid{display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;overflow:hidden}
-.grid .cell{position:relative;width:40px;height:46px;padding:2px}
-.grid .cell img{width:34px;height:34px;image-rendering:pixelated;display:block}
-.grid .cell i{position:absolute;left:3px;right:3px;bottom:3px;height:4px;background:#11131c}
+.grid{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:3px;align-content:center;max-height:100%;overflow:hidden}
+.grid .cell{position:relative;width:26px;height:31px;padding:1px}
+.grid .cell img{width:22px;height:22px;image-rendering:pixelated;display:block}
+.grid .cell i{position:absolute;left:2px;right:2px;bottom:2px;height:3px;background:#11131c}
 .grid .cell i b{display:block;height:100%}
-.grid .cell u{position:absolute;right:2px;top:2px;width:7px;height:7px;border:1px solid var(--ink)}
+.grid .cell u{position:absolute;right:1px;top:1px;width:6px;height:6px;border:1px solid var(--ink)}
 .grid .cell.esc{border-color:var(--yellow)}
-#tools{flex:none;display:grid;grid-template-columns:repeat(2,auto);gap:6px;align-content:center}
-#tools .tl{display:flex;align-items:center;justify-content:center;gap:5px;height:32px;padding:0 8px;background:var(--bar3);color:var(--txt);border:2px solid var(--ink);box-shadow:0 3px 0 var(--ink);font-size:12px}
+#tools{flex:none;display:grid;grid-template-columns:repeat(4,auto);gap:4px;align-content:center}
+#tools .tl{display:flex;align-items:center;justify-content:center;gap:4px;height:30px;padding:0 7px;background:var(--bar3);color:var(--txt);border:2px solid var(--ink);box-shadow:0 2px 0 var(--ink);font-size:12px}
 #tools .tl kbd{margin:0;border:0;padding:0;font-size:12px;color:var(--dim);opacity:1}
 #tools .tl.on{background:var(--pink)}
-@media (max-width:900px){:root{--barH:128px} #mini{width:150px;height:100px} #tug .cas{display:none} .rc{width:96px;grid-template-columns:32px 1fr} .rc img{width:32px;height:32px} .rc em{display:none} .ud .big{width:56px;height:56px} .hpb{width:150px} #tools .tl:nth-child(n+5){display:none}}
+@media (max-width:900px){:root{--barH:64px} #mini{width:72px;height:48px} #tug .cas{display:none} .rc{width:auto;height:46px;grid-template-columns:26px auto} .rc img{width:26px;height:26px} .big{width:40px;height:40px} .hpb{width:120px} .info{min-width:120px} .stats,.note{display:none} #panel .ph{min-width:70px} #tools{grid-template-columns:repeat(2,auto)} #tools .tl{height:24px;padding:0 5px} #tools .tl:nth-child(n+5){display:none}}
 </style>
 
 <canvas id="c"></canvas>
@@ -147,10 +144,10 @@ kbd{font:400 12px/1 var(--font);border:2px solid currentColor;padding:2px 3px;ma
   <h2>IMPERIUM</h2>
   <p>Tu fortaleza es <span class="b">AZUL</span>. La del rival <span class="r">ROJA</span> está al otro lado del río. Cada fortaleza y cada pueblo es una región.</p>
   <ul>
-    <li>Haz clic en el <b>CUARTEL</b> para reclutar desde la barra inferior. Cada tropa tarda unos segundos y va a la cola.</li>
+    <li>Haz clic en el <b>CUARTEL</b> (el edificio de madera de tu fortaleza) para reclutar desde la barra inferior. Cada tropa tarda unos segundos y va a la cola.</li>
     <li>Los <span class="g">pueblos</span> dan oro y tienen una torre que dispara. Se pueden reconquistar. El río solo se cruza por los vados de arena.</li>
     <li>Tus tropas se curan dentro de tus regiones y suben de rango al matar: <span class="rk" style="background:#c07a40"></span> BRONCE, <span class="rk" style="background:#b4afa2"></span> PLATA y <span class="rk" style="background:#e8c870"></span> ORO.</li>
-    <li>Invoca un <b>HÉROE</b> en el altar: aparece a la izquierda con sus tropas asignadas. Asígnale hasta 12: forman un bloque delante de él, con espadas al frente, arcos detrás y jinetes en los flancos.</li>
+    <li>Invoca un <b>HÉROE</b> en el altar: aparece a la izquierda con sus tropas asignadas. Asígnale hasta 50: forman un bloque delante de él, con espadas al frente, arcos detrás y jinetes en los flancos.</li>
   </ul>
   <div class="ctl"><b>IZQ</b> seleccionar · arrastrar caja · doble clic: mismo tipo<br><b>DER</b> ordenar · sobre tu héroe: asignar tropas · <b>DER+ARRASTRAR</b>, <b>WASD</b> o borde de pantalla: mover cámara · <b>RUEDA</b> zoom<br><b>1 2 3</b> reclutar · <b>B</b> cuartel · <b>G</b> héroe · <b>H</b> base · <b>F1–F5</b> grupos · <b>ESPACIO</b> alerta · <b>P</b> pausa · <b>V</b> velocidad · <b>ESC</b> deseleccionar</div>
   <div class="diff"><span>DIFICULTAD</span><button type="button" data-d="easy">FÁCIL</button><button type="button" data-d="normal">NORMAL</button><button type="button" data-d="hard">DIFÍCIL</button></div>
@@ -181,7 +178,7 @@ const TP = { lush: 0x6ea653, grass: 0x7db45b, grass2: 0x8bbd61, dry: 0x9fc56c, s
   path: 0xcbb48a, plaza: 0xd6cfba, wallbase: 0xb3a990, edge: 0x8ccbe0, shallow: 0x5fb0d4, deep: 0x4594c6,
   canopy: 0x3f7a45, canopy2: 0x4b874c, pine: 0x31683f, trunk: 0x6b4a2e, outside: 0x2c4430 };
 
-const MW = 192, MD = 128, HMAX = 9, LANDF = .7, INK = 0x0f0f1b, HULL = 0.12, NEUTRAL = 0xf4f4e8;
+const MW = 384, MD = 256, HMAX = 9, LANDF = .7, INK = 0x0f0f1b, HULL = 0.12, NEUTRAL = 0xf4f4e8;
 const TEAM = [{ c: 0x3a6ad8, d: 0x1e4a8a, l: 0x8ad8f0, css: '#3a6ad8', rgb: [58, 106, 216] }, { c: 0xd83a4a, d: 0x5a3a24, l: 0xe8c870, css: '#d83a4a', rgb: [216, 58, 74] }];
 const UNITS = {
   sword: { name: 'ESPADA', cost: 40, time: 4, hp: 120, dmg: 14, range: 1.5, cd: .8, speed: 3.2, aggro: 7, vs: { horse: 1.6 } },
@@ -192,11 +189,11 @@ const UNITS = {
 const RANKS = [{ name: '', kills: 0, mul: 1 }, { name: 'BRONCE', kills: 2, mul: 1.12, hex: 0xc07a40, css: '#c07a40' },
   { name: 'PLATA', kills: 5, mul: 1.25, hex: 0xb4afa2, css: '#b4afa2' }, { name: 'ORO', kills: 10, mul: 1.4, hex: 0xe8c870, css: '#e8c870' }];
 const TYPES = ['sword', 'bow', 'horse'];
-const GAME = { startGold: 150, income: 3, townIncome: 1.5, baseHp: 1500, cap: 30, towns: 10, capture: 4, queueMax: 6, bounty: 6,
-  heroRespawn: 30, escortMax: 12, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4 };
+const GAME = { startGold: 150, income: 3, townIncome: 1.5, baseHp: 1500, cap: 80, towns: 16, capture: 4, queueMax: 8, bounty: 6,
+  heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4 };
 const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, label: 'FÁCIL' }, normal: { inc: 1, attackAt: 5, hero: true, label: 'NORMAL' }, hard: { inc: 1.3, attackAt: 4, hero: true, label: 'DIFÍCIL' } };
 const BASE0 = 0, BASE1 = 1, BARR0 = 2, BARR1 = 3, ALT0 = 4, ALT1 = 5, TOWN0 = 6;
-const TOWN_NAMES = ['VILLAROCA', 'PINARES', 'ALBAMAR', 'ROBLEDO', 'FUENTEVIEJA', 'MONTEALTO', 'LAGUNILLA', 'PEÑASCO', 'VALDEORO', 'SALINAS', 'TORRENUEVA', 'ARENALES'];
+const TOWN_NAMES = ['VILLAROCA', 'PINARES', 'ALBAMAR', 'ROBLEDO', 'FUENTEVIEJA', 'MONTEALTO', 'LAGUNILLA', 'PEÑASCO', 'VALDEORO', 'SALINAS', 'TORRENUEVA', 'ARENALES', 'CASTROVERDE', 'OLMEDA', 'MIRAFLORES', 'ROCAFRÍA', 'VADOHONDO', 'LOS LLANOS'];
 
 // ---------- Render retro (estilo Tank-less) ----------
 const canvas = document.getElementById('c');
@@ -281,7 +278,7 @@ function baseGround(rng) {
       inT.push(best[1]); bridges.push(best);
     }
   }
-  const fords = [MD * .2, MD * .5, MD * .8].map(z => z + (rng() - .5) * 10);
+  const fords = [.1, .27, .43, .58, .74, .9].map(k => MD * k + (rng() - .5) * 10);
   for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) {
     const cx = x + .5, cz = z + .5; let g;
     if (scen === 'costa') {   // mar a un lado, playa y llanura con bosques
@@ -300,7 +297,7 @@ function baseGround(rng) {
       g = v > 0 ? 1 + Math.min(1, v * 3) * (1 + n2(cx, cz, .05, 3, 10) * 3) : -1 - Math.min(5, -v * 9);
       for (const [i, j] of bridges) if (segDist(cx, cz, isl[i].x, isl[i].z, isl[j].x, isl[j].z) < 2.2 + n2(cx, cz, .1, 2, 11)) g = Math.max(g, 1);
     } else {   // río con vados entre dos llanuras
-      const xr = MW / 2 + Math.sin(cz * .045 + ph) * 12 + (n2(0, cz, .03, 3, 12) - .5) * 14, dr = Math.abs(cx - xr);
+      const xr = MW / 2 + Math.sin(cz * .03 + ph) * 22 + (n2(0, cz, .02, 3, 12) - .5) * 26, dr = Math.abs(cx - xr);
       g = plains(cx, cz);
       if (dr < 4) g = fords.some(f => Math.abs(cz - f) < 3) ? 1 : -1.2 - (4 - dr) * .6;
       else if (dr < 5.5) g = Math.min(g, 1.2);
@@ -447,7 +444,7 @@ function generate(newSeed) {
     }
     return best;
   };
-  const A = pick(.12, .24), B = pick(.76, .88);
+  const A = pick(.1, .2), B = pick(.8, .9);
   if (A < 0 || B < 0) return generate(newSeed + 104729);
   const mkFort = (i, side) => {
     const x = cellX(i), z = cellZ(i), tb = Math.atan2(MD / 2 - z, MW / 2 - x);
@@ -519,7 +516,7 @@ function buildVoxels() {
 }
 
 // ---------- Minimapa ----------
-const mini = document.getElementById('mini'), mctx = mini.getContext('2d'), MS = 1.5;
+const mini = document.getElementById('mini'), mctx = mini.getContext('2d'), MS = 1;
 mini.width = MW * MS; mini.height = MD * MS;
 const mbuf = document.createElement('canvas'); mbuf.width = MW; mbuf.height = MD; const bctx = mbuf.getContext('2d');
 let miniRaw = null, miniImg = null, miniDirty = true;
@@ -549,16 +546,16 @@ function drawMinimap() {
   if (!miniImg) return;
   if (miniDirty) { paintMinimap(); bctx.putImageData(miniImg, 0, 0); }
   mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.imageSmoothingEnabled = false; mctx.drawImage(mbuf, 0, 0, MW * MS, MD * MS); mctx.setTransform(MS, 0, 0, MS, 0, 0);
-  mctx.lineWidth = 1; mctx.strokeStyle = '#0f0f1b';
+  mctx.lineWidth = 2; mctx.strokeStyle = '#0f0f1b';
   for (const s of spots) {
-    if (s.kind === 'town') { mctx.fillStyle = s.owner < 0 ? '#f4f4e8' : TEAM[s.owner].css; mctx.beginPath(); mctx.moveTo(s.x, s.z - 3.5); mctx.lineTo(s.x + 3.5, s.z); mctx.lineTo(s.x, s.z + 3.5); mctx.lineTo(s.x - 3.5, s.z); mctx.closePath(); mctx.fill(); mctx.stroke(); }
-    else if (s.kind === 'base') { mctx.fillStyle = TEAM[s.side].css; mctx.fillRect(s.x - 4, s.z - 4, 8, 8); mctx.strokeRect(s.x - 4, s.z - 4, 8, 8); }
+    if (s.kind === 'town') { const r = 7; mctx.fillStyle = s.owner < 0 ? '#f4f4e8' : TEAM[s.owner].css; mctx.beginPath(); mctx.moveTo(s.x, s.z - r); mctx.lineTo(s.x + r, s.z); mctx.lineTo(s.x, s.z + r); mctx.lineTo(s.x - r, s.z); mctx.closePath(); mctx.fill(); mctx.stroke(); }
+    else if (s.kind === 'base') { mctx.fillStyle = TEAM[s.side].css; mctx.fillRect(s.x - 8, s.z - 8, 16, 16); mctx.strokeRect(s.x - 8, s.z - 8, 16, 16); }
   }
-  for (const u of units) { const k = u.type === 'hero' ? 2 : 1; mctx.fillStyle = sel.has(u) ? '#e8c870' : u.type === 'hero' ? '#fff' : TEAM[u.side].css; mctx.fillRect(u.pos.x - k, u.pos.z - k, k * 2, k * 2); }
-  if (alarm.t > 0 && alarm.pos) { mctx.strokeStyle = (alarm.t * 4 | 0) % 2 ? '#d83a4a' : '#fff'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.arc(alarm.pos.x, alarm.pos.z, 4 + (1 - alarm.t % 1) * 6, 0, 7); mctx.stroke(); }
+  for (const u of units) { const k = u.type === 'hero' ? 4 : 2; mctx.fillStyle = sel.has(u) ? '#e8c870' : u.type === 'hero' ? '#fff' : TEAM[u.side].css; mctx.fillRect(u.pos.x - k, u.pos.z - k, k * 2, k * 2); }
+  if (alarm.t > 0 && alarm.pos) { mctx.strokeStyle = (alarm.t * 4 | 0) % 2 ? '#d83a4a' : '#fff'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.arc(alarm.pos.x, alarm.pos.z, 8 + (1 - alarm.t % 1) * 12, 0, 7); mctx.stroke(); }
   // zona visible: esquinas de la pantalla proyectadas sobre el suelo
   const pts = [[0, 0], [VW, 0], [VW, VH], [0, VH]].map(([a, b]) => groundAt(a, b, true));
-  if (pts.every(Boolean)) { mctx.strokeStyle = '#fff'; mctx.lineWidth = 1; mctx.beginPath(); pts.forEach((p, k) => k ? mctx.lineTo(p.x, p.z) : mctx.moveTo(p.x, p.z)); mctx.closePath(); mctx.stroke(); }
+  if (pts.every(Boolean)) { mctx.strokeStyle = '#fff'; mctx.lineWidth = 2; mctx.beginPath(); pts.forEach((p, k) => k ? mctx.lineTo(p.x, p.z) : mctx.moveTo(p.x, p.z)); mctx.closePath(); mctx.stroke(); }
 }
 
 // ---------- Edificios ----------
@@ -893,7 +890,7 @@ function formation(h) {
   const key = h.escort.map(u => u.id).join(',');
   if (h.formKey === key) return h.form;
   const by = t => h.escort.filter(u => u.type === t), sw = by('sword'), bw = by('bow'), hr = by('horse'), slots = new Map();
-  const cols = Math.max(2, Math.min(5, Math.max(sw.length, bw.length)));
+  const cols = THREE.MathUtils.clamp(Math.ceil(Math.sqrt((sw.length + bw.length) * 2)), 2, 10);
   const rowsOf = l => { const r = []; for (let i = 0; i < l.length; i += cols) r.push(l.slice(i, i + cols)); return r; };
   const z0 = 2; let z = z0;
   const put = row => { row.forEach((u, k) => slots.set(u, [(k - (row.length - 1) / 2) * FS, z])); z += FS; };
@@ -1170,55 +1167,55 @@ function panelContent() {
   if (selBld === 'barracks') {
     const full = popOf(0) >= GAME.cap || st.queue.length >= GAME.queueMax;
     const cards = TYPES.map((t, i) => { const d = UNITS[t];
-      return `<button type="button" class="rc" data-act="rec" data-t="${t}" ${full || st.gold < d.cost ? 'disabled' : ''} title="${d.name} · ${d.time} s"><kbd>${i + 1}</kbd><img alt="" src="${THUMB[t] || ''}"><b>${d.name}</b><s>${d.cost}</s><em>${VS[t]}</em></button>`; }).join('');
+      return `<button type="button" class="rc" data-act="rec" data-t="${t}" ${full || st.gold < d.cost ? 'disabled' : ''} title="${d.name} · ${d.time} s · ${VS[t]}"><kbd>${i + 1}</kbd><img alt="" src="${THUMB[t] || ''}"><b>${d.name}</b><s>${d.cost}</s></button>`; }).join('');
     const q = st.queue.map((it, i) => `<button type="button" class="q" data-act="cancel" data-i="${i}" title="Cancelar (devuelve el oro)"><img alt="${UNITS[it.type].name}" src="${THUMB[it.type] || ''}">${i === 0 ? `<i><b style="width:${pct(1 - it.t / UNITS[it.type].time)}"></b></i>` : ''}</button>`).join('');
-    return `<div class="ph"><h3>CUARTEL</h3><em>COLA ${st.queue.length}/${GAME.queueMax} · TROPAS ${popOf(0)}/${GAME.cap}</em><span class="sp"></span><em>DER EN EL MAPA: PUNTO DE REUNIÓN</em></div>
-      <div class="row">${cards}<div class="qu">${q || '<span class="none">COLA VACÍA</span>'}</div></div>`;
+    return `<div class="ph" title="Clic derecho en el mapa: punto de reunión"><h3>CUARTEL</h3><em>COLA ${st.queue.length}/${GAME.queueMax}</em><em>TROPAS ${popOf(0)}/${GAME.cap}</em></div>${cards}<div class="qu">${q || '<span class="none">COLA VACÍA</span>'}</div>`;
   }
   if (selBld === 'altar') {
     const h = st.hero, u = heroOf(0); let btn, note;
-    if (u) { btn = `<button type="button" class="y" data-act="hero">SELECCIONAR HÉROE</button>`; note = `ESCOLTA ${u.escort.length}/${GAME.escortMax} · VIDA ${Math.ceil(u.hp)}/${u.maxHp}`; }
+    if (u) { btn = `<button type="button" class="y" data-act="hero">SELECCIONAR HÉROE</button>`; note = `ESCOLTA ${u.escort.length}/${GAME.escortMax}`; }
     else if (h.state === 'training') { btn = `<button type="button" disabled>EN CAMINO · ${Math.ceil(h.t)} S</button>`; note = 'LLEGA AL ALTAR'; }
     else if (h.state === 'dead') { btn = `<button type="button" disabled>HA CAÍDO · ${Math.ceil(h.t)} S</button>`; note = 'VUELVE PRONTO'; }
     else { btn = `<button type="button" class="y" data-act="summon" ${st.gold < UNITS.hero.cost ? 'disabled' : ''}>INVOCAR · ${UNITS.hero.cost} ORO</button>`; note = 'TARDA ' + UNITS.hero.time + ' S'; }
-    return `<div class="ph"><h3>ALTAR DEL HÉROE</h3><em>${note}</em></div>
-      <div class="ud"><img class="big" alt="" src="${THUMB.hero || ''}"><div class="info"><div class="note">EL HÉROE ES MÁS FUERTE Y CARGA CONTRA EL ENEMIGO.<br>ASÍGNALE HASTA ${GAME.escortMax} TROPAS: FORMAN UN BLOQUE DELANTE DE ÉL.</div><div>${btn}</div></div></div>`;
+    return `<div class="ph"><h3>ALTAR</h3><em>${note}</em></div><img class="big" alt="" src="${THUMB.hero || ''}"><div class="info"><div class="note">MÁS FUERTE, CARGA CONTRA EL ENEMIGO.</div><div class="note">HASTA ${GAME.escortMax} TROPAS EN FORMACIÓN.</div></div><div class="act">${btn}</div>`;
   }
   if (selSpot) {
     const s = selSpot;
     if (s.kind === 'base') { const k = s.hp / GAME.baseHp;
-      return `<div class="ph"><h3>${s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA RIVAL'}</h3></div><div class="ud"><div class="info"><div class="hpb"><b style="width:${pct(k)};background:${TEAM[s.side].css}"></b><span>${Math.max(0, Math.ceil(s.hp))}/${GAME.baseHp}</span></div><div class="note">${s.side === 1 ? 'SELECCIONA TROPAS Y CLIC DERECHO SOBRE ELLA PARA ASALTARLA.' : 'SI CAE, PIERDES LA PARTIDA.'}</div></div></div>`; }
+      return `<div class="ph"><h3>${s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA RIVAL'}</h3></div><div class="info"><div class="hpb"><b style="width:${pct(k)};background:${TEAM[s.side].css}"></b><span>${Math.max(0, Math.ceil(s.hp))}/${GAME.baseHp}</span></div><div class="note">${s.side === 1 ? 'CLIC DERECHO CON TROPAS: ASALTAR.' : 'SI CAE, PIERDES LA PARTIDA.'}</div></div>`; }
     const own = s.owner, who = own < 0 ? 'NEUTRAL' : own === 0 ? 'TUYO' : 'DEL RIVAL';
     let prog = '';
     if (own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; prog = `<div class="hpb"><b style="width:${pct(s.prog[sd])};background:${TEAM[sd].css}"></b><span>CONQUISTA ${pct(s.prog[sd])}</span></div>`; }
     if (own >= 0 && s.lose > 0) prog = `<div class="hpb"><b style="width:${pct(1 - s.lose)};background:${TEAM[own].css}"></b><span>RESISTE ${pct(1 - s.lose)}</span></div>`;
-    return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="ud"><div class="info">${prog}<div class="stats"><span>ORO <b>+${String(GAME.townIncome).replace('.', ',')}/S</b></span><span>TORRE <b>${GAME.towerDmg} DAÑO</b></span><span>ALCANCE <b>${GAME.towerRange}</b></span></div><div class="note">${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : 'DEJA TROPAS DENTRO DEL CÍRCULO, SIN ENEMIGOS, PARA CONQUISTARLO.'}</div></div></div>`;
+    return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="info">${prog}<div class="stats"><span>ORO <b>+${String(GAME.townIncome).replace('.', ',')}/S</b></span><span>TORRE <b>${GAME.towerDmg}</b></span><span>ALCANCE <b>${GAME.towerRange}</b></span></div><div class="note">${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : 'DEJA TROPAS EN EL CÍRCULO PARA CONQUISTARLO.'}</div></div>`;
   }
   const list = [...sel].filter(alive);
   if (!list.length) return '';
   if (list.length === 1) return unitDetail(list[0]);
-  const h = heroOf(0), free = h && sel.has(h) ? list.filter(u => u !== h && u.leader !== h) : h ? list.filter(u => u.leader !== h && u !== h) : [];
-  const cnt = TYPES.map(t => [t, list.filter(u => u.type === t).length]).filter(([, n]) => n).map(([t, n]) => `${n} ${UNITS[t].name}${n > 1 ? 'S' : ''}`).join(' · ');
+  const h = heroOf(0), free = h ? list.filter(u => u !== h && u.leader !== h) : [];
+  const cnt = TYPES.map(t => [t, list.filter(u => u.type === t).length]).filter(([, n]) => n).map(([t, n]) => `${n} ${UNITS[t].name}${n > 1 ? 'S' : ''}`);
   const order = { hero: 0, sword: 1, bow: 2, horse: 3 };
-  const cells = list.sort((a, b) => order[a.type] - order[b.type] || b.rank - a.rank).slice(0, 40).map(u => { const k = u.hp / u.maxHp;
-    return `<button type="button" class="cell${u.leader ? ' esc' : ''}" data-act="one" data-id="${u.id}" title="${u.def.name}${u.rank ? ' · ' + RANKS[u.rank].name : ''}"><img alt="" src="${THUMB[u.type] || ''}">${u.rank ? `<u style="background:${RANKS[u.rank].css}"></u>` : ''}<i><b style="width:${pct(k)};background:${hpCol(k)}"></b></i></button>`; }).join('');
-  const asg = h && free.length ? `<button type="button" class="y" data-act="assign">ASIGNAR AL HÉROE (${h.escort.length}/${GAME.escortMax})</button>` : '';
-  return `<div class="ph"><h3>${list.length} UNIDADES</h3><em>${cnt}${list.includes(h) ? ' · HÉROE' : ''}</em><span class="sp"></span>${asg}</div><div class="grid">${cells}</div>`;
+  const cells = list.sort((a, b) => order[a.type] - order[b.type] || b.rank - a.rank).slice(0, 90).map(cellHtml).join('');
+  const asg = h && free.length ? `<div class="act"><button type="button" class="y" data-act="assign">ASIGNAR (${h.escort.length}/${GAME.escortMax})</button></div>` : '';
+  return `<div class="ph"><h3>${list.length} UNIDADES</h3><em>${cnt.slice(0, 2).join(' · ')}</em>${cnt[2] ? `<em>${cnt[2]}</em>` : ''}</div><div class="grid">${cells}</div>${asg}`;
+}
+function cellHtml(u) {
+  const k = u.hp / u.maxHp;
+  return `<button type="button" class="cell${u.leader ? ' esc' : ''}" data-act="one" data-id="${u.id}" title="${u.def.name}${u.rank ? ' · ' + RANKS[u.rank].name : ''}"><img alt="" src="${THUMB[u.type] || ''}">${u.rank ? `<u style="background:${RANKS[u.rank].css}"></u>` : ''}<i><b style="width:${pct(k)};background:${hpCol(k)}"></b></i></button>`;
 }
 function unitDetail(u) {
   const k = u.hp / u.maxHp, R1 = RANKS[u.rank], hero = u.type === 'hero', mul = (u.leader ? GAME.escortBonus : 1) * R1.mul;
   const rk = u.rank ? `<span class="rkn" style="background:${R1.css}">${R1.name}</span>` : '';
   const next = u.rank < 3 ? `BAJAS ${u.kills}/${RANKS[u.rank + 1].kills}` : `BAJAS ${u.kills}`;
   let note = VS[u.type];
-  if (u.leader) note = 'ESCOLTA DEL HÉROE · +20 % VIDA Y DAÑO';
+  if (u.leader) note = 'ESCOLTA DEL HÉROE · +20 %';
   if (hero) note = u.chargeT > 0 ? '¡CARGANDO!' : u.chargeCd > 0 ? `CARGA EN ${Math.ceil(u.chargeCd)} S` : 'CARGA LISTA';
-  const esc = hero ? `<div class="grid">${u.escort.map(e => { const q = e.hp / e.maxHp; return `<button type="button" class="cell esc" data-act="one" data-id="${e.id}"><img alt="" src="${THUMB[e.type] || ''}"><i><b style="width:${pct(q)};background:${hpCol(q)}"></b></i></button>`; }).join('')}</div>` : '';
-  const h = heroOf(0), asg = !hero && h && u.leader !== h ? `<button type="button" class="y" data-act="assign">ASIGNAR AL HÉROE (${h.escort.length}/${GAME.escortMax})</button>` : '';
-  return `<div class="ph"><h3>${u.def.name}</h3>${rk}<em>${hero ? `ESCOLTA ${u.escort.length}/${GAME.escortMax}` : next}</em><span class="sp"></span>${asg}</div>
-    <div class="ud"><img class="big" alt="" src="${THUMB[u.type] || ''}"><div class="info">
-      <div class="hpb"><b style="width:${pct(k)};background:${hpCol(k)}"></b><span>${Math.ceil(u.hp)}/${u.maxHp}</span></div>
-      <div class="stats"><span>ATAQUE <b>${Math.round(u.def.dmg * mul)}</b></span><span>ALCANCE <b>${u.def.range}</b></span><span>VELOCIDAD <b>${u.def.speed}</b></span>${hero ? `<span>BAJAS <b>${u.kills}</b></span>` : ''}</div>
-      <div class="note${u.leader || hero ? ' g' : ''}">${note}</div></div>${esc}</div>`;
+  const esc = hero && u.escort.length ? `<div class="grid">${u.escort.map(cellHtml).join('')}</div>` : '';
+  const h = heroOf(0), asg = !hero && h && u.leader !== h ? `<div class="act"><button type="button" class="y" data-act="assign">ASIGNAR (${h.escort.length}/${GAME.escortMax})</button></div>` : '';
+  return `<div class="ph"><h3>${u.def.name}${rk}</h3><em>${hero ? `ESCOLTA ${u.escort.length}/${GAME.escortMax}` : next}</em></div><img class="big" alt="" src="${THUMB[u.type] || ''}">
+    <div class="info"><div class="hpb"><b style="width:${pct(k)};background:${hpCol(k)}"></b><span>${Math.ceil(u.hp)}/${u.maxHp}</span></div>
+      <div class="stats"><span>ATQ <b>${Math.round(u.def.dmg * mul)}</b></span><span>ALC <b>${u.def.range}</b></span><span>VEL <b>${u.def.speed}</b></span>${hero ? `<span>BAJAS <b>${u.kills}</b></span>` : ''}</div>
+      <div class="note${u.leader || hero ? ' g' : ''}">${note}</div></div>${esc}${asg}`;
 }
 $('panel').addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
@@ -1342,7 +1339,7 @@ canvas.addEventListener('pointermove', e => {
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pinch && touches.size >= 2) {
       const [a, b] = [...touches.values()], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, k = camDist * .0019;
-      camGoal = THREE.MathUtils.clamp(pinch.z0 * pinch.d0 / (Math.hypot(a.x - b.x, a.y - b.y) || 1), 22, 150);
+      camGoal = THREE.MathUtils.clamp(pinch.z0 * pinch.d0 / (Math.hypot(a.x - b.x, a.y - b.y) || 1), 22, 240);
       pan(-(mx - pinch.mx) * k, -(my - pinch.my) * k * 1.5); pinch.mx = mx; pinch.my = my; return;
     }
   }
@@ -1382,7 +1379,7 @@ canvas.addEventListener('pointerup', e => {
     }
   } else if (d.btn === 2 && !d.moved) command(e.clientX, e.clientY);
 });
-canvas.addEventListener('wheel', e => { e.preventDefault(); camGoal = THREE.MathUtils.clamp(camGoal * Math.exp(e.deltaY * .0011), 22, 150); }, { passive: false });
+canvas.addEventListener('wheel', e => { e.preventDefault(); camGoal = THREE.MathUtils.clamp(camGoal * Math.exp(e.deltaY * .0011), 22, 240); }, { passive: false });
 const keys = new Set();
 function heroButton() { const h = heroOf(0); if (h) { setSelection([h, ...h.escort], false); follow = h; focusGoal = null; } else { selectBuilding('altar'); focusOn(spots[ALT0].x, spots[ALT0].z); } }
 addEventListener('keydown', e => {
@@ -1474,15 +1471,12 @@ function drawOverlay(dt) {
     if (!s.vis || !showUI) continue;
     const top = project(spotPos(s, s.kind === 'base' ? 9 : s.kind === 'town' ? 6 : 5), tmpP);
     if (s.kind === 'base') {
-      label(top.x, top.y - 12, s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA RIVAL', TEAM[s.side].css);
-      bar(top.x, top.y - 4, 70, 6, s.hp / GAME.baseHp, TEAM[s.side].css);
+      if (s.hp < GAME.baseHp) bar(top.x, top.y - 4, 70, 6, s.hp / GAME.baseHp, TEAM[s.side].css);
     } else if (s.kind === 'town') {
       const own = s.owner;
-      label(top.x, top.y, s.name, own < 0 ? '#f4f4e8' : TEAM[own].css, own < 0 ? '#0f0f1b' : '#fff', 7);
       if (own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; bar(top.x, top.y + 6, 50, 5, s.prog[sd], TEAM[sd].css); }
       if (own >= 0 && s.lose > 0) bar(top.x, top.y + 6, 50, 5, 1 - s.lose, TEAM[own].css);
     } else {
-      label(top.x, top.y, LBL[s.kind], TEAM[s.side].css, '#fff', 7);
       const q = s.kind === 'barracks' ? sideState[s.side].queue[0] : null, h = s.kind === 'altar' ? sideState[s.side].hero : null;
       if (s.side === 0 && selBld === s.kind) continue;
       if (s.side === 0 && q) bar(top.x, top.y + 6, 44, 4, 1 - q.t / UNITS[q.type].time, '#e8c870');
@@ -1521,13 +1515,35 @@ function drawOverlay(dt) {
     const x = Math.min(drag.x0, mouse.x), y = Math.min(drag.y0, mouse.y), w = Math.abs(mouse.x - drag.x0), h = Math.abs(mouse.y - drag.y0);
     octx.fillStyle = 'rgba(232,200,112,.12)'; octx.fillRect(x, y, w, h); octx.strokeStyle = '#e8c870'; octx.lineWidth = 2; octx.strokeRect(x, y, w, h); octx.lineWidth = 1;
   }
-  if (state === 'play' && !drag) {
-    let cur = 'default';
-    if (sel.size && pickUnit(mouse.x, mouse.y, 1)) cur = 'crosshair';
-    else if (pickUnit(mouse.x, mouse.y, 0)) cur = 'pointer';
-    else { const sp = pickSpot(mouse.x, mouse.y); if (sp) cur = sel.size && (sp.side === 1 || (sp.kind === 'town' && sp.owner !== 0)) ? 'crosshair' : 'pointer'; }
-    canvas.style.cursor = cur;
-  }
+  if (state === 'play' && !drag) canvas.style.cursor = hoverCursor();
+}
+
+// ---------- Cursores ----------
+// Iconos pixelados con contorno: espada = atacar, bandera = conquistar / punto de reunión, corona = asignar al héroe, flecha = mover
+function makeCursor(rows, pal, hx, hy, fb) {
+  const k = 2, w = rows[0].length, h = rows.length, c = document.createElement('canvas'); c.width = (w + 2) * k; c.height = (h + 2) * k;
+  const x = c.getContext('2d'), on = (i, j) => rows[j]?.[i] && rows[j][i] !== '.';
+  x.fillStyle = '#0f0f1b';
+  for (let j = -1; j <= h; j++) for (let i = -1; i <= w; i++) if (!on(i, j)) { let n = false; for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) if (on(i + di, j + dj)) n = true; if (n) x.fillRect((i + 1) * k, (j + 1) * k, k, k); }
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (on(i, j)) { x.fillStyle = pal[rows[j][i]]; x.fillRect((i + 1) * k, (j + 1) * k, k, k); }
+  return `url(${c.toDataURL()}) ${(hx + 1) * k} ${(hy + 1) * k}, ${fb}`;
+}
+const CUR = {
+  attack: makeCursor(['11.........', '131........', '.131.......', '..131......', '...131.....', '....131....', '.....131.2.', '......1322.', '.......22..', '......2.44.', '.........44'], { 1: '#f4f4e8', 3: '#b4afa2', 2: '#e8c870', 4: '#8a5a34' }, 0, 0, 'crosshair'),
+  flag: makeCursor(['2........', '2333.....', '233333...', '2333333..', '23333....', '2........', '2........', '2........', '2........', '22.......'], { 2: '#8a5a34', 3: '#e8c870' }, 0, 9, 'pointer'),
+  rally: makeCursor(['2........', '2333.....', '233333...', '2333333..', '23333....', '2........', '2........', '2........', '2........', '22.......'], { 2: '#8a5a34', 3: '#3a6ad8' }, 0, 9, 'pointer'),
+  assign: makeCursor(['1..1..1', '11.1.11', '1111111', '1111111', '2222222'], { 1: '#e8c870', 2: '#c07a40' }, 3, 2, 'pointer'),
+  move: makeCursor(['1.......', '11......', '121.....', '1221....', '12221...', '122221..', '1222111.', '121.....', '11......'], { 1: '#f4f4e8', 2: '#9ad86a' }, 0, 0, 'default'),
+};
+function hoverCursor() {
+  const x = mouse.x, y = mouse.y, has = sel.size > 0;
+  if (selBld === 'barracks') { const sp = pickSpot(x, y); return sp ? 'pointer' : CUR.rally; }
+  if (has && pickUnit(x, y, 1)) return CUR.attack;
+  const own = pickUnit(x, y, 0);
+  if (own) return has && own.type === 'hero' && [...sel].some(u => u !== own && u.type !== 'hero') ? CUR.assign : 'pointer';
+  const sp = pickSpot(x, y);
+  if (sp) { if (has && sp.side === 1) return CUR.attack; if (has && sp.kind === 'town' && sp.owner !== 0) return CUR.flag; return 'pointer'; }
+  return has ? CUR.move : 'default';
 }
 
 // ---------- Bucle ----------
