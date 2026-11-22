@@ -997,24 +997,26 @@ function placeSpot(s, g, face) {
 }
 // banderas que ondean: se estiran y encogen desde el mástil
 function addFlag(s, m, dir = 1) { s.flags.push({ m, w: m.scale.x, px: m.position.x - dir * m.scale.x / 2, dir, ph: Math.random() * 6 }); }
+// la cámara mira siempre al norte: los edificios ponen el frente hacia ella (+z) con un giro pequeño para que no queden en fila
+const camFace = (s, spread) => (hash(s.x | 0, 3, s.z | 0) - .5) * spread;
 const facing = (s, tx, tz) => Math.atan2(tx - s.x, tz - s.z);
 const local = (s, x, y, z) => s.group.localToWorld(new THREE.Vector3(x, y, z));
 function buildCastle(s) {
   const g = new THREE.Group(), f = forts[s.side];
   civOf(s.side).castle(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c);
-  placeSpot(s, g, Math.atan2(Math.cos(f.tb), Math.sin(f.tb)) + s.ry); s.hp = s.hp ?? GAME.baseHp;
+  placeSpot(s, g, camFace(s, .25)); s.hp = s.hp ?? GAME.baseHp;
 }
 function buildBarracks(s) {
   const g = new THREE.Group();
   civOf(s.side).barracks(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c);
   s.sel = ring(g, 3, 3.3, 0xffe03a, .2); s.sel.visible = selBld === 'barracks' && s.side === 0;
-  const f = forts[s.side]; placeSpot(s, g, Math.atan2(Math.cos(f.tb), Math.sin(f.tb)) + s.ry);
+  placeSpot(s, g, camFace(s, .4));
 }
 function buildAltar(s) {
   const g = new THREE.Group(), f = forts[s.side];
   civOf(s.side).map.altar(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c);
   s.sel = ring(g, 2.6, 2.9, 0xffe03a, .2); s.sel.visible = false;
-  placeSpot(s, g, Math.atan2(Math.cos(f.tb), Math.sin(f.tb)) + s.ry);
+  placeSpot(s, g, camFace(s, .4));
 }
 function buildCamp(s) {
   const g = new THREE.Group(), roofs = [], canvas = 0xd8c89a;
@@ -1026,19 +1028,19 @@ function buildCamp(s) {
   for (let k = 0; k < 26; k++) { const a = k / 26 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .2 && Math.cos(a) > 0) continue; part(g, .16, 1 + (k % 2) * .25, .16, 0x7a5a34, Math.cos(a) * 3, .4, Math.sin(a) * 3); }   // empalizada
   s.zone = ring(g, 3.5, 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.visible = false; g.add(s.beacon);
-  s.roofs = roofs; placeSpot(s, g, hash(s.x | 0, 2, s.z | 0) * Math.PI * 2); s.owner = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.campGen; addFlag(s, s.flag);
+  s.roofs = roofs; placeSpot(s, g, camFace(s, .5)); s.owner = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.campGen; addFlag(s, s.flag);
   s.tower = local(s, -1.6, 2.6, -1.4);
 }
 function buildTown(s) {
   if (s.camp) return buildCamp(s);
   const g = new THREE.Group(), roofs = [], cv = civOf(sideAt(s.x, s.z)), [wc, wc2] = cv.wall;
-  cv.house(CIV.grp(g, -1.1, 0, .9, .5, .2)); cv.house(CIV.grp(g, 1.2, 0, 1, .45, -.5)); cv.house(CIV.grp(g, .9, 0, -.9, .45, 1.2));
+  cv.house(CIV.grp(g, -1.25, 0, -.6, .68, .12)); cv.house(CIV.grp(g, 1.35, 0, -.8, .64, -.14)); cv.house(CIV.grp(g, .1, 0, 1.45, .62, .06));
   part(g, .9, 4, .9, wc, -1.5, 1.2, -1.5); roofs.push(part(g, 1.2, .45, 1.2, wc2, -1.5, 3.4, -1.5));
   part(g, .1, 1.4, .1, 0x8a5a34, -1.5, 4.3, -1.5); s.flag = part(g, .8, .5, .08, 0xffffff, -1.1, 4.7, -1.5, false);
   for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .25 && Math.cos(a) > 0) continue; part(g, .12, .9, .12, cv.id === 'galos' ? 0x7a5a34 : wc2, Math.cos(a) * 2.9, .05, Math.sin(a) * 2.9, false); }
   s.zone = ring(g, 3.5, 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.scale.set(.5, 14, .5); s.beacon.position.y = 9; s.beacon.visible = false; g.add(s.beacon);
-  s.roofs = roofs; placeSpot(s, g, hash(s.x | 0, 2, s.z | 0) * Math.PI * 2); s.owner = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
+  s.roofs = roofs; placeSpot(s, g, camFace(s, .5)); s.owner = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
   s.tower = local(s, -1.5, 3.6, -1.5);
 }
 const decos = [];
