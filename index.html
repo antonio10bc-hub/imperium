@@ -38,6 +38,9 @@ kbd{font:400 12px/1 var(--font);border:2px solid currentColor;padding:2px 3px;ma
 .card .ctl b{font-weight:400;color:var(--pink)}
 .card.menu{min-width:300px;align-items:center;gap:16px;padding:30px 34px}
 .card.menu h2{font-size:44px;margin-bottom:6px}
+.civsel{display:grid;grid-template-columns:70px 1fr;align-items:center;gap:10px;width:260px;font:400 12px/1 var(--font)}
+.civsel select{font:400 12px/1 var(--font);color:var(--ink);background:var(--paper2);border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink);padding:8px 6px;cursor:pointer;width:100%}
+.civsel select:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
 .card.menu #go,.card.menu #howBtn{width:220px;font-size:16px;padding:12px 0}
 #how .card{max-width:620px;max-height:90vh;overflow:auto}
 #how #howBack{align-self:center;font-size:14px;padding:10px 18px}
@@ -159,6 +162,8 @@ button.alt{background:var(--paper)}
 <div id="pause" hidden>PAUSA</div>
 <div id="start" class="overlay" hidden><div class="card menu">
   <h2>IMPERIUM</h2>
+  <div class="civsel"><label for="civ0">TÚ</label><select id="civ0"></select></div>
+  <div class="civsel"><label for="civ1">RIVAL</label><select id="civ1"></select></div>
   <div class="diff"><button type="button" data-d="easy">FÁCIL</button><button type="button" data-d="normal">NORMAL</button><button type="button" data-d="hard">DIFÍCIL</button></div>
   <button id="go" type="button">JUGAR</button>
   <button id="howBtn" type="button" class="alt">INSTRUCCIONES</button>
@@ -170,6 +175,7 @@ button.alt{background:var(--paper)}
     <li>Pulsa el <b>CUARTEL</b> (el edificio de madera de tu fortaleza) para reclutar desde la barra inferior.</li>
     <li>Los <span class="g">pueblos</span> dan oro, tienen una torre y se pueden mejorar. Los caminos dan velocidad y el río solo se cruza por los vados.</li>
     <li>Los dos <b>CAMPAMENTOS</b> tienen guardianes neutrales. Derrótalos y conquístalos: te darán jinetes arqueros, hasta 20 por campamento.</li>
+    <li>Elige tu <b>CIVILIZACIÓN</b> y la del rival en el menú (o al azar). Todas juegan igual: cambian el aspecto, los edificios y los nombres de las tropas.</li>
     <li>Invoca un <b>HÉROE</b> en el altar. Asígnale hasta 50 tropas: formarán delante de él en bloque, línea o cuña.</li>
     <li>La niebla de guerra oculta lo que no has explorado. Las tropas suben de rango al matar y se curan en tus regiones.</li>
   </ul>
@@ -707,13 +713,202 @@ function drawMinimap() {
   if (pts.every(Boolean)) { mctx.strokeStyle = '#fff'; mctx.lineWidth = 2; mctx.beginPath(); pts.forEach((p, k) => k ? mctx.lineTo(p.x, p.z) : mctx.moveTo(p.x, p.z)); mctx.closePath(); mctx.stroke(); }
 }
 
+// ---------- Civilizaciones ----------
+// Mismas reglas para todas; cambian los modelos de tropas y edificios, las murallas y los nombres. El color del bando va en escudos, estandartes y penachos.
+const CIV = (() => {
+  let FILL = null;   // lista donde se apuntan las piezas de una tropa (para el destello al recibir daño)
+  function P(g, w, h, d, c, x, y, z, o = true, ry = 0) {
+    const m = new THREE.Mesh(BOX, mat(c)); m.scale.set(w, h, d); m.position.set(x, y, z); m.rotation.y = ry; g.add(m);
+    if (o) { const k = new THREE.Mesh(BOX, HULLMAT); k.scale.set(w + .09, h + .09, d + .09); k.position.copy(m.position); k.rotation.y = ry; g.add(k); }
+    if (FILL) FILL.push(m);
+    return m;
+  }
+const grp = (parent, x = 0, y = 0, z = 0, s = 1, ry = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); g.rotation.y = ry; parent.add(g); return g; };
+// pirámide escalonada / tejado a cuatro aguas: cajas que encogen
+function steps(g, n, w, h, d, k, c, x, y, z, c2) { for (let i = 0; i < n; i++) P(g, w - i * k, h, d - i * k * (d / w), i % 2 && c2 ? c2 : c, x, y + h / 2 + i * h, z); return y + n * h; }
+// tejado chino: cubierta oscura con aleros que se levantan en las esquinas
+function eaveRoof(g, w, d, y, c, gold) { P(g, w, .22, d, c, 0, y, 0); P(g, w - .5, .3, d - .5, c, 0, y + .25, 0); P(g, w - 1.2, .3, d - 1.2, c, 0, y + .5, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) P(g, .25, .25, .25, c, sx * (w / 2 - .05), y + .18, sz * (d / 2 - .05)); if (gold) P(g, .2, .4, .2, gold, 0, y + .85, 0); }
+// palmera
+function palm(g, x, z, h = 2.4) { for (let i = 0; i < 5; i++) P(g, .22, h / 5, .22, 0x8a6a3a, x + i * .05, h / 10 + i * h / 5, z, false); for (let a = 0; a < 6; a++) { const r = a / 6 * Math.PI * 2; P(g, .9, .1, .28, 0x4f8a3a, x + .25 + Math.cos(r) * .5, h + .05 - (a % 2) * .1, z + Math.sin(r) * .5, false, -r); } }
+function cypress(g, x, z) { P(g, .16, .4, .16, 0x5a3a24, x, .2, z, false); P(g, .5, 1.3, .5, 0x2f5a35, x, 1.05, z); P(g, .32, .6, .32, 0x2f5a35, x, 1.95, z); }
+function bush(g, x, z, c = 0x3f7a45) { P(g, .7, .5, .7, c, x, .25, z); }
+
+// ---- piezas de tropa ----
+function legs(g, c, c2) { P(g, .16, .34, .16, c, -.11, .17, 0); P(g, .16, .34, .16, c2 ?? c, .11, .17, 0); }
+function torso(g, c) { P(g, .46, .48, .32, c, 0, .58, 0); }
+function head(g, c) { P(g, .3, .3, .3, c, 0, .97, 0); }
+function horse(g, c, c2, leg, cloth) {
+  P(g, .5, .45, 1.05, c, 0, .72, 0); P(g, .3, .42, .38, c2, 0, 1.02, .58); P(g, .2, .2, .28, c2, 0, 1.12, .82);
+  for (const [a, b] of [[-.16, -.36], [.16, -.36], [-.16, .36], [.16, .36]]) P(g, .13, .5, .13, leg, a, .25, b);
+  P(g, .12, .3, .12, leg, 0, .78, -.58); if (cloth) P(g, .6, .14, .58, cloth, 0, .98, -.05);
+}
+function rider(g, top, skin) { P(g, .4, .44, .3, top, 0, 1.26, -.05); P(g, .26, .26, .26, skin, 0, 1.62, -.05); }
+const SK = { light: 0xf0c49a, tan: 0xd59a68, brown: 0xa86a42, dark: 0x7a4a2a };
+const STEEL = 0xd8dcf0, BRONZE = 0xc8913c, GOLD = 0xe8c050, WOOD = 0x8a5a34, WHITE = 0xf2eee2;
+
+// ================= CIVILIZACIONES =================
+const CIVS = [
+{ id: 'roma', name: 'ROMA', era: 'República tardía · s. I a. C.', own: 0xa8282a,
+  tag: 'Mármol, teja roja y legiones en bloque. La civilización de referencia: ordenada, simétrica y metálica.',
+  biome: 0x7db45b, plaza: 0xd8d0bc, sw: [0xe8e2d4, 0xb5562f, 0xd8dcf0, 0xc8a040],
+  names: ['LEGIONARIO', 'SAGITARIO', 'ÉQUITE', 'GENERAL'],
+  notes: ['<b>Escudo:</b> scutum rectangular y alto, con umbo dorado', '<b>Casco:</b> galea con cresta transversal', '<b>Héroe:</b> capa del color del bando y el águila de la legión'],
+  castle(g, T) { P(g, 6.4, .9, 4.6, 0xd8d0bc, 0, .45, 0); P(g, 5.8, .3, 4, 0xe8e2d4, 0, 1.05, 0);
+    for (let i = 0; i < 6; i++) P(g, .38, 2.4, .38, WHITE, -2.3 + i * .92, 2.4, 1.6);
+    P(g, 4.6, 2.4, 2.6, 0xe8e2d4, 0, 2.4, -.5); P(g, 5.9, .3, 4.1, 0xd8d0bc, 0, 3.75, 0);
+    steps(g, 4, 6, .3, 4.2, 1.3, 0xb5562f, 0, 3.9, 0); P(g, 1.2, .9, .2, T, 0, 2.6, 1.82);
+    P(g, .1, 1.6, .1, WOOD, 2.6, 5, 0); P(g, .9, .7, .08, T, 2.6, 5.3, .1); P(g, .5, .3, .3, GOLD, 0, 5.4, 0); P(g, .9, .14, .2, GOLD, 0, 5.6, 0); },
+  barracks(g, T) { P(g, 3.6, 1.6, 2.4, 0xe8e2d4, 0, .8, 0); steps(g, 3, 3.9, .3, 2.7, 1, 0xb5562f, 0, 1.6, 0); P(g, 1, 1.1, .2, 0x5a3a24, 0, .55, 1.25); for (const x of [-1.3, 1.3]) { P(g, .08, 2.6, .08, WOOD, x, 1.3, 1.6); P(g, .5, .6, .06, T, x + .28, 2.2, 1.6); } },
+  house(g) { P(g, 2, 1.2, 1.6, WHITE, 0, .6, 0); steps(g, 2, 2.2, .3, 1.8, .9, 0xb5562f, 0, 1.2, 0); cypress(g, 1.6, .4); },
+  sword(g, T) { legs(g, 0x7a4a2a); torso(g, T); P(g, .5, .3, .34, STEEL, 0, .68, 0); head(g, SK.light);
+    P(g, .36, .16, .36, STEEL, 0, 1.15, 0); P(g, .5, .1, .08, T, 0, 1.28, 0); P(g, .1, .72, .5, T, -.33, .6, .04); P(g, .12, .2, .2, GOLD, -.39, .6, .04); P(g, .06, .4, .06, STEEL, .31, .6, .16); },
+  bow(g, T) { legs(g, 0x7a4a2a); torso(g, 0xd8c8a0); head(g, SK.light); P(g, .34, .2, .34, STEEL, 0, 1.14, 0); P(g, .12, .12, .12, STEEL, 0, 1.3, 0); P(g, .48, .14, .34, T, 0, .78, 0); P(g, .06, .82, .06, WOOD, -.3, .64, .12); P(g, .16, .42, .14, 0x7a4824, .1, .64, -.22); },
+  horse(g, T) { horse(g, 0x8a5a34, 0x7a4824, 0x5a3a24, T); rider(g, STEEL, SK.light); P(g, .32, .14, .32, STEEL, 0, 1.79, -.05); P(g, .08, .22, .3, T, 0, 1.95, -.05); P(g, .1, .5, .5, T, -.28, 1.25, 0); P(g, .06, .06, 1.4, STEEL, .27, 1.3, .4); },
+  hero(g, T) { horse(g, WHITE, 0xeae6f2, 0xd8d4e4, GOLD); rider(g, GOLD, SK.light); P(g, .5, .6, .08, T, 0, 1.15, -.24); P(g, .34, .14, .34, GOLD, 0, 1.8, -.05); P(g, .08, .26, .38, T, 0, 1.97, -.05);
+    P(g, .06, 1.7, .06, WOOD, .32, 1.7, .1); P(g, .34, .2, .14, GOLD, .32, 2.6, .1); P(g, .14, .14, .14, GOLD, .32, 2.75, .1); P(g, .38, .3, .05, T, .32, 2.3, .1); } },
+
+{ id: 'cartago', name: 'CARTAGO', era: 'Guerras púnicas · s. III a. C.', own: 0x6a2a7a,
+  tag: 'Ciudad comercial de adobe ocre, toldos púrpura y palmeras. Su héroe va a lomos de un elefante de guerra.',
+  biome: 0xa9b066, plaza: 0xe0c896, sw: [0xd9b27a, 0x6a2a7a, 0xc8913c, 0x4f8a3a],
+  names: ['INFANTE LIBIO', 'HONDERO', 'JINETE NÚMIDA', 'ELEFANTE'],
+  notes: ['<b>Escudo:</b> redondo de bronce con el borde del bando', '<b>Montura:</b> caballo númida sin silla, jinete sin casco', '<b>Héroe:</b> elefante con torre del color del bando'],
+  castle(g, T) { P(g, 6.2, 2.4, 4.2, 0xd9b27a, 0, 1.2, -.3); for (let i = 0; i < 9; i++) P(g, .4, .4, .4, 0xc9a26a, -2.9 + i * .72, 2.6, 1.8);
+    for (const x of [-3, 3]) { P(g, 1.6, 3.6, 1.6, 0xd9b27a, x, 1.8, 1.4); P(g, 1.6, 3.6, 1.6, 0xd9b27a, x, 1.8, 1.4, true, Math.PI / 4); P(g, 1.9, .3, 1.9, 0xc9a26a, x, 3.7, 1.4); P(g, .9, .6, .9, T, x, 4.1, 1.4); }
+    P(g, 2.4, 2, 1.8, 0xe8cfa0, 0, 3.4, -.8); P(g, 2.8, .3, 2.2, 0x6a2a7a, 0, 4.5, -.8);
+    P(g, 1.2, 1.6, .2, 0x4a2a14, 0, .8, 1.82); P(g, .6, .2, .1, T, 0, 2, 1.9); P(g, .2, .2, .1, T, 0, 2.3, 1.9); P(g, .5, .5, .1, T, 0, 1.75, 1.9, false, Math.PI / 4); },
+  barracks(g, T) { P(g, 3.4, 1.6, 2.4, 0xd9b27a, 0, .8, 0); P(g, 3.6, .2, 2.6, 0xc9a26a, 0, 1.7, 0); P(g, 3.6, .1, 1.1, 0x6a2a7a, 0, 1.35, 1.6); for (const x of [-1.6, 1.6]) P(g, .08, 1.3, .08, WOOD, x, .65, 2.1); P(g, 1, 1.1, .2, 0x4a2a14, 0, .55, 1.25); P(g, .7, .4, .06, T, 0, 2.1, 0); palm(g, -2.3, -.6, 2.2); },
+  house(g) { P(g, 1.6, 1.3, 1.4, 0xe8cfa0, -.2, .65, 0); P(g, 1, 1, 1, 0xe0c090, .5, 1.8, -.2); P(g, 1.8, .14, 1.6, 0xc9a26a, -.2, 1.35, 0); palm(g, 1.3, .6, 2.6); },
+  sword(g, T) { legs(g, SK.tan); torso(g, WHITE); P(g, .5, .14, .34, T, 0, .66, 0); head(g, SK.tan); P(g, .34, .2, .34, BRONZE, 0, 1.15, 0); P(g, .1, .16, .1, BRONZE, 0, 1.33, 0);
+    P(g, .1, .6, .6, BRONZE, -.34, .6, .04); P(g, .12, .66, .66, T, -.3, .6, .04); P(g, .14, .58, .58, BRONZE, -.36, .6, .04); P(g, .06, .7, .06, STEEL, .31, .7, .16); },
+  bow(g, T) { legs(g, SK.brown); torso(g, 0xe8dcc0); head(g, SK.brown); P(g, .36, .1, .36, T, 0, 1.1, 0); P(g, .3, .12, .3, 0x2a1a10, 0, 1.18, -.02); P(g, .06, .6, .06, 0xb08a5a, .3, .9, .1); P(g, .14, .14, .14, 0x9a9a9a, .3, 1.24, .1); P(g, .2, .3, .14, T, -.1, .62, -.22); },
+  horse(g, T) { horse(g, 0x6a4024, 0x5a3418, 0x3a2414, null); rider(g, 0xe8dcc0, SK.dark); P(g, .3, .12, .3, 0x1a1008, 0, 1.78, -.05); P(g, .08, .44, .44, T, -.26, 1.25, 0); for (const d of [0, .12]) P(g, .04, .04, 1.1, 0xb08a5a, .26 + d, 1.35, .3); },
+  hero(g, T) { // elefante de guerra
+    P(g, 1.1, 1, 1.7, 0x8a8a96, 0, 1.1, 0); for (const [a, b] of [[-.36, -.55], [.36, -.55], [-.36, .55], [.36, .55]]) P(g, .32, .7, .32, 0x7a7a86, a, .35, b);
+    P(g, .8, .8, .7, 0x8a8a96, 0, 1.35, 1.05); P(g, .3, .7, .3, 0x7a7a86, 0, .9, 1.45); P(g, .3, .3, .3, 0x7a7a86, 0, .55, 1.55); for (const s of [-1, 1]) { P(g, .5, .6, .14, 0x7a7a86, s * .55, 1.45, .95); P(g, .08, .08, .55, 0xf4ecd8, s * .2, 1.0, 1.55); }
+    P(g, 1, .14, 1.1, T, 0, 1.68, -.1); P(g, .8, .6, .8, 0xd9b27a, 0, 2.05, -.1); for (const [a, b] of [[-.36, -.46], [.36, -.46], [-.36, .26], [.36, .26]]) P(g, .1, .3, .1, 0xd9b27a, a, 2.5, b); P(g, .9, .1, .9, T, 0, 2.7, -.1);
+    P(g, .3, .3, .24, 0x6a2a7a, 0, 2.55, -.1); P(g, .2, .2, .2, SK.tan, 0, 2.82, -.1); P(g, .26, .1, .26, GOLD, 0, 2.95, -.1); } },
+
+{ id: 'china', name: 'HAN', era: 'Dinastía Han · s. II a. C.', own: 0xd8a020,
+  tag: 'Laca roja, tejas oscuras con aleros curvos y estandartes verticales. Armaduras de láminas y ballestas.',
+  biome: 0x6e9a50, plaza: 0xb8b0a0, sw: [0xb02a20, 0x3a3a44, 0xe8c050, 0xc8b89a],
+  names: ['ESPADACHÍN', 'BALLESTERO', 'LANCERO MONTADO', 'GENERAL'],
+  notes: ['<b>Silueta:</b> pagoda de varios pisos y aleros levantados', '<b>Arma:</b> ballesta horizontal en lugar de arco', '<b>Héroe:</b> dos plumas largas de faisán en el casco'],
+  castle(g, T) { P(g, 6, .8, 5, 0x9a9488, 0, .4, 0); P(g, 4.4, 1.6, 3.6, 0xb02a20, 0, 1.6, 0); for (const x of [-2, -1, 0, 1, 2]) P(g, .26, 1.6, .26, 0x7a1a14, x, 1.6, 1.85); eaveRoof(g, 5.4, 4.4, 2.5, 0x3a3a44);
+    P(g, 3, 1.2, 2.4, 0xb02a20, 0, 3.6, 0); eaveRoof(g, 4, 3.2, 4.25, 0x3a3a44); P(g, 1.8, 1, 1.4, 0xb02a20, 0, 5.2, 0); eaveRoof(g, 2.8, 2.2, 5.75, 0x3a3a44, GOLD);
+    P(g, 1, 1.1, .1, 0x2a1a10, 0, 1.35, 1.82); for (const x of [-3.4, 3.4]) { P(g, .08, 3.4, .08, WOOD, x, 1.7, 1.8); P(g, .5, 1.6, .06, T, x + .26, 2.5, 1.8); } },
+  barracks(g, T) { P(g, 3.4, 1.4, 2.2, 0xb02a20, 0, .7, 0); eaveRoof(g, 4.2, 3, 1.5, 0x3a3a44); P(g, 1, 1, .1, 0x2a1a10, 0, .5, 1.12); for (const x of [-2.2, 2.2]) { P(g, .08, 2.8, .08, WOOD, x, 1.4, .6); P(g, .45, 1.3, .06, T, x + .24, 2, .6); } },
+  house(g) { P(g, 1.8, 1.1, 1.4, 0xd8cdb8, 0, .55, 0); eaveRoof(g, 2.4, 2, 1.2, 0x4a4a54); P(g, .4, .7, .08, 0xb02a20, 0, .35, .72); P(g, .22, .3, .22, 0xe84a2a, .9, 1.1, .75, false); bush(g, -1.3, .5, 0x4f8a3a); },
+  sword(g, T) { legs(g, 0x3a3a44); torso(g, 0x3a3a44); P(g, .5, .1, .34, T, 0, .78, 0); P(g, .5, .1, .34, 0xb02a20, 0, .42, 0); head(g, SK.tan); P(g, .36, .14, .36, 0x3a3a44, 0, 1.15, 0); P(g, .14, .26, .14, 0x3a3a44, 0, 1.33, 0); P(g, .1, .2, .1, T, 0, 1.52, 0);
+    P(g, .06, .62, .1, STEEL, .32, .72, .16); P(g, .08, .5, .4, 0xb02a20, -.31, .6, .02); },
+  bow(g, T) { legs(g, 0x3a3a44); torso(g, 0xc8b89a); P(g, .5, .12, .34, T, 0, .7, 0); head(g, SK.tan); P(g, .62, .08, .62, 0xd8c08a, 0, 1.14, 0); P(g, .26, .14, .26, 0xd8c08a, 0, 1.22, 0); P(g, .08, .08, .7, WOOD, -.05, .82, .32); P(g, .7, .06, .08, WOOD, -.05, .82, .6); },
+  horse(g, T) { horse(g, 0x5a4a3a, 0x4a3a2a, 0x2a2018, 0x3a3a44); P(g, .56, .2, .5, 0x3a3a44, 0, .92, .35); rider(g, 0x3a3a44, SK.tan); P(g, .3, .14, .3, 0x3a3a44, 0, 1.79, -.05); P(g, .1, .24, .1, T, 0, 1.96, -.05); P(g, .05, .05, 1.8, WOOD, .27, 1.3, .5); P(g, .05, .3, .4, T, .27, 1.5, 1.25); },
+  hero(g, T) { horse(g, 0xe8e2d4, 0xd8d2c4, 0x9a9488, 0xb02a20); rider(g, 0x3a3a44, SK.tan); P(g, .44, .1, .32, GOLD, 0, 1.36, -.05); P(g, .5, .6, .08, T, 0, 1.15, -.24); P(g, .32, .16, .32, GOLD, 0, 1.8, -.05);
+    for (const s of [-1, 1]) { P(g, .05, .9, .05, 0x8a6a3a, s * .1, 2.25, -.12); P(g, .05, .5, .05, WHITE, s * .14, 2.9, -.22); }
+    P(g, .06, 1.5, .06, WOOD, .3, 1.5, .2); P(g, .1, .36, .18, STEEL, .3, 2.3, .26); } },
+
+{ id: 'mexica', name: 'MEXICAS', era: 'Triple Alianza · s. XV', own: 0x2aa8a0,
+  tag: 'Pirámides escalonadas de piedra caliza, jade y plumas. Sin caballos: su caballería son los guerreros águila, igual de rápidos.',
+  biome: 0x4f8a3e, plaza: 0xd8d0b8, sw: [0xd8d0b8, 0x2aa8a0, 0xe0a83a, 0x2a9a5a],
+  names: ['GUERRERO JAGUAR', 'ARQUERO', 'GUERRERO ÁGUILA', 'TLATOANI'],
+  notes: ['<b>Silueta:</b> traje de jaguar con manchas y macuáhuitl de obsidiana', '<b>Jinete:</b> guerrero águila a pie, con casco de pico y alas', '<b>Héroe:</b> gran penacho de plumas de quetzal'],
+  castle(g, T) { const top = steps(g, 4, 6, .8, 6, 1.2, 0xd8d0b8, 0, 0, -.6, 0xc8c0a8); P(g, 1.3, 3.2, 1.6, 0xb8b098, 0, 1.6, 2.1); for (let i = 0; i < 5; i++) P(g, 1.3, .1, .2, 0x9a9278, 0, .3 + i * .64, 2.92, false);
+    P(g, 2, 1.3, 1.8, 0xd8d0b8, 0, top + .65, -.6); P(g, 2.2, .3, 2, T, 0, top + 1.45, -.6); P(g, 1.6, .5, 1.4, 0x2aa8a0, 0, top + 1.85, -.6); P(g, .6, .8, .1, 0x2a1a10, 0, top + .4, .32);
+    for (const s of [-1, 1]) { P(g, .3, .3, .3, 0x2aa8a0, s * 2.7, 1.1, 2.1); P(g, .08, 1.6, .08, WOOD, s * 2.6, 2, 2.4); P(g, .4, .6, .06, T, s * 2.6 + .22, 2.5, 2.4); } },
+  barracks(g, T) { P(g, 3.4, .5, 2.6, 0xc8c0a8, 0, .25, 0); P(g, 2.8, 1.2, 2, 0xd8d0b8, 0, 1.1, 0); steps(g, 3, 3.2, .35, 2.4, .9, 0xc8a85a, 0, 1.7, 0); P(g, .8, .9, .1, 0x2a1a10, 0, .95, 1.02); P(g, .6, .3, .06, T, 0, 1.5, 1.04); bush(g, -2.2, .4, 0x2f6a35); },
+  house(g) { P(g, 1.6, 1, 1.4, 0xe0d4b8, 0, .5, 0); steps(g, 3, 1.9, .35, 1.7, .55, 0xc8a85a, 0, 1, 0); for (let i = 0; i < 3; i++) { P(g, .1, .9, .1, 0x6a9a3a, 1.3 + i * .3, .45, .5, false); P(g, .12, .22, .12, 0xe8c050, 1.3 + i * .3, .85, .5, false); } },
+  sword(g, T) { legs(g, 0xe0a83a); torso(g, 0xe0a83a); for (const [a, b, c] of [[-.12, .66, .17], [.13, .5, .17], [0, .8, .17], [-.2, .35, .1], [.16, .2, .1]]) P(g, .07, .07, .03, 0x2a1a10, a, b, c, false); P(g, .34, .34, .34, 0xe0a83a, 0, 1, 0); P(g, .3, .14, .1, 0x2a1a10, 0, .98, .18); P(g, .3, .1, .1, WHITE, 0, .88, .18); head(g, SK.brown);
+    P(g, .1, .55, .55, T, -.33, .6, .02); for (let i = 0; i < 4; i++) P(g, .06, .12, .1, 0x2a9a5a, -.36, .3 - i * .02, -.2 + i * .14, false); P(g, .08, .62, .14, WOOD, .32, .72, .16); P(g, .02, .5, .2, 0x1a1a1a, .32, .76, .16, false); },
+  bow(g, T) { legs(g, SK.brown); torso(g, SK.brown); P(g, .48, .2, .34, WHITE, 0, .42, 0); head(g, SK.brown); P(g, .34, .1, .34, T, 0, 1.1, 0); for (const s of [-.1, 0, .1]) P(g, .05, .3, .05, 0x2a9a5a, s, 1.3, -.14); P(g, .06, .82, .06, WOOD, -.3, .64, .12); P(g, .16, .42, .14, 0x7a4824, .1, .64, -.22); },
+  horse(g, T) { // guerrero águila, a pie y con alas
+    legs(g, 0x5a3a24); torso(g, 0x6a4a2a); P(g, .5, .16, .34, T, 0, .62, 0); P(g, .36, .36, .36, 0x5a3a24, 0, 1, 0); P(g, .16, .12, .2, 0xe8c050, 0, .96, .26); P(g, .28, .12, .1, WHITE, 0, 1.2, .1);
+    for (const s of [-1, 1]) { P(g, .1, .5, .5, 0x6a4a2a, s * .32, .72, -.05); P(g, .08, .34, .4, WHITE, s * .38, .5, -.1); } P(g, .1, .55, .55, T, -.4, .6, .1); P(g, .08, .62, .14, WOOD, .36, .72, .2); },
+  hero(g, T) { legs(g, SK.brown); torso(g, T); P(g, .5, .14, .34, 0x2aa8a0, 0, .78, 0); P(g, .5, .5, .1, GOLD, 0, .6, .17); head(g, SK.brown); P(g, .34, .12, .34, GOLD, 0, 1.15, 0);
+    for (let i = -4; i <= 4; i++) P(g, .1, .9 - Math.abs(i) * .07, .06, i % 2 ? 0x2a9a5a : 0x3ab0a0, i * .1, 1.6 - Math.abs(i) * .03, -.14, false, 0); P(g, 1, .12, .08, T, 0, 1.22, -.12);
+    P(g, .5, .8, .08, T, 0, .7, -.22); P(g, .08, .7, .16, WOOD, .32, .72, .16); P(g, .14, .14, .14, GOLD, .32, 1.1, .16); } },
+
+{ id: 'egipto', name: 'EGIPTO', era: 'Imperio Nuevo · s. XIII a. C.', own: 0x2a4ab0,
+  tag: 'Pilonos de arenisca, obeliscos y lino blanco. Su caballería son carros de guerra, como el del faraón.',
+  biome: 0xc8b47a, plaza: 0xe8d4a0, sw: [0xe0c48a, 0xf2eee2, 0x2a4ab0, 0xe8c050],
+  names: ['INFANTE', 'ARQUERO', 'CARRO', 'FARAÓN'],
+  notes: ['<b>Silueta:</b> pilono de dos torres trapezoidales y obelisco', '<b>Casco:</b> nemes a rayas del color del bando y oro', '<b>Jinete y héroe:</b> carros de guerra tirados por dos caballos'],
+  castle(g, T) { for (const s of [-1, 1]) steps(g, 6, 2.6, .6, 1.8, .14, 0xe0c48a, s * 1.9, 0, 0);
+    P(g, 1.4, 2.6, 1.2, 0xd0b47a, 0, 1.3, 0); P(g, 1.6, .3, 1.4, 0xe8c050, 0, 2.75, 0); P(g, .9, 1.8, .1, 0x3a2a14, 0, .9, .62);
+    for (const s of [-1, 1]) { P(g, 1.6, .2, .1, 0x2a4ab0, s * 1.9, 2.8, .92, false); P(g, .08, 4.6, .08, WOOD, s * 1.1, 2.3, 1); P(g, .5, .3, .06, T, s * 1.1 + .27, 4.3, 1); }
+    P(g, .5, 3, .5, 0xe0c48a, -3.6, 1.5, 1.2); P(g, .3, .4, .3, GOLD, -3.6, 3.2, 1.2); P(g, 3.4, 1.6, 2.6, 0xe8d4a0, 0, .8, -2.4); P(g, .9, .5, .9, T, 0, 1.85, -2.4); },
+  barracks(g, T) { P(g, 3.4, 1.5, 2.4, 0xd8c08a, 0, .75, 0); P(g, 3.6, .2, 2.6, 0xe8d4a0, 0, 1.6, 0); P(g, 3.6, .14, .1, 0x2a4ab0, 0, 1.35, 1.25, false); P(g, 3.6, .1, .1, GOLD, 0, 1.2, 1.25, false); P(g, 1, 1.1, .2, 0x3a2a14, 0, .55, 1.25); P(g, .7, .4, .06, T, 0, 2.05, 0); palm(g, 2.3, -.6, 2.2); },
+  house(g) { P(g, 1.6, 1.2, 1.4, WHITE, 0, .6, 0); P(g, .6, .5, .6, WHITE, .4, 1.45, -.3); for (let i = 0; i < 4; i++) P(g, .06, .8 + i % 2 * .2, .06, 0x5a8a3a, -1.2 + i * .12, .45, .6, false); palm(g, 1.3, .7, 2.3); },
+  sword(g, T) { legs(g, SK.brown); torso(g, SK.brown); P(g, .48, .26, .34, WHITE, 0, .44, 0); P(g, .5, .1, .34, GOLD, 0, .76, 0); head(g, SK.brown);
+    P(g, .38, .16, .36, T, 0, 1.15, 0); P(g, .38, .05, .36, GOLD, 0, 1.08, 0); for (const s of [-1, 1]) P(g, .1, .34, .2, T, s * .18, .92, -.06);
+    P(g, .1, .6, .42, T, -.32, .6, .04); P(g, .12, .2, .3, WHITE, -.33, .82, .04); P(g, .06, .36, .06, STEEL, .31, .62, .16); P(g, .06, .06, .24, STEEL, .31, .82, .26); },
+  bow(g, T) { legs(g, SK.brown); torso(g, SK.brown); P(g, .48, .26, .34, WHITE, 0, .44, 0); head(g, SK.brown); P(g, .34, .24, .36, 0x1a1a1a, 0, 1.06, -.03); P(g, .36, .06, .36, T, 0, 1.15, 0); P(g, .06, .82, .06, WOOD, -.3, .64, .12); P(g, .16, .42, .14, T, .1, .64, -.22); },
+  horse(g, T) { chariot(g, T, 0x8a5a34, false); },
+  hero(g, T) { chariot(g, T, WHITE, true); } },
+
+{ id: 'galos', name: 'GALOS', era: 'Galia independiente · s. I a. C.', own: 0x2f8a3a,
+  tag: 'Castros de empalizada, chozas redondas de paja y guerreros sin armadura con escudos ovalados. Madera y tierra.',
+  biome: 0x5a8a3e, plaza: 0xa88a5a, sw: [0x8a6a3a, 0xc8a85a, 0x2f8a3a, 0xc8913c],
+  names: ['GUERRERO', 'CAZADOR', 'JINETE NOBLE', 'CAUDILLO'],
+  notes: ['<b>Escudo:</b> ovalado y largo con umbo de bronce', '<b>Silueta:</b> pelo largo y bigote, torso descubierto con capa', '<b>Héroe:</b> casco alado y estandarte del jabalí'],
+  castle(g, T) { for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2; if (Math.abs(a - Math.PI / 2) < .35) continue; P(g, .3, 1.5 + (i % 2) * .3, .3, 0x7a5a34, Math.cos(a) * 3.2, .8, Math.sin(a) * 2.6); }
+    P(g, 3, 1.4, 3, 0xb8a080, 0, .7, -.3); P(g, 3, 1.4, 3, 0xb8a080, 0, .7, -.3, true, Math.PI / 4); steps(g, 5, 4.2, .4, 4.2, .8, 0xc8a85a, 0, 1.4, -.3, 0xb89848); P(g, .8, 1, .1, 0x3a2a14, 0, .5, 1.85);
+    P(g, .1, 4, .1, BRONZE, 2.4, 2, 1.2); P(g, .6, .36, .26, BRONZE, 2.4, 4.1, 1.2); P(g, .16, .16, .26, BRONZE, 2.75, 4.05, 1.2); P(g, .7, .6, .06, T, 2.4, 3.4, 1.2); },
+  barracks(g, T) { P(g, 3.6, 1.1, 2, 0x9a7a4a, 0, .55, 0); steps(g, 3, 3.9, .4, 2.3, .7, 0xc8a85a, 0, 1.1, 0); P(g, .8, .9, .1, 0x3a2a14, 0, .45, 1.02); P(g, .08, 2.6, .08, WOOD, 2.2, 1.3, .8); P(g, .5, .7, .06, T, 2.46, 2.1, .8); },
+  house(g) { P(g, 1.6, .9, 1.6, 0xb8a080, 0, .45, 0); P(g, 1.6, .9, 1.6, 0xb8a080, 0, .45, 0, true, Math.PI / 4); steps(g, 4, 2.2, .35, 2.2, .5, 0xc8a85a, 0, .9, 0); P(g, 1, .5, .6, 0x8a6a3a, 1.5, .25, .4); bush(g, -1.4, .5); },
+  sword(g, T) { legs(g, 0x6a8a3a, 0x8a3a2a); torso(g, SK.light); P(g, .5, .5, .1, T, 0, .66, -.2); P(g, .2, .06, .06, GOLD, 0, .8, .18); head(g, SK.light); P(g, .36, .2, .36, 0xe0b050, 0, 1.08, -.03); P(g, .3, .3, .1, 0xe0b050, 0, .9, -.18); P(g, .24, .06, .06, 0xc89a40, 0, .9, .17);
+    P(g, .1, .9, .48, T, -.33, .62, .04); P(g, .14, .2, .2, BRONZE, -.39, .62, .04); P(g, .06, .82, .08, STEEL, .32, .76, .16); },
+  bow(g, T) { legs(g, 0x6a5a3a); torso(g, 0x4a6a3a); head(g, SK.light); P(g, .38, .3, .38, 0x3a5a2a, 0, 1.06, -.02); P(g, .14, .2, .14, 0x3a5a2a, 0, 1.24, -.14); P(g, .5, .12, .34, T, 0, .76, 0); P(g, .06, .9, .06, WOOD, -.3, .66, .12); P(g, .16, .42, .14, 0x7a4824, .1, .64, -.22); },
+  horse(g, T) { horse(g, 0x9a7a5a, 0x8a6a4a, 0x4a3a24, T); rider(g, 0x8a6a3a, SK.light); P(g, .5, .5, .08, T, 0, 1.2, -.24); P(g, .32, .16, .32, BRONZE, 0, 1.8, -.05); for (const s of [-1, 1]) P(g, .08, .22, .08, BRONZE, s * .18, 1.95, -.05); P(g, .08, .7, .38, T, -.28, 1.2, 0); P(g, .05, .05, 1.5, WOOD, .27, 1.3, .4); },
+  hero(g, T) { horse(g, 0x3a2a1a, 0x2a1e12, 0x1a120a, T); rider(g, 0x8a6a3a, SK.light); P(g, .22, .06, .06, GOLD, 0, 1.47, .12); P(g, .6, .7, .08, T, 0, 1.15, -.26); P(g, .32, .16, .32, STEEL, 0, 1.8, -.05);
+    for (const s of [-1, 1]) { P(g, .06, .36, .3, WHITE, s * .2, 2, -.12); P(g, .06, .2, .2, WHITE, s * .26, 2.2, -.2); }
+    P(g, .08, 2.1, .08, BRONZE, .32, 1.9, .1); P(g, .34, .2, .44, BRONZE, .32, 3, .14); P(g, .14, .14, .14, BRONZE, .32, 3.02, .42); P(g, .36, .3, .06, T, .32, 2.55, .1); } },
+];
+// carro egipcio: dos caballos, caja del color del bando y conductor-arquero; el del faraón es dorado con corona azul
+function chariot(g, T, hc, king) {
+  for (const s of [-.3, .3]) { const h = new THREE.Group(); h.position.set(s, 0, .55); h.scale.setScalar(.85); g.add(h); horse(h, hc, hc === WHITE ? 0xeae6f2 : 0x7a4824, hc === WHITE ? 0xd8d4e4 : 0x5a3a24, T); }
+  P(g, .05, .05, 1.1, WOOD, 0, .75, .1); P(g, .9, .5, .5, king ? GOLD : T, 0, .7, -.55); P(g, .92, .08, .52, king ? T : GOLD, 0, .97, -.55);
+  for (const s of [-1, 1]) { P(g, .08, .5, .5, WOOD, s * .55, .3, -.6); P(g, .1, .14, .14, GOLD, s * .6, .3, -.6); }
+  P(g, .36, .4, .26, WHITE, 0, 1.18, -.6); P(g, .24, .24, .24, SK.brown, 0, 1.5, -.6);
+  if (king) { P(g, .28, .24, .28, 0x2a4ab0, 0, 1.72, -.6); P(g, .2, .12, .2, 0x2a4ab0, 0, 1.88, -.64); P(g, .06, .1, .06, GOLD, 0, 1.68, -.44); P(g, .42, .5, .06, T, 0, 1.2, -.75); }
+  else { P(g, .34, .16, .34, T, 0, 1.66, -.6); }
+  P(g, .05, .7, .05, WOOD, -.28, 1.2, -.5);
+}
+
+
+  const WALLS = { roma: [0xe2dccc, 0xc8c0ae], cartago: [0xd9b27a, 0xc49a62], china: [0x8a8a92, 0x6a6a74], mexica: [0xd8d0b8, 0xbab29a], egipto: [0xe0c48a, 0xc8aa70], galos: [0x8a6a3e, 0x6a4e2a] };
+  for (const c of CIVS) c.wall = WALLS[c.id];
+  return { list: CIVS, grp, setFill: f => { FILL = f; } };
+})();
+const CIVS = CIV.list;
+let civPick = ['random', 'random'], civIdx = [0, 1];
+try { civPick = JSON.parse(localStorage.getItem('imperium-civs')) || civPick; } catch (e) {}
+const civOf = side => CIVS[civIdx[side] ?? 0];
+const CIV_SLOT = { sword: 0, bow: 1, horse: 2, hero: 3 };
+const uname = (side, type) => side < 2 && type in CIV_SLOT ? civOf(side).names[CIV_SLOT[type]] : UNITS[type].name;
+// elige las civilizaciones: "aleatoria" evita repetir la del otro bando si se puede
+function resolveCivs(final) {
+  const fixed = civPick.map(v => v === 'random' ? -1 : CIVS.findIndex(c => c.id === v));
+  for (const sd of [0, 1]) {
+    if (fixed[sd] >= 0) { civIdx[sd] = fixed[sd]; continue; }
+    if (!final) { civIdx[sd] = civIdx[sd] ?? sd; continue; }
+    const other = fixed[1 - sd] >= 0 ? fixed[1 - sd] : sd === 1 ? civIdx[0] : -1, pool = CIVS.map((_, i) => i).filter(i => i !== other);
+    civIdx[sd] = pool[Math.random() * pool.length | 0];
+  }
+}
+// reconstruye fortaleza, cuartel y murallas con la civilización de cada bando
+function rebuildCivBuildings() {
+  if (!spots.length || !spots[BASE0].group) return;
+  for (const k of [BASE0, BASE1, BARR0, BARR1]) { const s = spots[k]; world.remove(s.group); if (s.shadow) { world.remove(s.shadow); decos.splice(decos.indexOf(s.shadow), 1); } (k <= BASE1 ? buildCastle : buildBarracks)(s); }
+  for (const f of forts) { for (const g of f.walls || []) { world.remove(g); const i = decos.indexOf(g); if (i >= 0) decos.splice(i, 1); } buildWalls(f); }
+  updateCtx();
+}
+
 // ---------- Edificios ----------
 const spotPos = (s, lift = 0) => new THREE.Vector3(s.x, s.y + lift, s.z);
 function placeSpot(s, g, face) {
   let m = 1; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) m = Math.max(m, surfY(s.x + dx, s.z + dz));
   s.y = m; g.position.set(s.x, s.y, s.z); g.rotation.y = face; world.add(g); s.group = g; s.base = g.position.clone(); g.updateMatrixWorld();
   const r = { base: 4.4, barracks: 2.9, altar: 2.7, town: 3.3 }[s.kind] || 3;   // sombra suave desplazada hacia donde cae la luz
-  const sh = new THREE.Mesh(new THREE.CircleGeometry(r, 28), basic(0x0f1a2a, .22)); sh.rotation.x = -Math.PI / 2; sh.position.set(s.x + r * .18, s.y + .04, s.z - r * .22); world.add(sh); decos.push(sh);
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(r, 28), basic(0x0f1a2a, .22)); sh.rotation.x = -Math.PI / 2; sh.position.set(s.x + r * .18, s.y + .04, s.z - r * .22); world.add(sh); decos.push(sh); s.shadow = sh;
   s.flags = [];
 }
 // banderas que ondean: se estiran y encogen desde el mástil
@@ -721,27 +916,15 @@ function addFlag(s, m, dir = 1) { s.flags.push({ m, w: m.scale.x, px: m.position
 const facing = (s, tx, tz) => Math.atan2(tx - s.x, tz - s.z);
 const local = (s, x, y, z) => s.group.localToWorld(new THREE.Vector3(x, y, z));
 function buildCastle(s) {
-  const g = new THREE.Group(), T = TEAM[s.side], stone = 0xd4cde2, stone2 = 0xa59ebb, f = forts[s.side];
-  part(g, 6.8, 1.4, 6.8, stone2, 0, -.55, 0);
-  for (const [a, b] of [[-2.2, -2.2], [2.2, -2.2], [-2.2, 2.2], [2.2, 2.2]]) { part(g, 1.4, 3, 1.4, stone, a, 1.5, b); part(g, 1.7, .5, 1.7, stone2, a, 3.2, b); part(g, .6, .6, .6, T.c, a, 3.75, b); }
-  for (const [a, b, w, d] of [[0, -2.2, 3, .7], [0, 2.2, 3, .7], [-2.2, 0, .7, 3], [2.2, 0, .7, 3]]) { part(g, w, 1.8, d, stone, a, .9, b); part(g, w, .25, d + .1, stone2, a, 1.9, b); }
-  part(g, 1.1, 1.3, .2, 0x5a3a24, 0, .65, 2.6, false);
-  part(g, 2.2, 4, 2.2, stone, 0, 2, 0); part(g, 2.6, 1, 2.6, stone2, 0, 4.4, 0); part(g, 1.4, .9, 1.4, T.c, 0, 5.3, 0);
-  part(g, .14, 2.4, .14, 0x8a5a34, 0, 6.8, 0); const fl = part(g, 1.4, .8, .1, T.c, .75, 7.5, 0, false);
-  placeSpot(s, g, Math.atan2(Math.cos(f.tb), Math.sin(f.tb))); s.hp = GAME.baseHp; addFlag(s, fl);
+  const g = new THREE.Group(), f = forts[s.side];
+  civOf(s.side).castle(CIV.grp(g, 0, 0, 0, 1.05), TEAM[s.side].c);
+  placeSpot(s, g, Math.atan2(Math.cos(f.tb), Math.sin(f.tb))); s.hp = s.hp ?? GAME.baseHp;
 }
 function buildBarracks(s) {
-  const g = new THREE.Group(), T = TEAM[s.side], wood = 0xc08850, wood2 = 0x8a5a34;
-  part(g, 4.4, 1.2, 3.6, 0xb3abc6, 0, -.45, 0);
-  part(g, 3.8, 1.8, 3, wood, 0, .9, 0);
-  for (const a of [-1.7, 1.7]) part(g, .3, 1.9, .3, wood2, a, .95, 1.4);
-  part(g, 4.1, .5, 3.3, 0x8a5a34, 0, 2.05, 0); part(g, 3.3, .5, 2.5, 0x5a3a24, 0, 2.5, 0); part(g, 2.3, .4, 1.5, 0x8a5a34, 0, 2.9, 0); part(g, .1, 1.2, .1, 0x5a3a24, 0, 3.6, 0); const fl = part(g, .7, .45, .08, T.c, .4, 3.95, 0, false);
-  part(g, 1.1, 1.3, .2, 0x4a2a14, 0, .65, 1.55, false);
-  part(g, .9, .6, .12, T.c, 0, 1.6, 1.6); part(g, .08, .7, .08, 0xd8dcf0, -.15, 1.6, 1.68, false); part(g, .08, .7, .08, 0xd8dcf0, .15, 1.6, 1.68, false);
-  for (const a of [-1, -.6]) part(g, .08, 1.1, .08, 0xd8dcf0, 2.2, .55, a);
-  part(g, .5, .5, .5, 0xb07a4a, 2.2, .25, .6);
-  s.sel = ring(g, 3, 3.3, 0xffe03a, .2); s.sel.visible = false;
-  placeSpot(s, g, facing(s, spots[s.side].x, spots[s.side].z)); addFlag(s, fl);
+  const g = new THREE.Group();
+  civOf(s.side).barracks(CIV.grp(g, 0, 0, 0, 1.1), TEAM[s.side].c);
+  s.sel = ring(g, 3, 3.3, 0xffe03a, .2); s.sel.visible = selBld === 'barracks' && s.side === 0;
+  placeSpot(s, g, facing(s, spots[s.side].x, spots[s.side].z));
 }
 function buildAltar(s) {
   const g = new THREE.Group(), T = TEAM[s.side], marble = 0xf4f1ff, gold = 0xffd23f;
@@ -783,7 +966,7 @@ function buildTown(s) {
 }
 const decos = [];
 function buildWalls(f) {
-  const T = TEAM[f.side], stone = 0xcfc8dc, stone2 = 0xb3abc6, NS = 64, hr = Math.round(f.h), A = [];
+  const T = TEAM[f.side], [stone, stone2] = civOf(f.side).wall, NS = 64, hr = Math.round(f.h), A = []; f.walls = [];
   for (let k = 0; k < NS; k++) { const th = k / NS * Math.PI * 2; A.push({ th, r: wallR(f, th) }); }
   const gateAt = k => { const a = A[((k % NS) + NS) % NS]; return inGate(f, a.th, a.r); };
   for (let k = 0; k < NS; k++) {
@@ -793,7 +976,7 @@ function buildWalls(f) {
     part(g, Math.hypot(dx, dz) + .25, 2.9, .9, stone, 0, .4, 0);
     if (k % 2) part(g, .55, .5, 1, stone2, 0, 2.05, 0);
     if (k % 16 === 8 || gateAt(k + 2) || gateAt(k - 1)) { part(g, 1.7, 3.7, 1.7, stone, 0, .65, 0); part(g, 2, .45, 2, stone2, 0, 2.7, 0); part(g, .6, .7, .6, T.c, 0, 3.25, 0); }
-    world.add(g); decos.push(g);
+    world.add(g); decos.push(g); f.walls.push(g);
   }
 }
 function setOwner(s, sd) {
@@ -820,6 +1003,16 @@ function setOwner(s, sd) {
 
 // ---------- Unidades ----------
 function buildUnit(type, side, parent = world) {
+  if (side < 2 && type in CIV_SLOT) {   // tropa de civilización
+    const g = new THREE.Group(), body = new THREE.Group(), fills = []; g.add(body);
+    CIV.setFill(fills); civOf(side)[type](body, TEAM[side].c); CIV.setFill(null);
+    body.updateMatrixWorld(true); const top = new THREE.Box3().setFromObject(body).max.y;
+    const crest = new THREE.Group(); part(crest, .18, .18, .18, 0xffffff, 0, top + .16, 0); crest.visible = false; body.add(crest);
+    const sh = new THREE.Mesh(new THREE.CircleGeometry(.62, 20), basic(0x0f0f1b, .28)); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; g.add(sh);
+    const team = ring(g, .46, .66, TEAM[side].c, .05), selR = ring(g, .7, .86, 0xffe03a, .07); selR.visible = false;
+    g.scale.setScalar(type === 'hero' ? 1.8 : 1.3); parent.add(g);
+    return { g, body, fills, team, selR, crest, sh };
+  }
   const g = new THREE.Group(), body = new THREE.Group(), T = TEAM[side], skin = 0xffd2a0, steel = 0xd8dcf0, fills = [];
   g.add(body);
   const P = (...a) => part(body, ...a, true, fills);
@@ -850,8 +1043,6 @@ function buildUnit(type, side, parent = world) {
     }
   }
   const hy = type === 'sword' ? 1.24 : type === 'bow' ? 1.3 : type === 'hero' ? 1.9 : 1.86, hz = type === 'horse' || type === 'hero' ? -.05 : 0;
-  if (side === 0) { P(.07, .3, .34, 0xf4f4e8, 0, hy + .14, hz - .02); crestY += .22; }   // cresta alta
-  else if (side === 1) for (const sx of [-1, 1]) { P(.24, .1, .1, 0xf4ead0, sx * .29, hy, hz); P(.1, .32, .1, 0xf4ead0, sx * .4, hy + .2, hz); }   // cuernos
   const crest = new THREE.Group(); part(crest, .18, .18, .18, 0xffffff, 0, crestY, 0); crest.visible = false; body.add(crest);
   const sh = new THREE.Mesh(new THREE.CircleGeometry(.62, 20), basic(0x0f0f1b, .28)); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; g.add(sh);
   const team = ring(g, .46, .66, T.c, .05);
@@ -868,6 +1059,7 @@ function palettize(src) {   // miniaturas limpias: solo recorta el alfa
 }
 
 function makeThumbs() {
+  for (const k in THUMB) delete THUMB[k];
   try {
     const r = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true });
     r.setPixelRatio(1); r.setSize(72, 72, false); r.outputColorSpace = THREE.LinearSRGBColorSpace;
@@ -1310,7 +1502,7 @@ function updateProduction(dt) {
       q[0].t -= dt;
       if (q[0].t <= 0) {
         const it = q.shift(), u = spawnUnit(side, it.type);
-        if (side === 0) { sfx('ready'); floatText(spotPos(spots[BARR0], 4.5), UNITS[it.type].name + ' LISTA', '#8ad8f0', 9); refreshPanel(); }
+        if (side === 0) { sfx('ready'); floatText(spotPos(spots[BARR0], 4.5), uname(0, it.type) + ' LISTO', '#8ad8f0', 9); refreshPanel(); }
         burst(u.pos, [0xffffff, TEAM[side].l], 6, 1.5, 2, .4, .16);
       }
     }
@@ -1346,7 +1538,7 @@ function clearWorld() {
 function newGame(s) {
   $('loading').hidden = false; $('end').hidden = true; $('start').hidden = true; $('ui').classList.add('hidden-ui');
   requestAnimationFrame(() => setTimeout(() => {
-    clearWorld(); resetFog(false);
+    clearWorld(); resetFog(false); resolveCivs(false);
     generate(s);
     const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, town: buildTown };
     for (const sp of spots) B[sp.kind](sp);
@@ -1362,7 +1554,7 @@ function newGame(s) {
     $('loading').hidden = true; $('start').hidden = false; state = 'menu';
   }, 30));
 }
-function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; resetFog(true); selBld = null; selSpot = null; updateCtx(); track('game_start', { seed, diff, map: scen }); }
+function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); resolveCivs(true); rebuildCivBuildings(); makeThumbs(); $('ui').classList.remove('hidden-ui'); state = 'play'; resetFog(true); selBld = null; selSpot = null; updateCtx(); track('game_start', { seed, diff, map: scen }); }
 function endGame(win) {
   state = 'end'; $('ui').classList.add('hidden-ui'); $('toast').hidden = true; $('pause').hidden = true;
   const s = spots[win ? BASE1 : BASE0];
@@ -1521,8 +1713,8 @@ function panelContent() {
   if (selBld === 'barracks') {
     const full = popOf(0) >= GAME.cap || st.queue.length >= GAME.queueMax;
     const cards = TYPES.map((t, i) => { const d = UNITS[t];
-      return `<button type="button" class="rc" data-act="rec" data-t="${t}" ${full || st.gold < d.cost ? 'disabled' : ''} title="${d.name} · ${d.time} s · ${VS[t]}"><kbd>${i + 1}</kbd><img alt="" src="${THUMB[t] || ''}"><b>${d.name}</b><s>${d.cost}</s></button>`; }).join('');
-    const q = st.queue.map((it, i) => `<button type="button" class="q" data-act="cancel" data-i="${i}" title="Cancelar (devuelve el oro)"><img alt="${UNITS[it.type].name}" src="${THUMB[it.type] || ''}">${i === 0 ? `<i><b style="width:${pct(1 - it.t / UNITS[it.type].time)}"></b></i>` : ''}</button>`).join('');
+      return `<button type="button" class="rc" data-act="rec" data-t="${t}" ${full || st.gold < d.cost ? 'disabled' : ''} title="${uname(0, t)} · ${d.time} s · ${VS[t]}"><kbd>${i + 1}</kbd><img alt="" src="${THUMB[t] || ''}"><b>${uname(0, t)}</b><s>${d.cost}</s></button>`; }).join('');
+    const q = st.queue.map((it, i) => `<button type="button" class="q" data-act="cancel" data-i="${i}" title="Cancelar (devuelve el oro)"><img alt="${uname(0, it.type)}" src="${THUMB[it.type] || ''}">${i === 0 ? `<i><b style="width:${pct(1 - it.t / UNITS[it.type].time)}"></b></i>` : ''}</button>`).join('');
     return `<div class="ph" title="Clic derecho en el mapa: punto de reunión"><h3>CUARTEL</h3><em>COLA ${st.queue.length}/${GAME.queueMax}</em><em>TROPAS ${popOf(0)}/${GAME.cap}</em></div>${cards}<div class="qu">${q || '<span class="none">COLA VACÍA</span>'}</div>`;
   }
   if (selBld === 'altar') {
@@ -1551,7 +1743,7 @@ function panelContent() {
   if (!list.length) return '';
   if (list.length === 1) return unitDetail(list[0]);
   const h = heroOf(0), free = h ? list.filter(u => u !== h && u.leader !== h) : [];
-  const cnt = ALLT.filter(t => t !== 'hero').map(t => [t, list.filter(u => u.type === t).length]).filter(([, n]) => n).map(([t, n]) => `${n} ${UNITS[t].name}${n > 1 ? 'S' : ''}`);
+  const cnt = ALLT.filter(t => t !== 'hero').map(t => [t, list.filter(u => u.type === t).length]).filter(([, n]) => n).map(([t, n]) => `${n} ${uname(0, t)}${n > 1 ? (/[AEIOUÁÉÓ]$/.test(uname(0, t)) ? 'S' : 'ES') : ''}`);
   const order = { hero: 0, sword: 1, bow: 2, horse: 3 };
   const cards = groupCards(list, 'type');
   const asg = h && free.length ? `<button type="button" class="y" data-act="assign">ASIGNAR (${h.escort.length}/${GAME.escortMax})</button>` : '';
@@ -1562,14 +1754,14 @@ function panelContent() {
 function groupCards(list, act) {
   return ALLT.map(t => { const l = list.filter(u => u.type === t); if (!l.length) return '';
     const k = l.reduce((a, u) => a + u.hp / u.maxHp, 0) / l.length, rk = Math.max(...l.map(u => u.rank));
-    return `<button type="button" class="gc" data-act="${act}" data-t="${t}" title="${UNITS[t].name} · clic: solo estas · mayús+clic: quitar"><img alt="" src="${THUMB[t] || ''}"><span class="n">${l.length}</span>${rk ? `<u style="background:${RANKS[rk].css}"></u>` : ''}<i><b style="width:${pct(k)};background:${hpCol(k)}"></b></i></button>`; }).join('');
+    return `<button type="button" class="gc" data-act="${act}" data-t="${t}" title="${uname(0, t)} · clic: solo estas · mayús+clic: quitar"><img alt="" src="${THUMB[t] || ''}"><span class="n">${l.length}</span>${rk ? `<u style="background:${RANKS[rk].css}"></u>` : ''}<i><b style="width:${pct(k)};background:${hpCol(k)}"></b></i></button>`; }).join('');
 }
 function shapeButtons(h) {
   return `<span class="shp">${Object.entries(SHAPES).map(([k, n]) => `<button type="button" data-act="shape" data-s="${k}" class="${(h.formShape || 'block') === k ? 'y' : ''}">${n}</button>`).join('')}</span>`;
 }
 function cellHtml(u) {
   const k = u.hp / u.maxHp;
-  return `<button type="button" class="cell${u.leader ? ' esc' : ''}" data-act="one" data-id="${u.id}" title="${u.def.name}${u.rank ? ' · ' + RANKS[u.rank].name : ''}"><img alt="" src="${THUMB[u.type] || ''}">${u.rank ? `<u style="background:${RANKS[u.rank].css}"></u>` : ''}<i><b style="width:${pct(k)};background:${hpCol(k)}"></b></i></button>`;
+  return `<button type="button" class="cell${u.leader ? ' esc' : ''}" data-act="one" data-id="${u.id}" title="${uname(u.side, u.type)}${u.rank ? ' · ' + RANKS[u.rank].name : ''}"><img alt="" src="${THUMB[u.type] || ''}">${u.rank ? `<u style="background:${RANKS[u.rank].css}"></u>` : ''}<i><b style="width:${pct(k)};background:${hpCol(k)}"></b></i></button>`;
 }
 function unitDetail(u) {
   const k = u.hp / u.maxHp, R1 = RANKS[u.rank], hero = u.type === 'hero', mul = (u.leader ? GAME.escortBonus : 1) * R1.mul;
@@ -1580,7 +1772,7 @@ function unitDetail(u) {
   if (hero) note = u.chargeT > 0 ? '¡CARGANDO!' : u.chargeCd > 0 ? `CARGA EN ${Math.ceil(u.chargeCd)} S` : 'CARGA LISTA';
   const esc = hero && u.escort.length ? groupCards(u.escort, 'esc') + `<div class="act">${shapeButtons(u)}</div>` : '';
   const h = heroOf(0), asg = !hero && h && u.leader !== h ? `<div class="act"><button type="button" class="y" data-act="assign">ASIGNAR (${h.escort.length}/${GAME.escortMax})</button></div>` : '';
-  return `<div class="ph"><h3>${u.def.name}${rk}</h3><em>${hero ? `ESCOLTA ${u.escort.length}/${GAME.escortMax}` : next}</em></div><img class="big" alt="" src="${THUMB[u.type] || ''}">
+  return `<div class="ph"><h3>${uname(u.side, u.type)}${rk}</h3><em>${hero ? `ESCOLTA ${u.escort.length}/${GAME.escortMax}` : next}</em></div><img class="big" alt="" src="${THUMB[u.type] || ''}">
     <div class="info"><div class="hpb"><b style="width:${pct(k)};background:${hpCol(k)}"></b><span>${Math.ceil(u.hp)}/${u.maxHp}</span></div>
       <div class="stats"><span>ATQ <b>${Math.round(u.def.dmg * mul)}</b></span><span>ALC <b>${u.def.range}</b></span><span>VEL <b>${u.def.speed}</b></span>${hero ? `<span>BAJAS <b>${u.kills}</b></span>` : ''}</div>
       <div class="note${u.leader || hero ? ' g' : ''}">${note}</div></div>${esc}${asg}`;
@@ -1790,6 +1982,15 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => { keys.clear(); mouse.in = false; });
 $('go').addEventListener('click', () => { sfx('select'); startGame(); });
+for (const sd of [0, 1]) {
+  const el = $('civ' + sd);
+  el.innerHTML = '<option value="random">ALEATORIA</option>' + CIVS.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  el.value = civPick[sd] || 'random';
+  el.addEventListener('change', () => {
+    civPick[sd] = el.value; try { localStorage.setItem('imperium-civs', JSON.stringify(civPick)); } catch (e) {}
+    resolveCivs(false); rebuildCivBuildings(); makeThumbs(); sfx('select');
+  });
+}
 $('howBtn').addEventListener('click', () => { sfx('select'); $('start').hidden = true; $('how').hidden = false; });
 $('howBack').addEventListener('click', () => { sfx('select'); $('how').hidden = true; $('start').hidden = false; });
 // tocar cualquier parte del menú (salvo sus botones) también empieza la partida
