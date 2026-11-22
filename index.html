@@ -328,7 +328,7 @@ function baseGround(rng) {
       g = v > 0 ? 1 + Math.min(1, v * 3) * (1 + n2(cx, cz, .05, 3, 10) * 3) : -1 - Math.min(5, -v * 9);
       for (const [i, j] of bridges) if (segDist(cx, cz, isl[i].x, isl[i].z, isl[j].x, isl[j].z) < 2.2 + n2(cx, cz, .1, 2, 11)) g = Math.max(g, 1);
     } else {   // río con vados entre dos llanuras
-      const xr = MW / 2 + Math.sin(cz * .03 + ph) * 22 + (n2(0, cz, .02, 3, 12) - .5) * 26, dr = Math.abs(cx - xr);
+      const xr = MW / 2 + Math.sin(cz * .03 + ph) * 22 + (n2(0, cz, .02, 3, 12) - .5) * 26, dr = Math.abs(cx - xr); RIVX[z] = xr;
       g = plains(cx, cz);
       if (dr < 4) g = fords.some(f => Math.abs(cz - f) < 3) ? 1 : -1.2 - (4 - dr) * .6;
       else if (dr < 5.5) g = Math.min(g, 1.2);
@@ -340,11 +340,13 @@ function baseGround(rng) {
 
 // ---------- Mapa de alturas ----------
 const N = MW * MD, idx = (x, z) => z * MW + x;
+const RIVX = new Float32Array(MD).fill(MW / 2);   // x del río en cada fila: separa las dos mitades del mapa
 let EL = null, G = null, HM = null, sea = .5, emax = 1, emin = 0, flats = [], forts = [];
 const rawG = e => e;
 function groundXZ(x, z) {
   let g = rawG(EL[idx(x, z)]); const cx = x + .5, cz = z + .5;
   for (const f of flats) { const r = Math.hypot(cx - f.x, cz - f.z); if (r < f.r1) g += (f.h - g) * (1 - smooth01((r - f.r0) / (f.r1 - f.r0))); }
+  for (const f of forts) if (f.moat) { const p = polar(f, cx, cz); if (p) { const rw = wallR(f, p[1]); if (p[0] > rw + 2.2 && p[0] < rw + 4.6 && !f.gates.some(ga => angDiff(p[1], ga) * p[0] < 2.4)) g = -1.6; } }
   return g;
 }
 function computeHM() { for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) { const i = idx(x, z), g = groundXZ(x, z); G[i] = g; HM[i] = g >= .5 ? Math.max(1, Math.round(g)) : 0; } }
@@ -354,10 +356,17 @@ const surfY = (x, z) => HM[cellOf(x, z)];
 // ---------- Fortalezas ----------
 function polar(f, x, z) { const dx = x - f.x, dz = z - f.z, r = Math.hypot(dx, dz); return r > 26 ? null : [r, Math.atan2(dz, dx)]; }
 const angDiff = (a, b) => { let d = Math.abs(a - b) % (Math.PI * 2); return d > Math.PI ? Math.PI * 2 - d : d; };
+// distancia desde el centro hasta el borde de un polígono (coordenadas locales: +z = frente) en el ángulo dado
+function shapeRadius(pts, ang) {
+  const dx = Math.cos(ang), dz = Math.sin(ang); let best = 0;
+  for (let i = 0; i < pts.length; i++) { const [ax, az] = pts[i], [bx, bz] = pts[(i + 1) % pts.length], ex = bx - ax, ez = bz - az, det = -dx * ez + ex * dz; if (Math.abs(det) < 1e-9) continue;
+    const t = (-ax * ez + ex * az) / det, u = (dx * az - dz * ax) / det; if (u >= -1e-6 && u <= 1 + 1e-6 && t > best) best = t; }
+  return best || 6;
+}
 function wallR(f, th) { const n = f.rw.length, t = (((th / (Math.PI * 2)) % 1) + 1) % 1 * n, i = Math.floor(t), k = t - i; return f.rw[i % n] * (1 - k) + f.rw[(i + 1) % n] * k; }
 const inGate = (f, th, r) => f.gates.some(g => angDiff(th, g) * r < 1.8);
 const fortPt = (f, r, th) => ({ x: f.x + Math.cos(th) * r, z: f.z + Math.sin(th) * r });
-function wallHit(x, z) { for (const f of forts) { const p = polar(f, x, z); if (p && Math.abs(p[0] - wallR(f, p[1])) < .85 && !inGate(f, p[1], p[0])) return true; } return false; }
+function wallHit(x, z) { for (const f of forts) { const p = polar(f, x, z); if (!p) continue; for (const q of f.rings) if (Math.abs(p[0] - wallR(f, p[1]) * q) < .85 && !inGate(f, p[1], p[0])) return true; } return false; }
 
 // ---------- Navegación en rejilla ----------
 let walk = null, inMain = null, mainList = [], regionCell = null;
@@ -475,23 +484,45 @@ const rngOf = s => { s = (s * 9301 + 49297) % 2147483647 || 1; return () => (s =
 function groundPaint(x, z) {   // patio de la fortaleza, pie de muralla, caminos de las puertas y plaza de los pueblos
   for (const f of forts) {
     const p = polar(f, x, z); if (!p) continue;
-    const [r, th] = p, rw = wallR(f, th);
-    if (r < rw - .7) return TP.plaza;
-    if (r < rw + 1.2) return TP.wallbase;
-    if (r < rw + 9 && f.gates.some(g => angDiff(th, g) * r < 1.2)) return TP.path;
+    const [r, th] = p, rw = wallR(f, th), M = civOf(f.side).map, qi = f.rings[f.rings.length - 1];
+    if (r < rw * qi - .7) { const a = f.tb - Math.PI / 2, ic = M.inside ? M.inside(r * Math.cos(th - a), r * Math.sin(th - a)) : -1; return ic >= 0 ? ic : M.plaza; }
+    if (f.rings.length > 1 && r < rw - .7) return M.between;
+    if (r < rw + 1.2) return M.wallbase;
+    if (r < rw + 9 && f.gates.some(g => angDiff(th, g) * r < 1.2)) return M.path;
   }
   for (const f of flats) if (f.kind === 'town' && Math.hypot(x - f.x, z - f.z) < 3.6) return TP.path;
   return -1;
 }
 // color de la cara superior de una casilla: pocas manchas grandes (personalidad) sin ruido por vóxel
+function sideAt(x, z) {   // 0 = orilla oeste (tu civilización), 1 = orilla este; borde ruidoso de ~24 casillas
+  const d = x - RIVX[THREE.MathUtils.clamp(z | 0, 0, MD - 1)] + (n2(x, z, .08, 2, 61) - .5) * 26, t = THREE.MathUtils.clamp(d / 24 + .5, 0, 1);
+  return t <= 0 ? 0 : t >= 1 ? 1 : hash((x | 0) >> 1, 5, (z | 0) >> 1) < t ? 1 : 0;
+}
+const biomeAt = (x, z) => civOf(sideAt(x, z)).map;
+// rasgo de paisaje de cada bioma (solo color de suelo; Galos y mexicas añaden piezas en buildVoxels)
+function featureAt(x, z, side, B) {
+  const cx = x + .5, cz = z + .5, f = n2(cx, cz, .055, 3, 33 + side * 8);
+  if (B.feature === 'nile') { const dr = Math.abs(cx - RIVX[z]); if (dr < 17) return z % 4 ? 0x86ac58 : 0x76a04c; return f < .3 ? 0xecdaa6 : -1; }
+  if (f >= .22) return -1;
+  switch (B.feature) {
+    case 'vine': return z % 3 === 0 ? 0x4f7a3a : 0x9ab868;
+    case 'salt': return f < .17 ? 0xece6d6 : 0xd8d0b4;
+    case 'paddy': return x % 6 === 0 || z % 6 === 0 ? 0x7a9a5a : 0x7ab8c8;
+    case 'maize': return z % 2 ? 0xa8b44c : 0x7a9a40;
+    case 'rocks': return f < .15 ? 0x8a8e88 : 0x6a9a48;
+  }
+  return -1;
+}
 function terrainColor(x, z) {
   const i = idx(x, z), h = HM[i], cx = x + .5, cz = z + .5;
   const pc = groundPaint(cx, cz); if (pc >= 0) return pc;
-  if (roadCell && roadCell[i]) return h <= 1 ? TP.ford : TP.road;
-  if (h <= 1) return TP.sand;
-  if (treeCell && treeCell[i]) return TP.lush;
-  const m = n2(cx, cz, .045, 3, 21) + (h - 2) * .05, tone = THREE.MathUtils.clamp(Math.floor((m - .34) / .09), 0, 3);
-  return [TP.lush, TP.grass, TP.grass2, TP.dry][tone];
+  const side = sideAt(cx, cz), B = civOf(side).map;
+  if (roadCell && roadCell[i]) return h <= 1 ? TP.ford : B.road;
+  if (h <= 1) return B.sand;
+  if (treeCell && treeCell[i]) return B.lush;
+  const fc = featureAt(x, z, side, B); if (fc >= 0) return fc;
+  const m = n2(cx, cz, .045, 3, 21 + side * 7) + (h - 2) * .05, tone = THREE.MathUtils.clamp(Math.floor((m - .34) / .09), 0, 3);
+  return B.ground[tone];
 }
 let meshes = [], spots = [];
 function generate(newSeed) {
@@ -518,15 +549,17 @@ function generate(newSeed) {
   const A = pick(.1, .2), B = pick(.8, .9);
   if (A < 0 || B < 0) return generate(newSeed + 104729);
   const mkFort = (i, side) => {
-    const x = cellX(i), z = cellZ(i), tb = Math.atan2(MD / 2 - z, MW / 2 - x);
-    return { side, x, z, tb, rw: Array.from({ length: 14 }, () => 11.8 + (rng() - .5) * 2.4), gates: [tb, tb + 2.1, tb - 2.1], h: plateau(x, z, 13) };
+    const x = cellX(i), z = cellZ(i), tb = Math.atan2(MD / 2 - z, MW / 2 - x), M = civOf(side).map, pts = M.shape();
+    const maxR = Math.max(...pts.map(([a, b]) => Math.hypot(a, b))), k = 12.3 / maxR, n = 96;
+    const rw = Array.from({ length: n }, (_, j) => shapeRadius(pts, j / n * Math.PI * 2 - tb + Math.PI / 2) * k);
+    return { side, x, z, tb, rw, k, rings: M.rings || [1], moat: !!M.moat, gates: [tb, tb + 2.1, tb - 2.1], h: plateau(x, z, 13) };
   };
   forts = [mkFort(A, 0), mkFort(B, 1)];
   for (const f of forts) flats.push({ kind: 'fort', x: f.x, z: f.z, r0: 15, r1: 21, h: f.h });
-  const inF = (f, r, th) => ({ ...fortPt(f, r, th) });
-  spots = [{ kind: 'base', side: 0, x: forts[0].x, z: forts[0].z }, { kind: 'base', side: 1, x: forts[1].x, z: forts[1].z },
-    { kind: 'barracks', side: 0, ...inF(forts[0], 7.2, forts[0].tb + 1.05) }, { kind: 'barracks', side: 1, ...inF(forts[1], 7.2, forts[1].tb + 1.05) },
-    { kind: 'altar', side: 0, ...inF(forts[0], 7.2, forts[0].tb - 1.05) }, { kind: 'altar', side: 1, ...inF(forts[1], 7.2, forts[1].tb - 1.05) }];
+  // cada civilización coloca castillo, cuartel y altar a su manera (coordenadas locales del recinto, +z hacia el centro del mapa)
+  const lay = (sd, kind) => { const f = forts[sd], [lx, lz, ry, sc] = civOf(sd).map.layout[kind], a = f.tb - Math.PI / 2;
+    return { kind: kind === 'castle' ? 'base' : kind, side: sd, x: f.x + lx * Math.cos(a) - lz * Math.sin(a), z: f.z + lx * Math.sin(a) + lz * Math.cos(a), ry, sc }; };
+  spots = [lay(0, 'castle'), lay(1, 'castle'), lay(0, 'barracks'), lay(1, 'barracks'), lay(0, 'altar'), lay(1, 'altar')];
   const names = [...TOWN_NAMES].sort(() => rng() - .5);
   const pool = mainList.filter(i => HM[i] <= 5 && cellX(i) > 10 && cellX(i) < MW - 10 && cellZ(i) > 10 && cellZ(i) < MD - 10);
   for (let k = 0; k < GAME.towns; k++) {
@@ -571,6 +604,20 @@ function buildRoads() {
     }
   }
 }
+// árboles de cada bioma: bajos para que las tropas sobresalgan por encima
+function treeBoxes(L, type, cx, h, cz, r2) {
+  const t = .5 + r2 * .25;
+  switch (type) {
+    case 'cypress': L.box(cx, h + .15, cz, .16, .3, .16, 0x5a3a24); L.box(cx, h + .75, cz, .42, .9, .42, 0x2f5a35); L.box(cx, h + 1.3, cz, .24, .3, .24, 0x2f5a35); break;
+    case 'olive': L.box(cx, h + .2, cz, .16, .4, .16, 0x6a5a44); L.box(cx, h + .62, cz, .9, .45, .8, 0x8a9a6a); break;
+    case 'palm': L.box(cx, h + .6, cz, .14, 1.2, .14, 0x8a6a3a); L.box(cx, h + 1.24, cz, 1.1, .08, .26, 0x4f8a3a); L.box(cx, h + 1.26, cz, .26, .08, 1.1, 0x5a9a40); break;
+    case 'bamboo': for (let k = 0; k < 3; k++) L.box(cx + (k - 1) * .22, h + .6 + k * .05, cz + (k % 2) * .16 - .08, .08, 1.2 + k * .1, .08, 0x7ab04a); L.box(cx, h + 1.15, cz, .5, .1, .3, 0x5f9a3e); break;
+    case 'ceiba': L.box(cx, h + .5, cz, .2, 1, .2, 0x8a7a5a); L.box(cx, h + 1.1, cz, 1.3, .28, 1.3, 0x2f6a35); L.box(cx, h + 1.3, cz, .8, .2, .8, 0x3a7a3e); break;
+    case 'jungle': L.box(cx, h + .28, cz, .95, .56, .95, 0x2f6a35); L.box(cx + .15, h + .66, cz - .1, .5, .3, .5, 0x3a8a45); break;
+    case 'oak': L.box(cx, h + .2, cz, .2, .4, .2, 0x5a3a24); L.box(cx, h + .3 + t * .5, cz, .95, t, .95, 0x2f5a30); L.box(cx, h + .35 + t, cz, .6, .3, .6, 0x3a6a38); break;
+    default: L.box(cx, h + .15, cz, .2, .3, .2, TP.trunk); L.box(cx, h + .3 + t * .35, cz, .78, t * .7, .78, TP.pine); L.box(cx, h + .3 + t * .9, cz, .42, t * .4, .42, TP.pine);   // pino
+  }
+}
 function buildVoxels() {
   landBase = []; landEdge = []; regionLand = regions.map(() => []); chunks = []; tileCh = new Uint8Array(N); tileV = new Int32Array(N);
   const H4 = [[1, 0, 0], [-1, 0, 1], [0, 1, 4], [0, -1, 5]];   // dx, dz, cara
@@ -583,8 +630,10 @@ function buildVoxels() {
     if (h < 2 || h > 4 || nearFlat(cx, cz, 3)) continue;
     let ok = true; for (let dz = -2; dz <= 2 && ok; dz++) for (let dx = -2; dx <= 2; dx++) { const j = idx(x + dx, z + dz); if (hAt(x + dx, z + dz) <= 1 || (Math.abs(dx) <= 1 && Math.abs(dz) <= 1 && roadCell[j])) { ok = false; break; } }
     if (!ok) continue;
-    const f = n2(cx, cz, .055, 3, 22);
-    if (f > .62 && hash(x * 3, 1, z * 11) < .4 + (f - .62) * 2.5) treeCell[i] = 1;
+    const f = n2(cx, cz, .055, 3, 22), side = sideAt(cx, cz), B = civOf(side).map;
+    if (B.feature === 'nile' && Math.abs(cx - RIVX[z]) > 22) continue;   // en Egipto, solo palmerales junto al río
+    if (featureAt(x, z, side, B) >= 0 && B.feature !== 'nile') continue;
+    if (f > .62 && hash(x * 3, 1, z * 11) < (.4 + (f - .62) * 2.5) * B.dens) treeCell[i] = 1;
   }
   // sombras cocinadas: el sol viene de -x/+z, así que árboles y desniveles oscurecen hacia +x/-z
   const shadow = new Float32Array(N);
@@ -609,11 +658,11 @@ function buildVoxels() {
     tileV[t] = L.quad(2, x, x + 1, h, h, z, z + 1, col);
     const sc = h <= 1 ? TP.cliffS : TP.cliff, lip = mixHex(col, 0x10203a, .14);   // escalón de 1: color del suelo; más hondo: ladera
     for (const [a, b, f] of H4) { const hn = Math.max(0, hAt(x + a, z + b)); if (hn >= h) continue; L.quad(f, x, x + 1, h - 1, h, z, z + 1, h <= 1 ? sc : lip); if (hn < h - 1) L.quad(f, x, x + 1, hn, h - 1, z, z + 1, sc); }
-    if (treeCell[i]) {   // árbol: tronco corto y copa en bloque, bajos para que las unidades sobresalgan
-      const r2 = hash(x * 5, 7, z * 3), tall = .5 + r2 * .25;
-      L.box(cx, h + .15, cz, .2, .3, .2, TP.trunk);
-      if (h >= 4) { L.box(cx, h + .3 + tall * .35, cz, .78, tall * .7, .78, TP.pine); L.box(cx, h + .3 + tall * .9, cz, .42, tall * .4, .42, TP.pine); }
-      else L.box(cx, h + .3 + tall * .4, cz, .8, tall * .8, .8, r2 > .5 ? TP.canopy : TP.canopy2);
+    if (treeCell[i]) { const B = biomeAt(cx, cz), r2 = hash(x * 5, 7, z * 3); treeBoxes(L, B.trees[r2 > .55 ? 1 : 0], cx, h, cz, r2); }
+    else if (!nearFlat(cx, cz, 1) && !roadCell[i] && h > 1) {   // piezas pequeñas del paisaje
+      const side = sideAt(cx, cz), B = civOf(side).map;
+      if (B.feature === 'rocks' && featureAt(x, z, side, B) === 0x8a8e88 && hash(x, 9, z) < .18) { L.box(cx, h + .18, cz, .62, .36, .5, 0x8a8a86); L.box(cx + .15, h + .42, cz + .05, .34, .2, .3, 0x9a9a96); }
+      else if (B.feature === 'maize' && featureAt(x, z, side, B) >= 0 && x % 2 === 0 && z % 2) { L.box(cx, h + .3, cz, .1, .6, .1, 0x8ab04a); L.box(cx, h + .6, cz, .12, .14, .12, 0xe0c050); }
     }
   }
   const lmat = terrainMat(false), wmat = terrainMat(true);
@@ -631,7 +680,7 @@ function buildMinimap() {
   miniRaw = new Uint32Array(N); miniImg = bctx.createImageData(MW, MD);
   for (let i = 0; i < N; i++) {
     const h = HM[i], g = G[i], x = i % MW, z = (i / MW) | 0;
-    miniRaw[i] = h <= 0 ? (g > -2.2 ? TP.shallow : TP.deep) : treeCell[i] ? TP.canopy : terrainColor(x, z);
+    miniRaw[i] = h <= 0 ? (g > -2.2 ? TP.shallow : TP.deep) : treeCell[i] ? biomeAt(x + .5, z + .5).treeCol : terrainColor(x, z);
   }
   miniDirty = true;
 }
@@ -876,6 +925,48 @@ function chariot(g, T, hc, king) {
 
   const WALLS = { roma: [0xe2dccc, 0xc8c0ae], cartago: [0xd9b27a, 0xc49a62], china: [0x8a8a92, 0x6a6a74], mexica: [0xd8d0b8, 0xbab29a], egipto: [0xe0c48a, 0xc8aa70], galos: [0x8a6a3e, 0x6a4e2a] };
   for (const c of CIVS) c.wall = WALLS[c.id];
+  // ---- mapa de cada civilización: bioma, paisaje, muralla, distribución del recinto, altar ----
+  const hsh = (x, z, k = 0) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263) ^ Math.imul(k, 2246822519); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };
+  const rrect = (w, d, r, n = 3) => { const p = [], hw = w / 2 - r, hd = d / 2 - r; for (const [cx, cz, a0] of [[hw, hd, 0], [-hw, hd, Math.PI / 2], [-hw, -hd, Math.PI], [hw, -hd, Math.PI * 1.5]]) for (let i = 0; i <= n; i++) { const a = a0 + i / n * Math.PI / 2; p.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); } return p; };
+  const rect = (w, d) => [[w / 2, d / 2], [-w / 2, d / 2], [-w / 2, -d / 2], [w / 2, -d / 2]];
+  const blob = (rx, rz, n, jit, seed) => { let s = seed; const r = () => (s = (s * 16807) % 2147483647) / 2147483647; return Array.from({ length: n }, (_, i) => { const a = i / n * Math.PI * 2, k = 1 + (r() - .5) * jit; return [Math.cos(a) * rx * k, Math.sin(a) * rz * k]; }); };
+  // puertas comunes: frente (hacia el centro del mapa) y a ±120°. Las piezas de puerta van en coordenadas locales: x a lo largo de la muralla (hueco de 3,6), z hacia fuera
+  const gateTowers = (c, c2, h) => (g, T) => { for (const s of [-1, 1]) { part(g, 1.7, h + 1, 1.7, c, s * 2.5, (h + 1) / 2 - 1.05, 0); part(g, 2, .45, 2, c2, s * 2.5, h - .05 + .22, 0); part(g, .6, .6, .6, T, s * 2.5, h + .7, 0); } };
+  const MAPS = {
+    roma: { ground: [0x86b85e, 0x7aae56, 0x93c068, 0xa2c470], lush: 0x6e9e4c, sand: 0xdccb95, road: 0xd2c29a, trees: ['cypress', 'olive'], treeCol: 0x2f5a35, dens: .85, feature: 'vine',
+      plaza: 0xc4bca6, wallbase: 0xb3aa92, path: 0xd8d0bc, inside: (x, z) => Math.abs(x) < 1.3 || Math.abs(z) < 1.3 ? 0xd8d0bc : -1,
+      shape: () => rrect(13, 10, 1.6), wall: { h: 2.6, t: .9, cren: true, tower: true, every: 8, gate: gateTowers(0xe2dccc, 0xc8c0ae, 2.6) },
+      layout: { castle: [0, 0, 0, 1.05], barracks: [-6.2, -4, 0, 1], altar: [5.4, 4, 0, 1.4] },
+      altar(g, T) { P(g, 2, .3, 2, 0xd8d0bc, 0, .15, 0); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; P(g, .2, 1.2, .2, WHITE, Math.cos(a) * .75, .9, Math.sin(a) * .75); } P(g, 1.9, .2, 1.9, 0xd8d0bc, 0, 1.6, 0); steps(g, 3, 1.6, .2, 1.6, .5, 0xb5562f, 0, 1.7, 0); P(g, .3, .4, .3, T, 0, .5, 0); } },
+    cartago: { ground: [0xb9b06a, 0xc4b878, 0xa9a45e, 0xd0c08a], lush: 0x9a9a58, sand: 0xe6d29c, road: 0xd8c496, trees: ['palm', 'olive'], treeCol: 0x4f8a3a, dens: .6, feature: 'salt',
+      plaza: 0xe0c896, wallbase: 0xc8ae7c, path: 0xd8c08a, between: 0xd0b480,
+      shape: () => blob(7, 5.6, 14, .28, 7), rings: [1, .74], wall: { h: 2.8, t: .9, cren: true, tower: true, every: 4, gate: gateTowers(0xd9b27a, 0xc49a62, 2.8) },
+      layout: { castle: [0, -1.2, 0, .95], barracks: [-4.6, 3.4, .4, .95], altar: [4.6, -3.4, 0, 1.3] },
+      altar(g, T) { P(g, 2, .2, 1.6, 0xc9a26a, 0, .1, 0); for (let i = 0; i < 5; i++) { const h = .6 + hsh(i, 5) * .5; P(g, .25, h, .14, 0xe0cfa8, -.7 + i * .35, h / 2 + .2, (i % 2) * .4 - .2); } P(g, .5, .2, .1, T, 0, 1.3, -.2); P(g, .2, .2, .1, T, 0, 1.5, -.2); } },
+    china: { ground: [0x6e9a50, 0x7aa858, 0x5f8c48, 0x88b060], lush: 0x5a8a44, sand: 0xd2c69a, road: 0xb8b0a0, trees: ['bamboo', 'pine'], treeCol: 0x3a7a3a, dens: .9, feature: 'paddy',
+      plaza: 0xb8b0a0, wallbase: 0x9a9488, path: 0xa8a090, inside: (x, z) => Math.abs(x) < 1.4 ? 0xa8a090 : -1, moat: true,
+      shape: () => rect(12, 12), wall: { h: 3, t: 1, cren: true, tower: true, every: 12,
+        gate(g, T) { for (const s of [-1, 1]) part(g, 1.5, 4, 1.5, 0x8a8a92, s * 2.5, .95, 0); part(g, 6.6, .8, 1.6, 0x8a8a92, 0, 2.6, 0); part(g, 4.4, 1.2, 1.2, 0xb02a20, 0, 3.6, 0); const q = new THREE.Group(); q.position.y = 0; g.add(q); eaveRoof(q, 5.4, 2.2, 4.3, 0x3a3a44, GOLD); part(g, .5, 1.2, .06, T, 1.3, 3.6, .66, false); } },
+      layout: { castle: [0, -5, 0, 1], barracks: [6.2, 1.2, -Math.PI / 2, .95], altar: [0, 2.6, 0, 1.4] },
+      altar(g, T) { P(g, 2.2, .4, 2.2, 0x9a9488, 0, .2, 0); P(g, 1.1, .7, 1.1, 0x5a7a5a, 0, .75, 0); for (const [a, b] of [[-.4, -.4], [.4, -.4], [-.4, .4], [.4, .4]]) P(g, .14, .4, .14, 0x5a7a5a, a, .3, b); for (const s of [-1, 1]) P(g, .14, .3, .3, 0x5a7a5a, s * .6, 1.2, 0); P(g, .4, .4, .4, 0xff8a3a, 0, 1.2, 0, false); P(g, .08, 1.6, .08, WOOD, 1, .8, .8); P(g, .3, .9, .05, T, 1.16, 1.1, .8); } },
+    mexica: { ground: [0x4f8a3e, 0x5a9646, 0x447a36, 0x66a050], lush: 0x3e7432, sand: 0xc8bc8a, road: 0xc8bea0, trees: ['ceiba', 'jungle'], treeCol: 0x2f6a35, dens: 1.35, feature: 'maize',
+      plaza: 0xb8ac90, wallbase: 0xa89c80, path: 0xc8bea0,
+      shape: () => rect(13, 11), wall: { h: 1.6, t: .8, cren: true, merlon: 0x2aa8a0, gate(g, T) { for (const s of [-1, 1]) { part(g, .8, 2.6, .8, 0x2aa8a0, s * 2.2, .25, 0); part(g, .5, .5, .5, T, s * 2.2, 1.8, 0); } } },
+      layout: { castle: [0, -2.4, 0, 1], barracks: [-6, -4.2, .4, .95], altar: [5.8, 4.2, -.5, 1.4] },
+      altar(g, T) { steps(g, 2, 1.6, .3, 1.6, .5, 0xd8d0b8, 0, 0, 0); P(g, .9, .4, .6, 0x8a8a8a, 0, .8, 0); P(g, .5, .3, .5, 0xff8a3a, 0, 1.1, 0, false); for (const s of [-1, 1]) { P(g, .2, .9, .2, 0x2aa8a0, s * .7, 1, -.5); P(g, .3, .2, .3, T, s * .7, 1.5, -.5); } } },
+    egipto: { ground: [0xd9c08a, 0xe2ca96, 0xcfb47a, 0xc8b070], lush: 0x9aa860, sand: 0xe6d29c, road: 0xe8d8b0, trees: ['palm', 'palm'], treeCol: 0x4f8a3a, dens: .5, feature: 'nile',
+      plaza: 0xc8ae78, wallbase: 0xb89e68, path: 0xe8d8b0, inside: (x, z) => Math.abs(x) < 1.6 && z > -2 ? 0xe8d8b0 : -1,
+      shape: () => rect(14, 10), wall: { h: 3, t: 1.1, butt: true,
+        gate(g, T, main) { const c = 0xe0c48a; for (const s of [-1, 1]) { if (main) steps(g, 5, 2.4, .8, 1.8, .22, c, s * 3, -1.05, 0); else part(g, 1.6, 3.6, 1.8, c, s * 2.6, .75, 0); } if (main) for (const s of [-1, 1]) { part(g, .1, 5.6, .1, WOOD, s * 1.9, 1.7, .9, false); part(g, .5, .4, .06, T, s * 1.9 + .28, 4.2, .9, false); } } },
+      layout: { castle: [0, -2.6, 0, 1], barracks: [-6.4, -1.2, Math.PI / 2, .95], altar: [5.2, 2.8, 0, 1.4] },
+      altar(g, T) { P(g, 2, .25, 1.4, 0xe0c48a, 0, .12, 0); for (const s of [-1, 1]) { P(g, .3, 2, .3, 0xe0c48a, s * .7, 1.1, 0); P(g, .2, .3, .2, GOLD, s * .7, 2.25, 0); } P(g, .6, .5, 1, 0xe0c48a, 0, .5, 0); P(g, .4, .4, .4, 0xe0c48a, 0, .9, .3); P(g, .44, .1, .44, T, 0, 1.15, .3); } },
+    galos: { ground: [0x5a8a3e, 0x4e7e36, 0x6a9a48, 0x7aa858], lush: 0x467232, sand: 0xc8bc8a, road: 0xa88a5a, trees: ['oak', 'pine'], treeCol: 0x2f5a30, dens: 1.3, feature: 'rocks',
+      plaza: 0xa88a5a, wallbase: 0x7a6a44, path: 0x9a7a4a, between: 0x3e5a2a,
+      shape: () => blob(7.2, 5.8, 22, .22, 11), rings: [1, .82], wall: { h: 2.2, palisade: true, gate(g, T) { for (const s of [-1, 1]) part(g, .6, 3.4, .6, 0x6a4e2a, s * 2.1, .65, 0); part(g, 4.8, .5, .7, 0x6a4e2a, 0, 2.4, 0); steps(g, 2, 5, .3, 1.2, 1.4, 0xc8a85a, 0, 2.65, 0); part(g, .6, .5, .06, T, 0, 1.8, .4, false); } },
+      layout: { castle: [-2, -.6, .3, 1], barracks: [2.4, 5.2, -.3, .95], altar: [5.4, -2.6, 0, 1.4] },
+      altar(g, T) { for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; P(g, .3, .9 + (i % 2) * .3, .3, 0x8a8a8a, Math.cos(a) * .9, .5, Math.sin(a) * .9); } P(g, 1, .2, .5, 0x9a9a98, 0, .7, 0); P(g, .2, .7, .2, 0x8a8a8a, -.3, .35, 0); P(g, .2, .7, .2, 0x8a8a8a, .3, .35, 0); P(g, .3, .3, .06, T, 0, 1.1, .3); } },
+  };
+  for (const c of CIVS) c.map = MAPS[c.id];
   return { list: CIVS, grp, setFill: f => { FILL = f; } };
 })();
 const CIVS = CIV.list;
@@ -894,13 +985,6 @@ function resolveCivs(final) {
     civIdx[sd] = pool[Math.random() * pool.length | 0];
   }
 }
-// reconstruye fortaleza, cuartel y murallas con la civilización de cada bando
-function rebuildCivBuildings() {
-  if (!spots.length || !spots[BASE0].group) return;
-  for (const k of [BASE0, BASE1, BARR0, BARR1]) { const s = spots[k]; world.remove(s.group); if (s.shadow) { world.remove(s.shadow); decos.splice(decos.indexOf(s.shadow), 1); } (k <= BASE1 ? buildCastle : buildBarracks)(s); }
-  for (const f of forts) { for (const g of f.walls || []) { world.remove(g); const i = decos.indexOf(g); if (i >= 0) decos.splice(i, 1); } buildWalls(f); }
-  updateCtx();
-}
 
 // ---------- Edificios ----------
 const spotPos = (s, lift = 0) => new THREE.Vector3(s.x, s.y + lift, s.z);
@@ -917,24 +1001,20 @@ const facing = (s, tx, tz) => Math.atan2(tx - s.x, tz - s.z);
 const local = (s, x, y, z) => s.group.localToWorld(new THREE.Vector3(x, y, z));
 function buildCastle(s) {
   const g = new THREE.Group(), f = forts[s.side];
-  civOf(s.side).castle(CIV.grp(g, 0, 0, 0, 1.05), TEAM[s.side].c);
-  placeSpot(s, g, Math.atan2(Math.cos(f.tb), Math.sin(f.tb))); s.hp = s.hp ?? GAME.baseHp;
+  civOf(s.side).castle(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c);
+  placeSpot(s, g, Math.atan2(Math.cos(f.tb), Math.sin(f.tb)) + s.ry); s.hp = s.hp ?? GAME.baseHp;
 }
 function buildBarracks(s) {
   const g = new THREE.Group();
-  civOf(s.side).barracks(CIV.grp(g, 0, 0, 0, 1.1), TEAM[s.side].c);
+  civOf(s.side).barracks(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c);
   s.sel = ring(g, 3, 3.3, 0xffe03a, .2); s.sel.visible = selBld === 'barracks' && s.side === 0;
-  placeSpot(s, g, facing(s, spots[s.side].x, spots[s.side].z));
+  const f = forts[s.side]; placeSpot(s, g, Math.atan2(Math.cos(f.tb), Math.sin(f.tb)) + s.ry);
 }
 function buildAltar(s) {
-  const g = new THREE.Group(), T = TEAM[s.side], marble = 0xf4f1ff, gold = 0xffd23f;
-  part(g, 4.2, 1.2, 4.2, 0xb3abc6, 0, -.45, 0); part(g, 3.6, .3, 3.6, marble, 0, .3, 0);
-  for (const [a, b] of [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]]) part(g, .45, 2.3, .45, marble, a, 1.7, b);
-  part(g, 3.7, .35, 3.7, gold, 0, 3, 0); part(g, 2.8, .45, 2.8, marble, 0, 3.4, 0); part(g, 1.6, .5, 1.6, gold, 0, 3.85, 0);
-  part(g, .5, .5, .5, gold, -.55, 4.3, 0); part(g, .5, .5, .5, gold, .55, 4.3, 0); part(g, .5, .7, .5, gold, 0, 4.4, 0);
-  part(g, .5, .6, 1, 0xffffff, 0, 1, 0); part(g, .3, .5, .35, 0xffffff, 0, 1.4, .5); part(g, .3, .4, .3, T.c, 0, 1.5, -.1);
-  s.sel = ring(g, 2.9, 3.2, 0xffe03a, .2); s.sel.visible = false;
-  placeSpot(s, g, facing(s, spots[s.side].x, spots[s.side].z));
+  const g = new THREE.Group(), f = forts[s.side];
+  civOf(s.side).map.altar(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c);
+  s.sel = ring(g, 2.6, 2.9, 0xffe03a, .2); s.sel.visible = false;
+  placeSpot(s, g, Math.atan2(Math.cos(f.tb), Math.sin(f.tb)) + s.ry);
 }
 function buildCamp(s) {
   const g = new THREE.Group(), roofs = [], canvas = 0xd8c89a;
@@ -951,14 +1031,11 @@ function buildCamp(s) {
 }
 function buildTown(s) {
   if (s.camp) return buildCamp(s);
-  const g = new THREE.Group(), wall = 0xfff1d6, roofs = [];
-  const house = (x, z, w, h, d) => { part(g, w, h + .7, d, wall, x, h / 2 - .35, z); part(g, w + .1, .3, d + .1, 0xb8ad94, x, -.1, z); roofs.push(part(g, w + .25, .35, d + .25, 0xd9773a, x, h + .17, z), part(g, w * .6, .3, d + .2, 0xd9773a, x, h + .48, z)); part(g, .3, .45, .06, 0x5a3a24, x, .22, z + d / 2 + .03, false); part(g, .25, .2, .06, 0x9cd8ff, x + w * .28, .55, z + d / 2 + .03, false); };
-  house(-1.1, .8, 1.2, .9, 1); house(1, 1.1, 1, .8, .9); house(.9, -.9, 1.1, 1, 1);
-  part(g, .7, .9, .7, 0x9aa0c0, -.4, .05, -.4); part(g, .5, .06, .5, 0x2ab8ff, -.4, .52, -.4, false);
-  part(g, .5, .7, .5, 0xffd23f, .15, .05, .2); part(g, .35, .3, .35, 0xffe98a, .15, .5, .2);
-  part(g, .9, 4, .9, 0xc9c2d8, -1.5, 1.2, -1.5); roofs.push(part(g, 1.2, .45, 1.2, 0xd9773a, -1.5, 3.4, -1.5));
+  const g = new THREE.Group(), roofs = [], cv = civOf(sideAt(s.x, s.z)), [wc, wc2] = cv.wall;
+  cv.house(CIV.grp(g, -1.1, 0, .9, .5, .2)); cv.house(CIV.grp(g, 1.2, 0, 1, .45, -.5)); cv.house(CIV.grp(g, .9, 0, -.9, .45, 1.2));
+  part(g, .9, 4, .9, wc, -1.5, 1.2, -1.5); roofs.push(part(g, 1.2, .45, 1.2, wc2, -1.5, 3.4, -1.5));
   part(g, .1, 1.4, .1, 0x8a5a34, -1.5, 4.3, -1.5); s.flag = part(g, .8, .5, .08, 0xffffff, -1.1, 4.7, -1.5, false);
-  for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .25 && Math.cos(a) > 0) continue; part(g, .12, .9, .12, 0x8a5a34, Math.cos(a) * 2.9, .05, Math.sin(a) * 2.9, false); }
+  for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .25 && Math.cos(a) > 0) continue; part(g, .12, .9, .12, cv.id === 'galos' ? 0x7a5a34 : wc2, Math.cos(a) * 2.9, .05, Math.sin(a) * 2.9, false); }
   s.zone = ring(g, 3.5, 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.scale.set(.5, 14, .5); s.beacon.position.y = 9; s.beacon.visible = false; g.add(s.beacon);
   s.roofs = roofs; placeSpot(s, g, hash(s.x | 0, 2, s.z | 0) * Math.PI * 2); s.owner = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
@@ -966,23 +1043,32 @@ function buildTown(s) {
 }
 const decos = [];
 function buildWalls(f) {
-  const T = TEAM[f.side], [stone, stone2] = civOf(f.side).wall, NS = 64, hr = Math.round(f.h), A = []; f.walls = [];
-  for (let k = 0; k < NS; k++) { const th = k / NS * Math.PI * 2; A.push({ th, r: wallR(f, th) }); }
-  const gateAt = k => { const a = A[((k % NS) + NS) % NS]; return inGate(f, a.th, a.r); };
-  for (let k = 0; k < NS; k++) {
-    if (gateAt(k) || gateAt(k + 1)) continue;
-    const a = A[k], b = A[(k + 1) % NS], pa = fortPt(f, a.r, a.th), pb = fortPt(f, b.r, b.th), dx = pb.x - pa.x, dz = pb.z - pa.z;
-    const g = new THREE.Group(); g.position.set((pa.x + pb.x) / 2, hr, (pa.z + pb.z) / 2); g.rotation.y = Math.atan2(-dz, dx);
-    part(g, Math.hypot(dx, dz) + .25, 2.9, .9, stone, 0, .4, 0);
-    if (k % 2) part(g, .55, .5, 1, stone2, 0, 2.05, 0);
-    if (k % 16 === 8 || gateAt(k + 2) || gateAt(k - 1)) { part(g, 1.7, 3.7, 1.7, stone, 0, .65, 0); part(g, 2, .45, 2, stone2, 0, 2.7, 0); part(g, .6, .7, .6, T.c, 0, 3.25, 0); }
-    world.add(g); decos.push(g); f.walls.push(g);
-  }
+  const cv = civOf(f.side), S = cv.map.wall, T = TEAM[f.side], [stone, stone2] = cv.wall, NS = 80, hr = Math.round(f.h); f.walls = [];
+  const add = g => { world.add(g); decos.push(g); f.walls.push(g); };
+  f.rings.forEach((q, ri) => {
+    const A = []; for (let k = 0; k < NS; k++) { const th = k / NS * Math.PI * 2; A.push({ th, r: wallR(f, th) * q }); }
+    const gateAt = k => { const a = A[((k % NS) + NS) % NS]; return inGate(f, a.th, a.r); };
+    const H = S.h * (ri ? .75 : 1), t = (S.t || .9) * (ri ? .8 : 1);
+    for (let k = 0; k < NS; k++) {
+      if (gateAt(k) || gateAt(k + 1)) continue;
+      const a = A[k], b = A[(k + 1) % NS], pa = fortPt(f, a.r, a.th), pb = fortPt(f, b.r, b.th), dx = pb.x - pa.x, dz = pb.z - pa.z, L = Math.hypot(dx, dz);
+      const g = new THREE.Group(); g.position.set((pa.x + pb.x) / 2, hr, (pa.z + pb.z) / 2); g.rotation.y = Math.atan2(-dz, dx);
+      if (S.palisade) { const n = Math.max(2, Math.round(L / .42)); for (let j = 0; j < n; j++) { const hh = H + (j % 2) * .35; part(g, .34, hh, .34, stone, -L / 2 + (j + .5) * L / n, hh / 2 - 1.05, 0, false); } }
+      else { part(g, L + .25, H, t, stone, 0, H / 2 - 1.05, 0); if (S.cren && k % 2) part(g, .55, .45, t + .1, S.merlon ?? stone2, 0, H - 1.05 + .22, 0); }
+      if (S.butt && k % 2 === 0) part(g, .7, H * .85, t + .9, stone2, 0, H * .42 - 1.05, 0);   // contrafuertes de adobe
+      if (!ri && S.tower && k % S.every === (S.every >> 1)) { part(g, 1.7, H + .8, 1.7, stone, 0, (H + .8) / 2 - 1.05, 0); part(g, 2, .45, 2, stone2, 0, H - .25 + .22, 0); part(g, .6, .6, .6, T.c, 0, H + .4, 0); }
+      add(g);
+    }
+    if (S.gate) f.gates.forEach((ga, gi) => {   // puertas: torres, pilono, puerta de madera… según la civilización
+      const p = fortPt(f, wallR(f, ga) * q, ga), g = new THREE.Group(); g.position.set(p.x, hr, p.z); g.rotation.y = Math.atan2(-Math.cos(ga), -Math.sin(ga));
+      S.gate(g, T.c, gi === 0 && !ri); if (ri) g.scale.setScalar(.8); add(g);
+    });
+  });
 }
 function setOwner(s, sd) {
   const prev = s.owner; s.owner = sd; if (sd < 0) s.lvl = 1; s.anim = 1.4;
   const col = sd < 0 ? null : TEAM[sd];
-  for (const m of s.roofs) m.material = mat(col ? (s.camp ? mixHex(0xd8c89a, col.c, .55) : col.c) : s.camp ? 0xd8c89a : 0xd9773a);
+  for (const m of s.roofs) m.material = mat(col ? (s.camp ? mixHex(0xd8c89a, col.c, .55) : col.c) : s.camp ? 0xd8c89a : civOf(sideAt(s.x, s.z)).wall[1]);
   s.flag.material = mat(col ? col.c : s.camp ? TEAM[2].c : 0xffffff);
   s.zone.material = basic(col ? col.c : 0xfff4d6, .85);
   s.beacon.visible = false;
@@ -1538,12 +1624,12 @@ function clearWorld() {
 function newGame(s) {
   $('loading').hidden = false; $('end').hidden = true; $('start').hidden = true; $('ui').classList.add('hidden-ui');
   requestAnimationFrame(() => setTimeout(() => {
-    clearWorld(); resetFog(false); resolveCivs(false);
+    clearWorld(); resetFog(false); resolveCivs(true);
     generate(s);
     const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, town: buildTown };
     for (const sp of spots) B[sp.kind](sp);
     for (const f of forts) buildWalls(f);
-    spawnGuards();
+    spawnGuards(); makeThumbs();
     regions.forEach((_, r) => paintRegion(r));
     fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2));
     for (const st of sideState) Object.assign(st, { gold: GAME.startGold, queue: [], hero: { state: 'none' } });
@@ -1554,7 +1640,7 @@ function newGame(s) {
     $('loading').hidden = true; $('start').hidden = false; state = 'menu';
   }, 30));
 }
-function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); resolveCivs(true); rebuildCivBuildings(); makeThumbs(); $('ui').classList.remove('hidden-ui'); state = 'play'; resetFog(true); selBld = null; selSpot = null; updateCtx(); track('game_start', { seed, diff, map: scen }); }
+function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; resetFog(true); selBld = null; selSpot = null; updateCtx(); track('game_start', { seed, diff, map: scen }); }
 function endGame(win) {
   state = 'end'; $('ui').classList.add('hidden-ui'); $('toast').hidden = true; $('pause').hidden = true;
   const s = spots[win ? BASE1 : BASE0];
@@ -1988,7 +2074,7 @@ for (const sd of [0, 1]) {
   el.value = civPick[sd] || 'random';
   el.addEventListener('change', () => {
     civPick[sd] = el.value; try { localStorage.setItem('imperium-civs', JSON.stringify(civPick)); } catch (e) {}
-    resolveCivs(false); rebuildCivBuildings(); makeThumbs(); sfx('select');
+    sfx('select'); newGame(seed);
   });
 }
 $('howBtn').addEventListener('click', () => { sfx('select'); $('start').hidden = true; $('how').hidden = false; });
