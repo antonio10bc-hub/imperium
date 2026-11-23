@@ -4,7 +4,7 @@ import { sfx } from './audio.js';
 import { spotPos } from './buildings.js';
 import { nearestEnemy, siege, strike } from './combat.js';
 import { BASE1, GAME, MD, MW, idx } from './config.js';
-import { burst, floatText, ping, plume } from './effects.js';
+import { burst, floatText, ping, plume, streak } from './effects.js';
 import { aiUnit } from './ai.js';
 import { bonusOf } from './civs.js';
 import { caravanUnit, raiderUnit } from './events.js';
@@ -153,9 +153,31 @@ export function spreadTo(u, cx, cz, field, r0, k, dt, disc = 0) {
 // dios: destellos a su alrededor y, si escolta a un héroe, cura poco a poco al héroe y a su escolta cercana
 function godTick(u, dt) {
   if ((u.fxT = (u.fxT ?? 0) - dt) <= 0) { u.fxT = .22; const p = u.pos.clone(); p.x += (Math.sin(u.id + elapsed * 7)) * .9; p.z += Math.cos(u.id * 3 + elapsed * 5) * .9; p.y += 1.4; plume(p, (u.id + elapsed * 10 | 0) % 2 ? 0xffe9a0 : 0xffffff, .16, .9, 1.6, -.5); }
-  const h = u.leader; if (!h) return;
+  const h = u.leader;
   let healed = 0;
-  for (const o of [h, ...h.escort]) if (o !== u && !o.dead && o.hp < o.maxHp && o.pos.distanceTo(u.pos) < GAME.godHealR) { o.hp = Math.min(o.maxHp, o.hp + GAME.godHeal * dt); if (healed++ < 3 && (o.godFx = (o.godFx ?? 0) - dt) <= 0) { o.godFx = 1.2; plume(o.pos.clone().setY(o.pos.y + 1), 0x9ad86a, .2, .8, 1.4, -.6); } }
+  if (h) for (const o of [h, ...h.escort]) if (o !== u && !o.dead && o.hp < o.maxHp && o.pos.distanceTo(u.pos) < GAME.godHealR) {
+    o.hp = Math.min(o.maxHp, o.hp + GAME.godHeal * dt);
+    if (healed++ < 10 && (o.godFx = (o.godFx ?? 0) - dt) <= 0) {   // en cada tropa curada: un rayo de luz desde el dios y chispas verdes que suben
+      o.godFx = .55 + (o.id % 5) * .08;
+      const from = u.pos.clone().setY(u.pos.y + 2.6), to = o.pos.clone().setY(o.pos.y + 1);
+      for (let k = 0; k < 5; k++) streak(from.clone().lerp(to, k * .1), to, k % 2 ? 0xffe9a0 : 0xb8f07a, .3 + k * .06, .3 - k * .03);
+      plume(to, 0x9ad86a, .4, 1.1, 1.8, -.6); plume(to.clone().setY(to.y + .5), 0xe8ffc0, .26, .9, 2.4, -.8); burst(to, [0xb8f07a, 0xffffff], 4, 1.2, 2.5, .5, .16);
+    }
+  }
+  // mientras cura: el halo gira y brilla, el aura del suelo late y una onda verde se expande hasta el alcance de la curación
+  u.healing = healed > 0 ? Math.min(1, (u.healing || 0) + dt * 3) : Math.max(0, (u.healing || 0) - dt * 2);
+  const k = u.healing, t = elapsed;
+  if (u.halo) { u.halo.rotation.z += dt * (1 + k * 5); u.halo.scale.setScalar(1 + k * (.25 + Math.sin(t * 8) * .1)); }
+  if (u.aura) u.aura.scale.setScalar(1 + k * (.6 + Math.sin(t * 5) * .25));
+  if (u.wave) {
+    if (k > .5 && !u.wave.visible) { u.wave.visible = true; u.waveT = 0; }
+    if (u.wave.visible) {
+      u.waveT += dt; const p = u.waveT / 1.1, R = GAME.godHealR / u.g.scale.x;
+      u.wave.scale.setScalar(.3 + p * R); u.wave.material.opacity = .8 * (1 - p);
+      if (p >= 1) { if (k > .5) u.waveT = 0; else u.wave.visible = false; }
+    }
+  }
+  if (k > .5 && (u.burstT = (u.burstT ?? 0) - dt) <= 0) { u.burstT = .07; const p = u.pos.clone(); const a = t * 9 + u.id; p.x += Math.cos(a) * 1.6; p.z += Math.sin(a) * 1.6; p.y += .4; plume(p, (t * 20 | 0) % 2 ? 0xb8f07a : 0xffe9a0, .3, 1.2, 2.8, -1); }   // remolino de luz alrededor
 }
 export function updateUnit(u, dt) {
   u.cd -= dt; u.block -= dt; u.moving = false; u.lunge = Math.max(0, u.lunge - dt * 4); u.flash -= dt; u.combatT -= dt;

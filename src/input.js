@@ -41,10 +41,14 @@ export function groundAt(x, y, loose) {
   if (!loose && (px < 0 || pz < 0 || px >= MW || pz >= MD)) return null;
   return { x: px, z: pz };
 }
+// punto de reunión de cada edificio que produce (cuartel, salón de héroes y templo); su banderín lleva el color del icono del edificio
+export const RALLY_BLD = { barracks: '#8ad8f0', altar: '#e8c870', temple: '#f4f4e8' };
 function setRally(g) {
-  S.rally = g; if (!S.rallyFlag) { S.rallyFlag = new THREE.Group(); part(S.rallyFlag, .1, 2, .1, 0x8a5a34, 0, 1, 0); part(S.rallyFlag, .8, .5, .08, 0x2f7bff, .45, 1.7, 0); world.add(S.rallyFlag); }
-  S.rallyFlag.position.set(g.x, surfY(g.x, g.z), g.z);
-  ping(S.rallyFlag.position, '#3a6ad8'); sfx('cmd'); toast('PUNTO DE REUNIÓN FIJADO');
+  const k = S.selBld; S.rally[k] = g;
+  let f = S.rallyFlag[k];
+  if (!f) { f = S.rallyFlag[k] = new THREE.Group(); part(f, .1, 2, .1, 0x8a5a34, 0, 1, 0); part(f, .8, .5, .08, 0x2f7bff, .45, 1.7, 0); part(f, .3, .3, .1, parseInt(RALLY_BLD[k].slice(1), 16), .45, 1.7, .06, false); world.add(f); }
+  f.position.set(g.x, surfY(g.x, g.z), g.z);
+  ping(f.position, '#3a6ad8'); sfx('cmd'); toast(`PUNTO DE REUNIÓN ${{ barracks: 'DEL CUARTEL', altar: 'DE LOS HÉROES', temple: 'DEL DIOS' }[k]} FIJADO`);
 }
 // orden sobre la fortaleza rival (asalto), un pueblo ajeno (conquista) o un punto del suelo (mover); la usan el mapa y el minimapa
 function orderTo(list, sp, g, attack) {
@@ -55,7 +59,7 @@ function orderTo(list, sp, g, attack) {
 const commandList = () => [...sel].filter(u => !(u.leader && sel.has(u.leader)));   // la escolta de un héroe seleccionado sigue en formación
 export function command(x, y, attack = false) {
   if (state !== 'play') return;
-  if (S.selBld === 'barracks') { const g = groundAt(x, y); if (g) setRally(g); return; }
+  if (S.selBld in RALLY_BLD) { const g = groundAt(x, y); if (g) setRally(g); return; }
   if (!sel.size) return;
   const list = commandList();
   const own = pickUnit(x, y, 0);
@@ -75,7 +79,7 @@ export function command(x, y, attack = false) {
 // orden desde el minimapa (clic derecho): punto de reunión con el cuartel seleccionado; si no, mover, conquistar o asaltar
 export function commandAt(x, z, attack = false) {
   if (state !== 'play') return false;
-  if (S.selBld === 'barracks') { setRally({ x, z }); return true; }
+  if (S.selBld in RALLY_BLD) { setRally({ x, z }); return true; }
   if (!sel.size) return false;
   const list = commandList(); for (const u of list) unassign(u);
   const sp = spots.find(s => (s.kind === 'town' || (s.kind === 'base' && s.side === 1)) && exploredAt(s.x, s.z) && Math.hypot(s.x - x, s.z - z) < (s.kind === 'base' ? 10 : 7));

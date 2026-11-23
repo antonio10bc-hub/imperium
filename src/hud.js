@@ -5,7 +5,7 @@ import { uname } from './civs.js';
 import { assign } from './combat.js';
 import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, RANKS, TEAM, TEMP0, TYPES, UNITS } from './config.js';
 import { ping } from './effects.js';
-import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, popOf, state, summonHero, toast, towerDmg, towerRange, townInc, upgradeTown } from './game.js';
+import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, townIncNow, popOf, state, summonHero, toast, towerDmg, towerRange, upgradeTown } from './game.js';
 import { focusOn, heroButton } from './input.js';
 import { MERC, ev, hireMercs, mercRoom } from './events.js';
 import { regions, spots } from './map.js';
@@ -42,7 +42,7 @@ export function updateHud() {
 }
 const hpCol = k => k > .5 ? '#7ed957' : k > .25 ? '#e8c870' : '#d83a4a';
 const pct = k => Math.round(Math.max(0, Math.min(1, k)) * 100) + '%';
-const VS = { sword: 'VENCE A JINETE', bow: 'VENCE A ESPADA', horse: 'VENCE A ARCO', harcher: 'RÁPIDO Y A DISTANCIA', hero: 'CARGA CON SU ESCOLTA', god: 'CURA A LA ESCOLTA DE SU HÉROE' };
+const VS = { titan: 'LENTO Y MUY DURO', sword: 'VENCE A JINETE', bow: 'VENCE A ESPADA', horse: 'VENCE A ARCO', harcher: 'RÁPIDO Y A DISTANCIA', hero: 'CARGA CON SU ESCOLTA', god: 'CURA A LA ESCOLTA DE SU HÉROE' };
 // Retrato del héroe a la izquierda (como en Imperium), con las tropas asignadas
 let heroesHtml = '';
 function renderHeroes() {
@@ -79,7 +79,7 @@ function panelContent() {
       const g = units.find(u => u.side === 0 && u.type === 'god');
       info = st.godQ ? `<div class="hpb"><b style="width:${pct(1 - st.godQ.t / d.time)};background:var(--yellow)"></b><span>DESCIENDE EN ${Math.ceil(st.godQ.t)} S</span></div>`
         : g ? `<div class="note g">${god} YA LUCHA A TU LADO.</div>` : `<div class="note g">FLOTA, GOLPEA CUERPO A CUERPO Y CURA A LA ESCOLTA DE SU HÉROE.</div>`;
-      info += `<div class="note">UN DIOS POR BANDO. ASÍGNALO A UN HÉROE: IRÁ DETRÁS DE ÉL.</div>`;
+      info += `<div class="note">UN DIOS POR BANDO. ASÍGNALO A UN HÉROE: IRÁ DETRÁS DE ÉL.</div><div class="note">CLIC DERECHO EN EL MAPA: DÓNDE APARECE.</div>`;
       act = g ? `<button type="button" data-act="god">SELECCIONAR</button>` : st.godQ ? '' : `<button type="button" class="y" data-act="summonGod" ${st.gold < d.cost || popOf(0) >= capOf(0) ? 'disabled' : ''}>INVOCAR · ${d.cost} ORO</button>`;
     }
     return `<div class="ph"><h3>TEMPLO</h3><em>${r.state === 'done' ? 'CONSAGRADO' : r.state === 'ritual' ? 'RITUAL EN CURSO' : 'SIN CONSAGRAR'}</em></div><img class="big" alt="" src="${THUMB.god || ''}"><div class="info">${info}</div>${act ? `<div class="act">${act}</div>` : ''}`;
@@ -89,21 +89,28 @@ function panelContent() {
     let btn = n < GAME.maxHeroes ? `<button type="button" class="y" data-act="summon" ${st.gold < UNITS.hero.cost ? 'disabled' : ''}>INVOCAR · ${UNITS.hero.cost} ORO</button>` : `<button type="button" disabled>MÁXIMO ${GAME.maxHeroes} HÉROES</button>`;
     if (alive) btn = `<button type="button" data-act="hero">SELECCIONAR</button>` + btn;
     const note = `HÉROES ${n}/${GAME.maxHeroes}` + (tr.length ? ` · LLEGA EN ${Math.ceil(tr[0].t)} S` : '') + (dead.length ? ` · VUELVE EN ${Math.ceil(dead[0].t)} S` : '');
-    return `<div class="ph"><h3>SALÓN DE HÉROES</h3><em>${note}</em></div><img class="big" alt="" src="${THUMB.hero || ''}"><div class="info"><div class="note">MÁS FUERTE, CARGA CONTRA EL ENEMIGO.</div><div class="note">HASTA ${GAME.escortMax} TROPAS EN FORMACIÓN.</div></div><div class="act">${btn}</div>`;
+    return `<div class="ph"><h3>SALÓN DE HÉROES</h3><em>${note}</em></div><img class="big" alt="" src="${THUMB.hero || ''}"><div class="info"><div class="note">MÁS FUERTE, CARGA CONTRA EL ENEMIGO.</div><div class="note">HASTA ${GAME.escortMax} TROPAS EN FORMACIÓN.</div><div class="note">CLIC DERECHO EN EL MAPA: A DÓNDE VA AL LLEGAR.</div></div><div class="act">${btn}</div>`;
   }
   if (S.selSpot) {
     const s = S.selSpot;
     if (s.kind === 'base') { const k = s.hp / GAME.baseHp;
       return `<div class="ph"><h3>${s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA RIVAL'}</h3></div><div class="info"><div class="hpb"><b style="width:${pct(k)};background:${TEAM[s.side].css}"></b><span>${Math.max(0, Math.ceil(s.hp))}/${GAME.baseHp}</span></div><div class="note">${s.side === 1 ? 'CLIC DERECHO CON TROPAS: ASALTAR.' : 'SI CAE, PIERDES LA PARTIDA.'}</div></div>`; }
     const own = s.owner, who = own < 0 ? 'NEUTRAL' : own === 0 ? 'TUYO' : 'DEL RIVAL';
+    let prog = '';
+    if (own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; prog = `<div class="hpb"><b style="width:${pct(s.prog[sd])};background:${TEAM[sd].css}"></b><span>CONQUISTA ${pct(s.prog[sd])}</span></div>`; }
+    if (own >= 0 && s.lose > 0) prog = `<div class="hpb"><b style="width:${pct(1 - s.lose)};background:${TEAM[own].css}"></b><span>RESISTE ${pct(1 - s.lose)}</span></div>`;
+    if (s.keep) {
+      const g = units.filter(u => u.home === s).length, n = own >= 0 ? units.filter(u => u.keepOf === s && u.side === own).length : 0;
+      return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><img class="big" alt="" src="${THUMB.titan || ''}"><div class="info">${own < 0 ? `<div class="note">${g ? `QUEDAN ${g} COLOSOS DE GUARDIA. DERRÓTALOS PARA PODER CONQUISTARLA.` : 'SIN GUARDIANES: DEJA TROPAS EN EL CÍRCULO.'}</div>` : `<div class="stats"><span>COLOSOS <b>${n}/${GAME.keepMax}</b></span><span>UNO CADA <b>${GAME.keepGen} S</b></span></div>`}<div class="note g">DA COLOSOS: LENTOS, MUY DUROS Y CUERPO A CUERPO.</div></div>`;
+    }
+    if (s.watch) {
+      return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="info">${prog}<div class="stats"><span>VISIÓN <b>${GAME.watchVision}</b></span><span>TORRE <b>${GAME.watchDmg}</b></span><span>ALCANCE <b>${GAME.watchRange}</b></span></div><div class="note g">ATALAYA: VE MUY LEJOS Y DISPARA A QUIEN SE ACERQUE. NO DA ORO.</div><div class="note">${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : 'DEJA TROPAS EN EL CÍRCULO PARA CONQUISTARLA.'}</div></div>`;
+    }
     if (s.camp) {
       const g = units.filter(u => u.home === s).length, n = own >= 0 ? units.filter(u => u.campOf === s && u.side === own).length : 0;
       return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><img class="big" alt="" src="${THUMB.harcher || ''}"><div class="info">${own < 0 ? `<div class="note">${g ? `QUEDAN ${g} GUARDIANES. DERRÓTALOS PARA PODER CONQUISTARLO.` : 'SIN GUARDIANES: DEJA TROPAS EN EL CÍRCULO.'}</div>` : `<div class="stats"><span>JINETES ARQUEROS <b>${n}/${GAME.campMax}</b></span><span>UNO CADA <b>${GAME.campGen} S</b></span></div>`}<div class="note">DA JINETES ARQUEROS: RÁPIDOS Y A DISTANCIA.</div></div>`;
     }
-    let prog = '';
-    if (own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; prog = `<div class="hpb"><b style="width:${pct(s.prog[sd])};background:${TEAM[sd].css}"></b><span>CONQUISTA ${pct(s.prog[sd])}</span></div>`; }
-    if (own >= 0 && s.lose > 0) prog = `<div class="hpb"><b style="width:${pct(1 - s.lose)};background:${TEAM[own].css}"></b><span>RESISTE ${pct(1 - s.lose)}</span></div>`;
-    return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="info">${prog}<div class="stats"><span>NIVEL <b>${s.lvl}</b></span><span>ORO <b>+${String(Math.round(townInc(s) * 10) / 10).replace('.', ',')}/S</b></span><span>TORRE <b>${Math.round(towerDmg(s))}</b></span><span>ALCANCE <b>${towerRange(s)}</b></span></div><div class="note${s.special || s.fortified ? ' g' : ''}">${s.fortified ? (own < 0 && s.guards > 0 ? `PUEBLO FORTIFICADO: QUEDAN ${s.guards} DEFENSORES. ORO DOBLE. ` : 'PUEBLO FORTIFICADO: ORO DOBLE. ') : ''}${s.special ? 'CIMA DE LA MESETA: ORO DOBLE. ' : ''}${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : own < 0 && s.guards > 0 ? '' : 'DEJA TROPAS EN EL CÍRCULO PARA CONQUISTARLO.'}</div></div>${own === 0 && s.lvl < 3 ? `<div class="act"><button type="button" class="y" data-act="upgrade" ${sideState[0].gold < TOWN_LV.cost[s.lvl] ? 'disabled' : ''} title="Más oro y torre más fuerte">MEJORAR A NIVEL ${s.lvl + 1} · ${TOWN_LV.cost[s.lvl]} ORO</button></div>` : ''}`;
+    return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="info">${prog}<div class="stats"><span>NIVEL <b>${s.lvl}</b></span><span>ORO <b>+${String(Math.round(townIncNow(s) * 10) / 10).replace('.', ',')}/S</b></span><span>TORRE <b>${Math.round(towerDmg(s))}</b></span><span>ALCANCE <b>${towerRange(s)}</b></span></div><div class="note${s.special || s.fortified ? ' g' : ''}">${s.fortified ? (own < 0 && s.guards > 0 ? `PUEBLO FORTIFICADO: QUEDAN ${s.guards} DEFENSORES. MÁS ORO. ` : 'PUEBLO FORTIFICADO: MÁS ORO. ') : ''}${s.special ? 'CIMA DE LA MESETA: MÁS ORO. ' : ''}${own === 0 ? 'CUANTOS MÁS PUEBLOS, MENOS RINDE CADA UNO. ' : ''}${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : own < 0 && s.guards > 0 ? '' : 'DEJA TROPAS EN EL CÍRCULO PARA CONQUISTARLO.'}</div></div>${own === 0 && s.lvl < 3 ? `<div class="act"><button type="button" class="y" data-act="upgrade" ${sideState[0].gold < TOWN_LV.cost[s.lvl] ? 'disabled' : ''} title="Más oro y torre más fuerte">MEJORAR A NIVEL ${s.lvl + 1} · ${TOWN_LV.cost[s.lvl]} ORO</button></div>` : ''}`;
   }
   const list = [...sel].filter(alive);
   if (!list.length) return '';

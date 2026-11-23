@@ -71,7 +71,7 @@ function kill(u, by) {
   ping(u.pos, TEAM[u.side].css);
   if (by?.side != null) {
     const b = u.bounty ?? (u.type === 'hero' ? 60 : GAME.bounty); if (sideState[by.side]) sideState[by.side].gold += b;
-    if (u.caravan && by.side < 2) toast(by.side === 0 ? `¡CARAVANA CAPTURADA! +${b} ORO` : 'EL RIVAL HA CAPTURADO LA CARAVANA', by.side === 0 ? 'good' : 'bad', u.pos);
+    if (u.caravan && by.side < 2) toast(by.side === 0 ? `¡CARRO DE LA CARAVANA SAQUEADO! +${b} ORO` : 'EL RIVAL HA SAQUEADO UN CARRO DE LA CARAVANA', by.side === 0 ? 'good' : 'bad', u.pos);
     if (by.side === 0) floatText(u.pos.clone().setY(u.pos.y + 2.8), '+' + b + ' ORO', '#e8c870', 9);
     if (by.kills != null && !by.dead) { by.kills += u.type === 'hero' ? 3 : 1; promote(by); }
   }

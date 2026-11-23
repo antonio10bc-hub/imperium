@@ -221,25 +221,35 @@ export function generate(newSeed, tries = 0) {
     if (bi < 0) break;
     addTown(cellX(bi), cellZ(bi));
   }
+  const plain = s => s.kind === 'town' && !s.camp && !s.keep && !s.watch && !s.fortified && !s.special;
+  // el pueblo más céntrico del mapa es la ciudadela: guardada por colosos neutrales, da colosos a quien la conquiste
+  { const c = spots.filter(plain).sort((a, b) => Math.hypot(a.x - MW / 2, (a.z - MD / 2) * 1.2) - Math.hypot(b.x - MW / 2, (b.z - MD / 2) * 1.2))[0];
+    if (c) { c.keep = true; c.name = 'CIUDADELA DE ' + c.name; } }
   // dos pueblos (uno a cada lado del río, cerca del centro) son campamentos con guardianes neutrales
   for (const half of [0, 1]) {
-    const c = spots.filter(s => s.kind === 'town' && (s.x < MW / 2) === !half).sort((a, b) => (Math.abs(a.x - MW / 2) + Math.abs(a.z - MD / 2) * .5) - (Math.abs(b.x - MW / 2) + Math.abs(b.z - MD / 2) * .5))[0];
+    const c = spots.filter(s => plain(s) && (s.x < MW / 2) === !half).sort((a, b) => (Math.abs(a.x - MW / 2) + Math.abs(a.z - MD / 2) * .5) - (Math.abs(b.x - MW / 2) + Math.abs(b.z - MD / 2) * .5))[0];
     if (c) { c.camp = true; c.name = 'CAMPAMENTO ' + c.name; }
   }
+  // en cada mitad, una atalaya: el pueblo pequeño más metido en la franja central (lejos de los bordes de arriba y abajo y de las fortalezas)
+  for (const half of [0, 1]) {
+    const f = forts[half], score = s => Math.abs(s.z - MD / 2) * 1.6 + Math.abs(s.x - MW / 2) * .6 - Math.min(60, Math.hypot(s.x - f.x, s.z - f.z)) * .5;
+    const c = spots.filter(s => plain(s) && (s.x < MW / 2) === !half && s.z > MD * .2 && s.z < MD * .8).sort((a, b) => score(a) - score(b))[0];
+    if (c) { c.watch = true; c.name = 'ATALAYA DE ' + c.name; }
+  }
   // un 25 % de los pueblos neutrales son fortificados: más grandes, con muchos defensores y el doble de oro
-  const nFort = Math.round(spots.filter(s => s.kind === 'town' && !s.camp).length * .25);
+  const nFort = Math.round(spots.filter(plain).length * .25);
   for (let k = 0; k < nFort; k++) {
     const half = k % 2, f = forts[half];
-    const cand = spots.filter(s => s.kind === 'town' && !s.camp && !s.fortified && !s.special && (s.x >= MW / 2) === !!half && Math.hypot(s.x - f.x, s.z - f.z) > 55);
+    const cand = spots.filter(s => plain(s) && (s.x >= MW / 2) === !!half && Math.hypot(s.x - f.x, s.z - f.z) > 55);
     const c = cand[(rng() * cand.length) | 0]; if (!c) continue;
     c.fortified = true;
-    const fl = flats.find(q => q.kind === 'town' && q.x === c.x && q.z === c.z); if (fl) { fl.r0 = 8; fl.r1 = 12; }
   }
+  for (const c of spots) if (c.fortified || c.keep) { const fl = flats.find(q => q.kind === 'town' && q.x === c.x && q.z === c.z); if (fl) { fl.r0 = 8; fl.r1 = 12; } }   // los grandes, sobre una explanada mayor
   computeHM(); buildNav();
   for (const s of spots) s.node = nearestNode(s.x, s.z);
   // equilibrio: distancia por camino de cada fortaleza a sus 3 pueblos más cercanos de su mitad; si difiere más de un 18 %, otra semilla
   if (geoR && tries < 8) {
-    const near = sd => { const f = bfs([spots[sd].node]), d = spots.filter(s => s.kind === 'town' && !s.camp && (s.x >= MW / 2) === !!sd).map(s => f[s.node]).sort((a, b) => a - b).slice(0, 3); return d.length ? d.reduce((a, b) => a + b, 0) / d.length : 1e9; };
+    const near = sd => { const f = bfs([spots[sd].node]), d = spots.filter(s => s.kind === 'town' && !s.camp && !s.keep && !s.watch && (s.x >= MW / 2) === !!sd).map(s => f[s.node]).sort((a, b) => a - b).slice(0, 3); return d.length ? d.reduce((a, b) => a + b, 0) / d.length : 1e9; };
     const a = near(0), b = near(1), reach = bfs([spots[BASE0].node])[spots[BASE1].node];
     if (reach >= 1e9 || a >= 1e8 || b >= 1e8 || Math.abs(a - b) / Math.max(a, b) > .18) return generate(newSeed + 15485863, tries + 1);
   }

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { decos, refreshKnownTowns } from './buildings.js';
-import { MD, MW } from './config.js';
+import { GAME, MD, MW } from './config.js';
 import { toast } from './game.js';
 import { spots } from './map.js';
 import { markMiniDirty } from './minimap.js';
@@ -14,7 +14,7 @@ import { units } from './units.js';
 export const FW = MW, FH = MD, fogData = new Uint8Array(FW * FH).fill(255), seen = new Uint8Array(FW * FH), explored = new Uint8Array(FW * FH);
 const visF = new Float32Array(FW * FH), expF = new Float32Array(FW * FH), fogTgt = new Float32Array(FW * FH), fogB = new Float32Array(FW * FH);
 const fogTex = new THREE.DataTexture(fogData, FW, FH, THREE.RedFormat);
-const VISION = { sword: 10, bow: 13, horse: 15, harcher: 15, hero: 14 }, FOG_SOFT = 5;   // casillas de degradado en el borde de la visión
+const VISION = { sword: 10, bow: 13, horse: 15, harcher: 15, hero: 14, titan: 10, god: 14 }, FOG_SOFT = 5;   // casillas de degradado en el borde de la visión
 export let fogOn = false;
 function revealAt(x, z, r) {
   const R = r + FOG_SOFT * .5;
@@ -35,7 +35,7 @@ export function updateFog(snapTo) {
   if (!fogOn) return;
   visF.fill(0);
   for (const u of units) if (u.side === 0) revealAt(u.pos.x, u.pos.z, VISION[u.type]);
-  for (const s of spots) if (s.kind === 'base' && s.side === 0) revealAt(s.x, s.z, 28); else if (s.kind === 'town' && s.owner === 0) revealAt(s.x, s.z, 14);
+  for (const s of spots) if (s.kind === 'base' && s.side === 0) revealAt(s.x, s.z, 28); else if (s.kind === 'town' && s.owner === 0) revealAt(s.x, s.z, s.watch ? GAME.watchVision : 14);
   for (let k = 0; k < visF.length; k++) { const v = visF[k]; if (v > expF[k]) expF[k] = v; seen[k] = v > .5 ? 1 : 0; if (expF[k] > .5) explored[k] = 1; fogTgt[k] = Math.max(v * 255, expF[k] * 120); }
   blurFog(fogTgt, fogB, visF);   // visF se reutiliza como búfer temporal
   for (let k = 0; k < fogData.length; k++) { const t = fogB[k]; fogData[k] = snapTo ? t : fogData[k] + (t - fogData[k]) * .5; }

@@ -1,11 +1,11 @@
 // Capa 2D sobre el 3D (barras, iconos, textos), cursores y tamaño de la ventana.
 import * as THREE from 'three';
 import { spotPos } from './buildings.js';
-import { BARR0, BASE1, CFG, GAME, RANKS, TEAM, UNITS } from './config.js';
+import { ALT0, BARR0, BASE1, CFG, GAME, RANKS, TEAM, TEMP0, UNITS } from './config.js';
 import { uname } from './civs.js';
 import { exploredAt, visibleAt } from './fog.js';
 import { state } from './game.js';
-import { drag, mouse, pickEnemy, pickSpot, pickUnit, project } from './input.js';
+import { RALLY_BLD, drag, mouse, pickEnemy, pickSpot, pickUnit, project } from './input.js';
 import { spots, surfY } from './map.js';
 import { camera, canvas, gl, target } from './render.js';
 import { $, S } from './state.js';
@@ -45,6 +45,7 @@ const ICONS = {
   horse: ['0002200', '0022220', '0222020', '2222000', '0222000', '0202000', '0202000'],
   harcher: ['0002200', '0022220', '2222020', '2222000', '0222000', '0202000', '0202000'],
   hero:  ['2020202', '2222222', '2222222', '0000000', '0222220', '0222220', '0000000'],
+  titan: ['0222200', '0222220', '2222222', '2022202', '0222200', '0220220', '0220220'],
   god:   ['2002002', '0222220', '0200020', '2202022', '0200020', '0222220', '2002002'],
   shield: ['2222222', '2000002', '2022202', '2022202', '0200020', '0020200', '0002000'],
 };
@@ -85,8 +86,8 @@ function orderLines() {
     if (!scr(u.pos.x, u.pos.y + .3, u.pos.z, LA) || !scr(x, surfY(x, z) + .1, z, LB)) continue;
     dashLine(LA.x, LA.y, LB.x, LB.y, c); ends.set(Math.round(LB.x / 4) + ',' + Math.round(LB.y / 4), [LB.x, LB.y, c]);
   }
-  const b = spots[BARR0];
-  if (S.selBld === 'barracks' && S.rally && scr(b.x, b.y + .5, b.z, LA) && scr(S.rally.x, surfY(S.rally.x, S.rally.z) + .1, S.rally.z, LB)) { dashLine(LA.x, LA.y, LB.x, LB.y, '#8ad8f0'); ends.set('rally', [LB.x, LB.y, '#8ad8f0']); }
+  const rb = { barracks: BARR0, altar: ALT0, temple: TEMP0 }[S.selBld], rp = S.rally[S.selBld];
+  if (rb != null && rp) { const b = spots[rb], c = RALLY_BLD[S.selBld]; if (scr(b.x, b.y + .5, b.z, LA) && scr(rp.x, surfY(rp.x, rp.z) + .1, rp.z, LB)) { dashLine(LA.x, LA.y, LB.x, LB.y, c); ends.set('rally', [LB.x, LB.y, c]); } }
   octx.globalAlpha = 1;
   for (const [x, y, c] of ends.values()) { octx.fillStyle = '#0f0f1b'; octx.fillRect(x - 4, y - 4, 8, 8); octx.fillStyle = c; octx.fillRect(x - 2.5, y - 2.5, 5, 5); }   // marca en cada destino
 }
@@ -97,14 +98,14 @@ export function drawOverlay(dt) {
     const c = project(spotPos(s), tmpP); s.sx = c.x; s.sy = c.y; s.vis = c.vis && (state !== 'play' || exploredAt(s.x, s.z));
     const ed = project(_h.set(s.x + 3, s.y, s.z), tmpQ); s.pr = Math.max(18, Math.hypot(ed.x - s.sx, ed.y - s.sy) * (s.kind === 'base' ? 1.3 : 1));
     if (!s.vis || !showUI) continue;
-    const top = project(spotPos(s, s.kind === 'base' ? 9 : s.kind === 'town' ? 6 : 5), tmpP);
+    const top = project(spotPos(s, s.kind === 'base' ? 9 : s.watch ? 11 : s.keep ? 8.5 : s.kind === 'town' ? 6 : 5), tmpP);
     if (s.kind === 'base') {
       if (s.hp < GAME.baseHp) bar(top.x, top.y - 4, 70, 6, s.hp / GAME.baseHp, TEAM[s.side].css);
     } else if (s.kind === 'town') {
       const own = s.owner;
       for (let k = 1; k < s.lvl; k++) pip(top.x + (k - s.lvl / 2) * 10, top.y - 6, '#e8c870');
       const seenT = visibleAt(s.x, s.z);
-      if (s.fortified && s.owner < 0 && s.guards > 0) actionIcon(top.x, top.y - 16, 'shield', '#9a7a3a', '#f4f4e8');
+      if ((s.fortified || s.keep) && s.owner < 0 && s.guards > 0) actionIcon(top.x, top.y - 16, s.keep ? 'titan' : 'shield', '#9a7a3a', '#f4f4e8');
       if (seenT && own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; bar(top.x, top.y + 6, 50, 5, s.prog[sd], TEAM[sd].css); }
       if (seenT && own >= 0 && s.lose > 0) bar(top.x, top.y + 6, 50, 5, 1 - s.lose, TEAM[own].css);
     } else {
@@ -178,7 +179,7 @@ const CUR = {
 function hoverCursor() {
   const x = mouse.x, y = mouse.y, has = sel.size > 0;
   if (S.amode && has) return CUR.attack;
-  if (S.selBld === 'barracks') { const sp = pickSpot(x, y); return sp ? 'pointer' : CUR.rally; }
+  if (S.selBld in RALLY_BLD) { const sp = pickSpot(x, y); return sp ? 'pointer' : CUR.rally; }
   if (has && pickEnemy(x, y)) return CUR.attack;
   const own = pickUnit(x, y, 0);
   if (own) return has && own.type === 'hero' && [...sel].some(u => u !== own && u.type !== 'hero') ? CUR.assign : 'pointer';

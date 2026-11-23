@@ -44,7 +44,7 @@ export function drawMinimap() {
   mctx.lineWidth = 2; mctx.strokeStyle = '#0f0f1b';
   for (const s of spots) {
     if (!exploredAt(s.x, s.z)) continue;
-    if (s.kind === 'town') { const r = s.fortified ? 10 : 7, ko = s.known ?? s.owner; mctx.fillStyle = ko < 0 ? '#f4f4e8' : TEAM[ko].css; mctx.beginPath(); mctx.moveTo(s.x, s.z - r); mctx.lineTo(s.x + r, s.z); mctx.lineTo(s.x, s.z + r); mctx.lineTo(s.x - r, s.z); mctx.closePath(); mctx.fill(); mctx.stroke(); }
+    if (s.kind === 'town') { const r = s.fortified || s.keep ? 10 : 7, ko = s.known ?? s.owner; mctx.fillStyle = ko < 0 ? '#f4f4e8' : TEAM[ko].css; mctx.beginPath(); mctx.moveTo(s.x, s.z - r); mctx.lineTo(s.x + r, s.z); mctx.lineTo(s.x, s.z + r); mctx.lineTo(s.x - r, s.z); mctx.closePath(); mctx.fill(); mctx.stroke(); }
     else if (s.kind === 'base') { mctx.fillStyle = TEAM[s.side].css; mctx.fillRect(s.x - 8, s.z - 8, 16, 16); mctx.strokeRect(s.x - 8, s.z - 8, 16, 16); }
   }
   for (const u of units) { if (u.side !== 0 && !visibleAt(u.pos.x, u.pos.z)) continue; const k = u.type === 'hero' || u.type === 'god' ? 4 : 2; mctx.fillStyle = sel.has(u) ? '#e8c870' : u.type === 'god' ? '#ffe9a0' : u.type === 'hero' ? '#fff' : TEAM[u.side].css; mctx.fillRect(u.pos.x - k, u.pos.z - k, k * 2, k * 2); }

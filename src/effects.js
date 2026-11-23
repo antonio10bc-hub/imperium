@@ -25,6 +25,12 @@ export function plume(loc, color, size, life, up = 1.2, g = -.6) {
   const m = takeBox(color); m.scale.setScalar(size * .5); m.position.copy(loc);
   puffs.push({ m, v: new THREE.Vector3((fxRand() - .5) * .5, up, (fxRand() - .5) * .5), t: life, life, s: size, g, grow: true });
 }
+// destello que vuela de un punto a otro (la curación del dios hacia cada tropa)
+export function streak(from, to, color, life = .45, size = .2) {
+  if (!seenAt(from) && !seenAt(to)) return;
+  const m = takeBox(color); m.scale.setScalar(size); m.position.copy(from);
+  puffs.push({ m, v: new THREE.Vector3().subVectors(to, from).divideScalar(life), t: life, life, s: size, g: 0 });
+}
 // lo que pasa en la niebla no se ve: textos, señales, partículas y flechas
 export const seenAt = p => !fogOn || visibleAt(p.x, p.z);
 export const floatText = (loc, text, color, size = 10) => { if (seenAt(loc)) floats.push({ local: loc.clone(), text, color, t: 0, size }); };

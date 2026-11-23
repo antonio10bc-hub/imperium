@@ -113,7 +113,7 @@ function clearWorld() {
   for (const s of spots) if (s.group) world.remove(s.group);
   for (const d of decos) world.remove(d); decos.length = 0;
   for (const g of bakedGeos) g.dispose(); bakedGeos.length = 0;   // edificios y murallas fundidos de la partida anterior
-  if (S.rallyFlag) { world.remove(S.rallyFlag); S.rallyFlag = null; } S.rally = null;
+  for (const k in S.rallyFlag) world.remove(S.rallyFlag[k]); S.rallyFlag = {}; S.rally = {};
 }
 // keepCivs: conserva las civilizaciones de la partida actual (reiniciar el mismo mapa)
 export function newGame(s, keepCivs = false) {
@@ -156,13 +156,21 @@ export function toast(msg, kind = '', pos = null) {   // avisos en columna, arri
   if (pos) { const p = { x: pos.x, z: pos.z }; d.classList.add('go'); d.title = 'Ir allí'; d.addEventListener('pointerdown', () => focusOn(p.x, p.z)); miniPings.push({ x: p.x, z: p.z, t: 0, c: kind === 'bad' ? '#d83a4a' : kind === 'good' ? '#e8c870' : '#f4f4e8' }); }
   while (f.children.length > 4) f.lastChild.remove(); setTimeout(() => d.remove(), 4500);
 }
-export const TOWN_LV = { cost: [0, 120, 220], inc: [1, 1.8, 2.6] };
-export const townInc = s => s.camp ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special ? 2 : 1) * (s.fortified ? 2 : 1) * (bonusOf(s.owner).income || 1);
-export const incomeOf = sd => GAME.income + spots.reduce((a, s) => a + (s.kind === 'town' && s.owner === sd ? townInc(s) : 0), 0);
-export const towerRange = s => GAME.towerRange + (s.lvl - 1) * 1.5, towerDmg = s => GAME.towerDmg * (1 + (s.lvl - 1) * .5);
+export const TOWN_LV = { cost: [0, 120, 220], inc: [1, 1.5, 2] };
+// pueblos que no dan oro: campamento, ciudadela y atalaya (dan tropas o defensa)
+export const noGold = s => s.camp || s.keep || s.watch;
+// oro de un pueblo por sí solo (nivel, oro doble de los fortificados y de la cima, ventaja de civilización)
+export const townInc = s => noGold(s) ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special || s.fortified ? GAME.richMul : 1) * (bonusOf(s.owner).income || 1);
+// rendimiento decreciente: el pueblo k-ésimo (del que más da al que menos) rinde un 8 % menos que el anterior, hasta un mínimo del 45 %
+const decay = k => Math.max(GAME.townDecayMin, 1 - GAME.townDecay * k);
+const goldTowns = sd => spots.filter(s => s.kind === 'town' && s.owner === sd && !noGold(s)).sort((a, b) => townInc(b) - townInc(a) || spots.indexOf(a) - spots.indexOf(b));
+export const incomeOf = sd => GAME.income + goldTowns(sd).reduce((a, s, k) => a + townInc(s) * decay(k), 0);
+// lo que aporta de verdad este pueblo ahora (con el rendimiento decreciente de su dueño)
+export const townIncNow = s => { if (s.owner < 0) return townInc(s); const k = goldTowns(s.owner).indexOf(s); return k < 0 ? 0 : townInc(s) * decay(k); };
+export const towerRange = s => s.watch ? GAME.watchRange : GAME.towerRange + (s.lvl - 1) * 1.5, towerDmg = s => s.watch ? GAME.watchDmg : GAME.towerDmg * (1 + (s.lvl - 1) * .5);
 export function upgradeTown(side, s) {
   const st = sideState[side];
-  if (s.camp || s.owner !== side || s.lvl >= 3 || st.gold < TOWN_LV.cost[s.lvl]) { if (side === 0) sfx('deny'); return false; }
+  if (noGold(s) || s.owner !== side || s.lvl >= 3 || st.gold < TOWN_LV.cost[s.lvl]) { if (side === 0) sfx('deny'); return false; }
   st.gold -= TOWN_LV.cost[s.lvl]; s.lvl++; townLevelLook(s);
   burst(spotPos(s, 1), [0xffd23f, 0xffffff], 16, 2.5, 5, .9, .22);
   if (side === 0) { sfx('capture'); floatText(spotPos(s, 5), 'NIVEL ' + s.lvl, '#e8c870', 10); refreshPanel(); }
@@ -175,16 +183,24 @@ export function campSpawn(s) {   // el campamento da jinetes arqueros a su dueñ
   burst(u.pos, [0xffffff, TEAM[own].l], 6, 1.5, 2, .4, .16);
   if (own === 0) { floatText(spotPos(s, 4.5), 'JINETE ARQUERO', '#8ad8f0', 9); refreshPanel(); }
 }
+export function keepSpawn(s) {   // la ciudadela da colosos a su dueño, hasta 10 vivos, alrededor del edificio
+  const own = s.owner; if (own < 0) return;
+  if (units.filter(u => u.keepOf === s && u.side === own).length >= GAME.keepMax || popOf(own) >= capOf(own)) return;
+  const a = Math.random() * 6.28, u = spawnAt(own, 'titan', s.x + Math.cos(a) * 6.5, s.z + Math.sin(a) * 6.5, a); u.keepOf = s;
+  burst(u.pos, [0xffffff, 0xb8b0a0, TEAM[own].l], 10, 2, 2.5, .5, .2);
+  if (own === 0) { floatText(spotPos(s, 6), 'COLOSO', '#8ad8f0', 10); refreshPanel(); }
+}
 function spawnGuards() {
   const post = (s, x, z, type, a) => { const n = nearestNode(x, z), u = spawnAt(2, type, cellX(n), cellZ(n), a); u.home = s; u.post = [cellX(n), cellZ(n)]; s.guards = (s.guards || 0) + 1; return u; };
   for (const s of spots) {
     if (s.camp) for (let k = 0; k < GAME.campGuards; k++) { const a = k / GAME.campGuards * 6.28; post(s, s.x + Math.cos(a) * 2.2, s.z + Math.sin(a) * 2.2, k % 2 ? 'harcher' : 'sword', a); }
+    if (s.keep) for (let k = 0; k < GAME.keepGuards; k++) { const a = k / GAME.keepGuards * 6.28 + .3; post(s, s.x + Math.cos(a) * 4.2, s.z + Math.sin(a) * 4.2, 'titan', a); }
     if (s.fortified) { const T = ['sword', 'bow', 'sword', 'horse', 'bow'];   // seis dentro y el resto en dos corros alrededor; muchos son veteranos
       for (let k = 0; k < GAME.fortGuards; k++) { const ring = k < 6 ? 0 : k < 14 ? 1 : 2, n = [6, 8, GAME.fortGuards - 14][ring], j = k - [0, 6, 14][ring], a = j / n * 6.28 + ring * .4, r = [2.6, 6.6, 9.2][ring];
         const u = post(s, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, T[k % 5], a); u.rank = k % 4 === 0 ? 2 : k % 2 ? 1 : 0; if (u.rank) { setMax(u); u.hp = u.maxHp; applyRank(u); } } }
   }
 }
-export const capR = s => s.fortified ? 5.7 : 3.9;   // radio del círculo de conquista
+export const capR = s => s.fortified || s.keep ? 5.7 : 3.9;   // radio del círculo de conquista
 // arqueros en las murallas: varios puntos del recinto disparan a los enemigos que se acercan
 function castleDefense(dt) {
   for (const f of forts) {
@@ -204,8 +220,9 @@ function updateTowns(dt) {
     const s = spots[k], p = spotPos(s), here = [0, 0, 0];
     const inside = UGRID.near(p.x, p.z, capR(s), _nearTown).filter(u => u.pos.distanceTo(p) < capR(s)); for (const u of inside) here[u.side]++;
     const cheer = sd => { for (const u of inside) if (u.side === sd && !u.enemy) u.capT = .25; };   // los que conquistan saltan en el sitio
-    if ((s.camp || s.fortified) && s.owner === -1 && s.guards > 0) { s.prog = [0, 0]; continue; }   // hay que acabar antes con los defensores
+    if ((s.camp || s.fortified || s.keep) && s.owner === -1 && s.guards > 0) { s.prog = [0, 0]; continue; }   // hay que acabar antes con los defensores
     if (s.camp && s.owner >= 0 && (s.genT -= dt) <= 0) { s.genT = GAME.campGen; campSpawn(s); }
+    if (s.keep && s.owner >= 0 && (s.genT -= dt) <= 0) { s.genT = GAME.keepGen; keepSpawn(s); }
     if (s.owner === -1) {
       for (const sd of [0, 1]) {
         if (here[sd] && !here[1 - sd]) { s.prog[sd] += dt / GAME.capture * (bonusOf(sd).capture || 1); cheer(sd); } else s.prog[sd] = Math.max(0, s.prog[sd] - dt / GAME.capture / 2);
@@ -221,7 +238,7 @@ function updateTowns(dt) {
       if (!s.camp && s.owner >= 0 && (s.towerCd -= dt) <= 0) {
         let best = null, bd = towerRange(s);
         for (const u of UGRID.near(p.x, p.z, bd, _nearTown)) if (u.side !== s.owner) { const d = u.pos.distanceTo(p); if (d < bd) { bd = d; best = u; } }
-        if (best) { s.towerCd = GAME.towerCd; shoot(s.tower, best.pos, 0); damage({ side: s.owner, vis: s.vis, def: {} }, best, towerDmg(s)); }
+        if (best) { s.towerCd = s.watch ? GAME.watchCd : GAME.towerCd; shoot(s.tower, best.pos, 0); damage({ side: s.owner, vis: s.vis, def: {} }, best, towerDmg(s)); }
       }
     }
   }

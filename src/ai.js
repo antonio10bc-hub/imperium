@@ -7,15 +7,15 @@ import { escortUnit, spreadTo } from './behavior.js';
 import { spotPos } from './buildings.js';
 import { assign, nearestEnemy, siege, strike } from './combat.js';
 import { DIFF, GAME, TOWN0, TYPES, UNITS } from './config.js';
-import { capR, elapsed, enqueue, fields, hasGod, heroCount, heroesOf, startRitual, summonGod, summonHero, townInc, upgradeTown } from './game.js';
+import { capR, elapsed, noGold, enqueue, fields, hasGod, heroCount, heroesOf, startRitual, summonGod, summonHero, townInc, upgradeTown } from './game.js';
 import { spots } from './map.js';
 import { MERC, ev, hireMercs } from './events.js';
 import { UGRID, alive, sideState, units } from './units.js';
 
 // valor aproximado de cada tropa para medir fuerzas (coste, con algo de peso al héroe)
-const WORTH = { sword: 40, bow: 55, horse: 80, harcher: 70, hero: 260 };
+const WORTH = { sword: 40, bow: 55, horse: 80, harcher: 70, titan: 150, hero: 260, god: 400, cart: 0 };
 const worth = u => WORTH[u.type] * (.35 + .65 * u.hp / u.maxHp) * (1 + u.rank * .15);
-const COUNTER = { sword: 'bow', bow: 'horse', horse: 'sword', harcher: 'horse' };   // qué tropa vence a cada una
+const COUNTER = { sword: 'bow', bow: 'horse', horse: 'sword', harcher: 'horse', titan: 'bow' };   // qué tropa vence a cada una
 const AI_VISION = 15, AI_MEMORY = 45;   // casillas a las que ve la IA y segundos que recuerda lo visto
 
 // estado de la IA de un bando según la dificultad (o el cerebro pedido para pruebas)
@@ -44,7 +44,7 @@ function simplePlan(A) {
     if (h.escort.length < 20) { const free = mine.filter(u => !u.leader && !u.retreat).sort((a, b) => a.pos.distanceTo(h.pos) - b.pos.distanceTo(h.pos)); if (free.length > 1) assign(free[0], h); }
   }
   // mejora sus pueblos cuando le sobra oro
-  if (!saving && st.gold > 320) { const t = spots.filter(s => s.kind === 'town' && !s.camp && s.owner === side && s.lvl < 3).sort((a, b) => a.lvl - b.lvl)[0]; if (t) upgradeTown(side, t); }
+  if (!saving && st.gold > 320) { const t = spots.filter(s => s.kind === 'town' && !noGold(s) && s.owner === side && s.lvl < 3).sort((a, b) => a.lvl - b.lvl)[0]; if (t) upgradeTown(side, t); }
   const bp = spotPos(spots[side]), threat = theirs.filter(u => u.pos.distanceTo(bp) < 16).length;
   if (threat > mine.length * .7 && threat > 0) A.stance = 'defend';
   else if (mine.length >= Df.attackAt || (mine.length >= 2 && spots.some(s => s.kind === 'town' && s.owner === -1))) A.stance = 'attack';
@@ -61,9 +61,9 @@ function simpleUnit(u, dt, A) {
   if (u.retreat || A.stance === 'defend') { spreadTo(u, home.x, home.z, fields[side], 3.5, 1.15, dt); return; }   // en casa, repartidos por el recinto
   // varios frentes: la mitad del ejército va al pueblo más cercano y la otra mitad al segundo.
   // Cada tropa se compromete con su objetivo y solo lo replantea cada pocos segundos o al conquistarlo (antes lo cambiaba a cada paso y se quedaba clavada a medio camino)
-  const valid = t => t >= TOWN0 && spots[t] && spots[t].owner !== side && (u.bigArmy || !(spots[t].fortified && spots[t].guards > 0));
+  const valid = t => t >= TOWN0 && spots[t] && spots[t].owner !== side && !(spots[t].guards > 0 && ((spots[t].fortified && u.armyN < 24) || (spots[t].keep && u.armyN < 14)));
   if ((u.aiReT = (u.aiReT ?? 0) - dt) <= 0 || !valid(u.aiT)) {
-    u.aiReT = 5 + (u.id % 5); u.bigArmy = units.filter(o => o.side === side && o.type !== 'hero').length >= 24;
+    u.aiReT = 5 + (u.id % 5); u.armyN = units.filter(o => o.side === side && o.type !== 'hero').length;
     let bt = -1, bv = 1e9, st = -1, sv = 1e9;
     for (let t = TOWN0; t < spots.length; t++) if (valid(t)) { const v = fields[t][u.node]; if (v < bv) { st = bt; sv = bv; bt = t; bv = v; } else if (v < sv) { st = t; sv = v; } }
     u.aiT = u.id % 2 && st >= 0 && sv < bv * 2.5 + 20 ? st : bt; u.aiV = u.aiT === st ? sv : bv;
@@ -81,7 +81,7 @@ function observe(A) {
   const side = A.side, foe = 1 - side, places = spots.filter(s => (s.kind === 'base' && s.side === side) || (s.kind === 'town' && s.owner === side));
   for (const e of units) {
     if (e.side !== foe && !(e.side === 2 && e.raid === side)) continue;   // el rival y los bandidos que vienen a por él
-    const seen = places.some(s => near(s, e.pos.x, e.pos.z, s.kind === 'base' ? 28 : 14)) || UGRID.near(e.pos.x, e.pos.z, AI_VISION, _seen).some(o => o.side === side && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < AI_VISION);
+    const seen = places.some(s => near(s, e.pos.x, e.pos.z, s.kind === 'base' ? 28 : s.watch ? GAME.watchVision : 14)) || UGRID.near(e.pos.x, e.pos.z, AI_VISION, _seen).some(o => o.side === side && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < AI_VISION);
     if (seen) A.mem.set(e.id, { type: e.type, x: e.pos.x, z: e.pos.z, w: worth(e), t: elapsed });
   }
   const live = new Set(); for (const u of units) live.add(u.id);
@@ -96,7 +96,7 @@ function smartPlan(A) {
   observe(A);
   const mine = units.filter(u => u.side === side && u.type !== 'hero'), heroes = heroesOf(side);
   const myW = mine.reduce((a, u) => a + worth(u), 0) + heroes.reduce((a, u) => a + worth(u), 0);
-  let foeW = 0; const foeCount = { sword: 0, bow: 0, horse: 0, harcher: 0, hero: 0 };
+  let foeW = 0; const foeCount = { sword: 0, bow: 0, horse: 0, harcher: 0, titan: 0, hero: 0, god: 0 };
   for (const m of A.mem.values()) { foeW += m.w; foeCount[m.type]++; }
 
   // --- producción: contrarresta lo más numeroso que ha visto, sin descuidar el equilibrio propio
@@ -109,7 +109,7 @@ function smartPlan(A) {
   if (hc < wantH && mine.length >= 3 && st.gold >= UNITS.hero.cost) summonHero(side);
   else if (!saving && st.queue.length < 2 && st.gold >= UNITS[A.next].cost && enqueue(side, A.next)) {
     const own = t => mine.filter(u => u.type === t).length + st.queue.filter(q => q.type === t).length;
-    const top = ['sword', 'bow', 'horse', 'harcher'].sort((a, b) => foeCount[b] - foeCount[a])[0];
+    const top = ['sword', 'bow', 'horse', 'harcher', 'titan'].sort((a, b) => foeCount[b] - foeCount[a])[0];
     A.next = off(A, 'counter') ? TYPES[Math.random() * 3 | 0] : foeCount[top] > 0 && Math.random() < .7 ? COUNTER[top] : TYPES.slice().sort((a, b) => own(a) - own(b))[0];
   }
   for (const h of heroes) {   // escolta en formación para cada héroe: cuña al atacar, bloque al defender
@@ -124,7 +124,7 @@ function smartPlan(A) {
   // --- mejoras: con oro de sobra, primero los pueblos que más rinden y sin enemigos cerca
   const upAt = off(A, 'eco') ? (foeW > myW ? 420 : 320) : foeW > myW * 1.2 ? 400 : 140;   // una mejora se amortiza en ~80 s: si no va por detrás, mejora pronto
   if (!saving && st.gold > upAt) {
-    const t = spots.filter(s => s.kind === 'town' && !s.camp && s.owner === side && s.lvl < 3 && memNear(A, s.x, s.z, 16, 10) === 0).sort((a, b) => townInc(b) - townInc(a) || a.lvl - b.lvl)[0];
+    const t = spots.filter(s => s.kind === 'town' && !noGold(s) && s.owner === side && s.lvl < 3 && memNear(A, s.x, s.z, 16, 10) === 0).sort((a, b) => townInc(b) - townInc(a) || a.lvl - b.lvl)[0];
     if (t) upgradeTown(side, t);
   }
 
@@ -179,9 +179,9 @@ function smartUnit(u, dt, A) {
   const home = spots[side];
   if (A.stance === 'defend') { spreadTo(u, home.x, home.z, fields[side], 3.5, 1.15, dt); return; }
   // como la IA original: la mitad al objetivo más cercano y la otra mitad al segundo, pero sin meterse donde sabe que no puede ganar
-  const valid = t => t >= TOWN0 && spots[t] && spots[t].owner !== side && !A.blocked?.has(t) && (u.bigArmy || !(spots[t].fortified && spots[t].guards > 0));
+  const valid = t => t >= TOWN0 && spots[t] && spots[t].owner !== side && !A.blocked?.has(t) && !(spots[t].guards > 0 && ((spots[t].fortified && u.armyN < 24) || (spots[t].keep && u.armyN < 14)));
   if ((u.aiReT = (u.aiReT ?? 0) - dt) <= 0 || !valid(u.aiT)) {
-    u.aiReT = 5 + (u.id % 5); u.bigArmy = units.filter(o => o.side === side && o.type !== 'hero').length >= 24;
+    u.aiReT = 5 + (u.id % 5); u.armyN = units.filter(o => o.side === side && o.type !== 'hero').length;
     let bt = -1, bv = 1e9, st = -1, sv = 1e9;
     for (let t = TOWN0; t < spots.length; t++) if (valid(t)) { const v = fields[t][u.node]; if (v < bv) { st = bt; sv = bv; bt = t; bv = v; } else if (v < sv) { st = t; sv = v; } }
     u.aiT = u.id % 2 && st >= 0 && sv < bv * 2.5 + 20 && !A.concentrate ? st : bt; u.aiV = u.aiT === st ? sv : bv;

@@ -18,14 +18,17 @@ export const UNITS = {
   horse: { name: 'JINETE', cost: 80, time: 7, hp: 160, dmg: 18, range: 1.8, cd: 1.0, speed: 5.5, aggro: 9, vs: { bow: 1.7 } },
   harcher: { name: 'JINETE ARQUERO', cost: 0, time: 0, hp: 110, dmg: 10, range: 7.5, cd: 1.25, speed: 5.2, aggro: 10, vs: { sword: 1.3 } },
   hero:  { name: 'HÉROE',  cost: 200, time: 10, hp: 650, dmg: 32, range: 2.1, cd: .9, speed: 4.5, aggro: 9, vs: {} },
+  titan: { name: 'COLOSO', cost: 0, time: 0, hp: 620, dmg: 26, range: 1.9, cd: 1.4, speed: 2.1, aggro: 8, vs: {} },   // de la ciudadela central: lento, duro y cuerpo a cuerpo
+  cart:  { name: 'CARRO DE CARAVANA', cost: 0, time: 0, hp: 280, dmg: 0, range: 0, cd: 1, speed: 2.6, aggro: 0, vs: {} },   // evento de la caravana: no pelea
   god:   { name: 'DIOS',   cost: 300, time: 20, hp: 1500, dmg: 40, range: 2.4, cd: 1.0, speed: 4, aggro: 10, vs: {} },   // del templo, tras el ritual; uno por bando
 };
 export const RANKS = [{ name: '', kills: 0, mul: 1 }, { name: 'BRONCE', kills: 2, mul: 1.12, hex: 0xc07a40, css: '#c07a40' },
   { name: 'PLATA', kills: 5, mul: 1.25, hex: 0xb4afa2, css: '#b4afa2' }, { name: 'ORO', kills: 10, mul: 1.4, hex: 0xe8c870, css: '#e8c870' }];
-export const TYPES = ['sword', 'bow', 'horse'], ALLT = ['god', 'hero', 'sword', 'bow', 'horse', 'harcher'];
+export const TYPES = ['sword', 'bow', 'horse'], ALLT = ['god', 'hero', 'titan', 'sword', 'bow', 'horse', 'harcher'];
 export const RANGED = t => t === 'bow' || t === 'harcher';
-export const GAME = { startGold: 220, income: 1, townIncome: 1.8, baseHp: 1500, capBase: 30, capTown: 6, capMax: 100, towns: 16, capture: 4, queueMax: 30, bounty: 6, maxHeroes: 3, wallShooters: 12, wallRange: 10, wallDmg: 7, wallCd: 1.6,
-  campGen: 14, campMax: 20, campGuards: 6, fortGuards: 20, heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, ritualCost: 500, ritualTime: 60, godHeal: 5, godHealR: 10, godBounty: 150, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4 };
+export const GAME = { startGold: 220, income: 1, townIncome: 1.3, townDecay: .08, townDecayMin: .45, richMul: 1.6, baseHp: 1500, capBase: 30, capTown: 6, capMax: 100, towns: 16, capture: 4, queueMax: 30, bounty: 6, maxHeroes: 3, wallShooters: 12, wallRange: 10, wallDmg: 7, wallCd: 1.6,
+  campGen: 14, campMax: 20, campGuards: 6, fortGuards: 20, heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, ritualCost: 500, ritualTime: 60, godHeal: 5, godHealR: 10, godBounty: 150, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4,
+  watchRange: 15, watchDmg: 13, watchCd: 1.1, watchVision: 32, keepGen: 22, keepMax: 10, keepGuards: 5 };
 // dificultad: fácil usa la IA simple con menos oro; normal y difícil, la IA smart con el mismo oro que el jugador (difícil decide más a menudo y concentra el fuego)
 // plan: segundos entre decisiones de la IA smart · focus: cada tropa elige objetivo en vez de atacar al más cercano
 export const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, brain: 'simple', label: 'FÁCIL' }, normal: { inc: 1, attackAt: 6, hero: true, brain: 'smart', plan: 1, focus: false, label: 'NORMAL' }, hard: { inc: 1, attackAt: 5, hero: true, brain: 'smart', plan: .5, focus: true, label: 'DIFÍCIL' } };

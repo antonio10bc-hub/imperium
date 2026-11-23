@@ -12,6 +12,9 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 - Mapas de 384×256 con once geografías irregulares (río, cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto y caldera), elegibles en el menú o al azar. El generador descarta las semillas desequilibradas (mismos pueblos por mitad y distancias por camino parecidas).
 - Terreno con reglas: pantanos y bajíos frenan (más a los jinetes), el bosque denso no se atraviesa, los tiradores desde dos niveles por encima ganan alcance y daño, y la cima de la meseta da oro doble. Caminos entre pueblos y niebla de guerra.
 - Dos campamentos con guardianes neutrales: al conquistarlos dan jinetes arqueros (hasta 20 por campamento).
+- En el centro, una ciudadela guardada por colosos: quien la conquista recibe colosos (hasta 10), lentos, duros y cuerpo a cuerpo.
+- Una atalaya en cada mitad, en la franja central: no da oro, pero da visión lejana y su torre dispara más lejos.
+- Oro con rendimiento decreciente: cada pueblo propio rinde un 8 % menos que el anterior (mínimo 45 %).
 - Seis civilizaciones (Roma, Cartago, Han, mexicas, Egipto y galos) con aspecto, música y ventaja propios (legiones, comercio, ballestas, conquista rápida, carros y furia); se eligen en el menú para ti y para el rival, o al azar.
 - Cada civilización trae su bioma, sus pueblos y una fortaleza con muralla y distribución propias; el mapa se reparte 50/50 entre las dos.
 - Para añadir una civilización nueva, sigue [docs/checklist-civilizacion.md](docs/checklist-civilizacion.md).
@@ -21,7 +24,8 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 - Las tropas seleccionadas muestran una línea hasta su destino (verde: mover, roja: atacar o asediar, amarilla: conquistar).
 - Las fortalezas dañadas echan humo y fuego, y los pueblos mejorados ganan construcciones.
 - Cada fortaleza tiene castillo, cuartel, salón de héroes y templo. En el templo, un ritual (500 de oro, 1 minuto) permite invocar al dios de la civilización (uno por bando): flota, golpea cuerpo a cuerpo y, asignado a un héroe, va detrás de él curando a su escolta.
-- Eventos neutrales cada ~2 minutos: bandidos que asaltan al líder en territorio, mercenarios veteranos a la venta y caravanas con oro.
+- Cuartel, salón de héroes y templo tienen cada uno su punto de reunión (clic derecho con el edificio seleccionado).
+- Eventos neutrales cada ~2 minutos: bandidos que asaltan al líder en territorio, mercenarios veteranos a la venta y caravanas de tres carros con oro.
 - IA rival: en fácil, la IA simple con menos oro; en normal y difícil, una IA sin trampas (mismo oro que tú, solo sabe lo que ven sus tropas) que contrarresta tu ejército, defiende sus pueblos, cura a sus heridos y concentra fuerzas. En difícil decide más a menudo y concentra el fuego.
 - **ESC** (o el botón ☰) abre el menú de pausa: continuar, reiniciar el mismo mapa, rendirse o volver al menú principal.
 - El héroe aparece a la izquierda con sus tropas asignadas (hasta 50), que forman delante de él en bloque, línea o cuña.

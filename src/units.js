@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { orderMove } from './behavior.js';
 import { CIV_SLOT, civOf, defOf } from './civs.js';
-import { BARR0, GAME, MD, MW, RANKS, TEAM, TYPES, mixHex } from './config.js';
+import { ALT0, BARR0, GAME, MD, MW, RANKS, TEAM, TEMP0, TYPES, mixHex } from './config.js';
 import { GEOT, HM, cellOf, roadCell, spots } from './map.js';
 import { NBO, cellX, cellZ, inMain, nearestNode, stepMask, walk } from './nav.js';
 import { BOX, FLASH, HULLMAT, VCMAT, basic, collectParts, discGeo, mergeBoxes, part, ring, ringGeo, world } from './render.js';
@@ -20,7 +20,27 @@ function unitModel(type, side, body) {   // construye las piezas del modelo en b
   // modelo genérico: jinetes arqueros y guardianes neutrales
   const T = TEAM[side], skin = 0xffd2a0, steel = 0xd8dcf0, P = (...a) => part(body, ...a, true);
   let crestY = 1.36;
-  if (type === 'horse' || type === 'hero' || type === 'harcher') {
+  if (type === 'titan') {   // coloso: gigante acorazado y lento, con maza de piedra y escudo; no es de ninguna civilización
+    const iron = 0x6a6e7a, iron2 = 0x8a8e9a, stone = 0x9a9488, dark = 0x2a2a34;
+    for (const x of [-.2, .2]) { P(.26, .5, .3, dark, x, .25, 0); P(.32, .14, .4, iron, x, .05, .04); }
+    P(.8, .5, .5, iron, 0, .72, 0); P(.92, .5, .56, iron2, 0, 1.18, 0); P(.62, .5, .08, T.c, 0, .86, .3);   // coraza y faldón del bando
+    for (const x of [-1, 1]) { P(.36, .26, .44, iron2, x * .6, 1.42, 0); P(.24, .56, .26, iron, x * .6, 1.02, .02); }   // hombreras y brazos
+    P(.46, .44, .44, iron2, 0, 1.68, .02); P(.36, .08, .06, 0xffc83a, 0, 1.7, .26); P(.12, .2, .5, T.c, 0, 1.98, -.02);   // yelmo con visera y cresta
+    P(.12, 1.1, .12, 0x5a3a24, .62, .95, .28); P(.4, .4, .44, stone, .62, 1.5, .34); P(.2, .2, .2, stone, .62, 1.78, .34);   // maza
+    P(.12, .8, .66, iron, -.76, 1, .1); P(.06, .3, .3, T.c, -.83, 1.02, .1);   // escudo
+    crestY = 2.2;
+  } else if (type === 'cart') {   // carro de caravana: buey, carreta entoldada con mercancía y cofre de oro
+    const wood = 0x8a5a34, wood2 = 0x6a4224, ox = 0x8a6a4a, canvas = 0xe8dcc0;
+    P(.6, .55, 1, ox, 0, .75, 1.35); P(.4, .4, .4, 0x7a5a3a, 0, .95, 1.98); P(.5, .08, .08, 0xe8e0c8, 0, 1.16, 1.98);   // buey y cuernos
+    for (const [a, b] of [[-.2, .98], [.2, .98], [-.2, 1.72], [.2, 1.72]]) P(.14, .48, .14, 0x5a4024, a, .24, b);
+    P(.1, .1, 1, wood2, 0, .62, .66); P(.9, .1, .1, wood2, 0, .9, .86);   // lanza y yugo
+    P(1.2, .18, 1.8, wood, 0, .62, -.4); P(1.24, .32, .08, wood2, 0, .86, .48); P(1.24, .32, .08, wood2, 0, .86, -1.28);   // caja
+    for (const z of [.2, -1]) for (const x of [-.66, .66]) { P(.1, .62, .62, wood2, x, .32, z); P(.12, .18, .18, 0x3a2a1a, x, .32, z); }   // ruedas
+    P(1.1, .6, 1.3, canvas, 0, 1.28, -.55); P(.9, .2, 1.32, canvas, 0, 1.66, -.55); P(.05, .6, 1.32, 0xc8b896, 0, 1.3, -.55);   // toldo
+    P(.5, .4, .4, 0x7a4a24, -.25, .94, -1.15); P(.44, .12, .34, 0xffc83a, -.25, 1.18, -1.15); P(.34, .3, .34, 0xa87a4a, .3, .9, -1.1);   // cofre de oro y fardos
+    P(.3, .36, .26, 0x5a7a9a, 0, 1.04, .26); P(.22, .22, .22, 0xffd2a0, 0, 1.36, .26); P(.32, .08, .32, 0xd8c89a, 0, 1.5, .26);   // carretero
+    crestY = 2;
+  } else if (type === 'horse' || type === 'hero' || type === 'harcher') {
     const hero = type === 'hero', hc = hero ? 0xffffff : 0x8a5a34, hc2 = hero ? 0xf0ecff : 0x7a4824;
     P(.5, .45, 1.05, hc, 0, .72, 0); P(.3, .42, .38, hc2, 0, 1.02, .58); P(.16, .18, .2, hero ? 0xd8d0e8 : 0x2a1a10, 0, 1.2, .38);
     for (const [a, b] of [[-.16, -.36], [.16, -.36], [-.16, .36], [.16, .36]]) P(.13, .5, .13, hero ? 0xe8e4f4 : 0x5a3a24, a, .25, b);
@@ -70,12 +90,14 @@ function buildUnit(type, side, parent = world) {
   const crest = new THREE.Group(); part(crest, .18, .18, .18, 0xffffff, 0, t.crestY, 0); crest.visible = false; body.add(crest);
   const sh = new THREE.Mesh(discGeo(.62, 20), basic(0x0f0f1b, .28)); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; g.add(sh);
   const team = ring(g, .46, .66, TEAM[side].c, .05), selR = ring(g, .7, .86, 0xffe03a, .07); selR.visible = false;
-  if (type === 'god') {   // el dios: halo dorado tras la cabeza y un aura de luz en el suelo
-    const halo = new THREE.Mesh(ringGeo(.3, .4), basic(0xffe9a0, .9)); halo.position.set(0, t.crestY - .2, -.24); body.add(halo);
-    ring(g, .2, 1.15, 0xffe9a0, .04, .3);
+  let halo = null, aura = null, wave = null;
+  if (type === 'god') {   // el dios: halo dorado tras la cabeza, aura de luz en el suelo y una onda que se expande al curar
+    halo = new THREE.Mesh(ringGeo(.3, .4), basic(0xffe9a0, .9)); halo.position.set(0, t.crestY - .2, -.24); body.add(halo);
+    aura = ring(g, .2, 1.15, 0xffe9a0, .04, .3);
+    wave = new THREE.Mesh(ringGeo(.9, 1), new THREE.MeshBasicMaterial({ color: 0xb8f07a, transparent: true, opacity: 0, depthWrite: false })); wave.rotation.x = -Math.PI / 2; wave.position.y = .08; wave.visible = false; g.add(wave);
   }
-  g.scale.setScalar(type === 'god' ? 2.1 : type === 'hero' ? (side < 2 ? 1.8 : 1.95) : 1.3); parent.add(g);
-  return { g, body, mesh, tpl: t, team, selR, crest, sh };
+  g.scale.setScalar({ god: 2.1, titan: 1.7, cart: 1.25 }[type] ?? (type === 'hero' ? (side < 2 ? 1.8 : 1.95) : 1.3)); parent.add(g);
+  return { g, body, mesh, tpl: t, team, selR, crest, sh, halo, aura, wave };
 }
 export const THUMB = {};
 // un solo renderer fuera de pantalla para miniaturas y retratos del menú (crear contextos WebGL en cada partida agota el límite del navegador)
@@ -93,7 +115,7 @@ export function makeThumbs() {
     const r = offscreen(); r.setSize(72, 72, false);
     const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, .1, 50);
     const l = new THREE.DirectionalLight(0xfff6e8, 2.2); l.position.set(3, 5, 4); sc.add(l, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25));
-    for (const t of [...TYPES, 'hero', 'harcher', 'god']) {
+    for (const t of [...TYPES, 'hero', 'harcher', 'god', 'titan']) {
       const u = buildUnit(t, 0, sc); u.team.visible = false; u.sh.visible = false;
       const box = new THREE.Box3().setFromObject(u.g), c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3()).length();
       cam.position.copy(c).add(new THREE.Vector3(1.1, .6, 1.2).normalize().multiplyScalar(s * 1.25)); cam.lookAt(c);
@@ -129,10 +151,13 @@ export const sel = new Set();
 let uid = 0;
 const maxHpOf = u => Math.round(u.def.hp * (u.leader ? GAME.escortBonus : 1) * RANKS[u.rank].mul);
 export function setMax(u) { const old = u.maxHp; u.maxHp = maxHpOf(u); if (u.maxHp > old) u.hp += u.maxHp - old; else u.hp = Math.min(u.hp, u.maxHp); }
+// edificio que produce cada tipo de sitio: su punto de reunión está en S.rally[edificio]
+export const RALLY_OF = { [BARR0]: 'barracks', [ALT0]: 'altar', [TEMP0]: 'temple' };
 export function spawnUnit(side, type, at = BARR0) {
   const b = spots[at + side], k = spots[side], ang = Math.atan2(k.z - b.z, k.x - b.x) + (Math.random() - .5) * 1.6;
   const u = spawnAt(side, type, b.x + Math.cos(ang) * 2.8, b.z + Math.sin(ang) * 2.8, ang);
-  if (side === 0 && !sideState[0].ai && S.rally && type !== 'hero') orderMove([u], S.rally.x, S.rally.z, false);
+  const r = S.rally[RALLY_OF[at]];
+  if (side === 0 && !sideState[0].ai && r) orderMove([u], r.x, r.z, false);
   return u;
 }
 export function spawnAt(side, type, x, z, ang = Math.random() * 6.28) {

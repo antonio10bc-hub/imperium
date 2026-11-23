@@ -12,14 +12,15 @@ import { bfs, cellX, cellZ, inMain, nearestNode } from './nav.js';
 import { alive, followField, sel, setMax, sideState, spawnAt, spawnUnit, units } from './units.js';
 
 export const MERC = { cost: 220, time: 45, types: ['horse', 'horse', 'bow', 'sword'], rank: 2 };
-const CARAVAN_GOLD = 150;
-export const ev = { t: 0, last: '', merc: null };   // merc: oferta en curso { t, hired: [false, false] }
+const CARAVAN_GOLD = 150, CARAVAN_CARTS = 3, CARAVAN_GAP = 2.4;   // oro total, carros y segundos entre uno y el siguiente
+export const ev = { t: 0, last: '', merc: null, cara: null };   // cara: carros de la caravana que faltan por salir   // merc: oferta en curso { t, hired: [false, false] }
 
 // pruebas: lanza un evento ya ('bandits', 'mercs' o 'caravan')
 export function triggerEvent(k) { return k === 'bandits' ? bandits() : k === 'mercs' ? mercs() : caravan(); }
-export function resetEvents() { ev.t = 180; ev.last = ''; ev.merc = null; }
+export function resetEvents() { ev.t = 180; ev.last = ''; ev.merc = null; ev.cara = null; }
 export function updateEvents(dt) {
   if (ev.merc && (ev.merc.t -= dt) <= 0) ev.merc = null;
+  if (ev.cara && (ev.cara.t -= dt) <= 0) { ev.cara.t = CARAVAN_GAP; spawnCart(ev.cara.from, ev.cara.f, false); if (--ev.cara.n <= 0) ev.cara = null; }
   if ((ev.t -= dt) > 0) return;
   ev.t = 110 + Math.random() * 40;
   const kinds = ['bandits', 'mercs', 'caravan'].filter(k => k !== ev.last), k = kinds[Math.random() * kinds.length | 0];
@@ -83,14 +84,17 @@ function caravan() {
   const x0 = MW / 2 + (Math.random() - .5) * 60, from = nearestNode(x0, 6), to = nearestNode(MW / 2 + (Math.random() - .5) * 60, MD - 6);
   if (!inMain[from] || !inMain[to]) return false;
   const f = bfs([to]); if (f[from] >= 1e9) return false;
-  const u = spawnAt(2, 'horse', cellX(from), cellZ(from), Math.PI / 2);
-  u.caravan = f; u.bounty = CARAVAN_GOLD; u.maxHp = u.hp = 420;
-  toast(`UNA CARAVANA CRUZA EL MAPA: ${CARAVAN_GOLD} DE ORO PARA QUIEN LA DETENGA`, 'good', { x: cellX(from), z: cellZ(from) });
+  spawnCart(from, f, true); ev.cara = { n: CARAVAN_CARTS - 1, t: CARAVAN_GAP, from, f };   // los demás carros salen detrás, en fila
+  toast(`UNA CARAVANA DE ${CARAVAN_CARTS} CARROS CRUZA EL MAPA: ${CARAVAN_GOLD} DE ORO PARA QUIEN LA DETENGA`, 'good', { x: cellX(from), z: cellZ(from) });
   return true;
+}
+function spawnCart(from, f, lead) {
+  const u = spawnAt(2, 'cart', cellX(from), cellZ(from), Math.PI / 2);
+  u.caravan = f; u.bounty = Math.round(CARAVAN_GOLD / CARAVAN_CARTS); u.lead = lead;
 }
 // la caravana no pelea: sigue su camino y desaparece al salir por el otro lado
 export function caravanUnit(u, dt) {
   if (u.caravan[u.node] <= 1) { u.dead = true; units.splice(units.indexOf(u), 1); sel.delete(u); u.g.parent?.remove(u.g); return; }
-  followField(u, u.caravan, dt, 2.6);
-  if ((u.pingT = (u.pingT ?? 0) - dt) <= 0) { u.pingT = 3; ping(u.pos, '#e8c870'); }
+  followField(u, u.caravan, dt, u.def.speed);
+  if (u.lead && (u.pingT = (u.pingT ?? 0) - dt) <= 0) { u.pingT = 3; ping(u.pos, '#e8c870'); }
 }

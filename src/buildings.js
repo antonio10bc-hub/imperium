@@ -5,7 +5,7 @@ import { CIV, civOf } from './civs.js';
 import { GAME, TEAM, mixHex } from './config.js';
 import { burst, floatText, fxRand, ping, plume, seenAt } from './effects.js';
 import { visibleAt } from './fog.js';
-import { campSpawn, toast } from './game.js';
+import { campSpawn, keepSpawn, toast, townIncNow } from './game.js';
 import { sideState } from './units.js';
 import { fortPt, forts, inGate, paintRegion, sideAt, spots, surfY, wallR } from './map.js';
 import { hash } from './noise.js';
@@ -17,7 +17,7 @@ export const spotPos = (s, lift = 0) => new THREE.Vector3(s.x, s.y + lift, s.z);
 function placeSpot(s, g, face) {
   let m = 1; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) m = Math.max(m, surfY(s.x + dx, s.z + dz));
   s.y = m; g.position.set(s.x, s.y, s.z); g.rotation.y = face; world.add(g); s.group = g; s.base = g.position.clone(); g.updateMatrixWorld();
-  const r = ({ base: 4.4, barracks: 2.9, altar: 2.9, temple: 3, town: 3.3 }[s.kind] || 3) * (s.fortified ? 1.5 : 1);   // sombra suave desplazada hacia donde cae la luz
+  const r = ({ base: 4.4, barracks: 2.9, altar: 2.9, temple: 3, town: 3.3 }[s.kind] || 3) * (s.fortified || s.keep ? 1.5 : 1);   // sombra suave desplazada hacia donde cae la luz
   const sh = new THREE.Mesh(discGeo(r), basic(0x0f1a2a, .22)); sh.rotation.x = -Math.PI / 2; sh.position.set(s.x + r * .18, s.y + .04, s.z - r * .22); world.add(sh); decos.push(sh); s.shadow = sh;
   s.flags = [];
 }
@@ -85,8 +85,47 @@ function buildCamp(s) {
   s.roofs = roofs; bake(g, new Set([...roofs, s.flag])); placeSpot(s, g, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.campGen; addFlag(s, s.flag);
   s.tower = local(s, -1.6, 2.6, -1.4);
 }
+// final común de los sitios conquistables: funde el modelo (menos tejados y bandera, que cambian de color) y deja el sitio neutral
+function finishSite(s, g, roofs, towerAt, beam = 14) {
+  s.zone = ring(g, s.keep ? 5.3 : 3.5, s.keep ? 5.6 : 3.8, 0xfff4d6, .12, .85);
+  s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.scale.set(.5, beam, .5); s.beacon.position.y = beam / 2 + 2; s.beacon.visible = false; g.add(s.beacon);
+  s.roofs = roofs; bake(g, new Set([...roofs, s.flag])); placeSpot(s, g, camFace(s, .5));
+  s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.keepGen; addFlag(s, s.flag);
+  s.tower = local(s, ...towerAt);
+}
+// atalaya: torre alta de piedra con plataforma de madera y brasero; da visión lejana y dispara más lejos que un pueblo
+function buildWatch(s) {
+  const g = new THREE.Group(), roofs = [], cv = civOf(sideAt(s.x, s.z)), [wc, wc2] = cv.wall, wood = 0x7a5a34;
+  part(g, 2.4, .6, 2.4, wc2, 0, .3, 0); part(g, 1.9, 3.2, 1.9, wc, 0, 2.2, 0); part(g, 1.6, 3, 1.6, wc, 0, 5.2, 0);   // basa y fuste
+  for (const y of [1.4, 3.8]) part(g, .34, .5, .1, 0x1a1a24, 0, y, .96, false);   // saeteras
+  part(g, 2.8, .25, 2.8, wood, 0, 6.8, 0);   // plataforma
+  for (const [a, b] of [[-1.25, -1.25], [1.25, -1.25], [-1.25, 1.25], [1.25, 1.25]]) part(g, .16, 1.5, .16, wood, a, 7.6, b);
+  for (let k = 0; k < 4; k++) { const r = k * Math.PI / 2; part(g, 2.7, .45, .12, wood, Math.sin(r) * 1.3, 7.2, Math.cos(r) * 1.3).rotation.y = r; }   // barandilla
+  roofs.push(part(g, 3.2, .3, 3.2, wc2, 0, 8.45, 0), part(g, 2.2, .35, 2.2, wc2, 0, 8.75, 0), part(g, 1.1, .35, 1.1, wc2, 0, 9.05, 0));   // tejado (color del dueño)
+  part(g, .7, .3, .7, 0x3a3a3a, .6, 7.1, -.6); part(g, .4, .35, .4, 0xff9a2a, .6, 7.35, -.6, false); part(g, .22, .3, .22, 0xffe06a, .6, 7.55, -.6, false);   // brasero
+  part(g, .1, 1.6, .1, 0x5a3a24, 0, 10, 0); s.flag = part(g, .9, .55, .08, 0xffffff, .45, 10.5, 0, false);
+  for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .3 && Math.cos(a) > 0) continue; part(g, .14, 1, .14, cv.id === 'galos' ? wood : wc2, Math.cos(a) * 2.8, .1, Math.sin(a) * 2.8, false); }
+  finishSite(s, g, roofs, [0, 7.6, 0], 18);
+}
+// ciudadela: torreón neutral (sin civilización) con cuatro torres y muralla; quien la conquista recibe colosos
+function buildKeep(s) {
+  const g = new THREE.Group(), roofs = [], st = 0x8c8a92, st2 = 0x6c6a74, dark = 0x2a2a34;
+  part(g, 4.6, .5, 4.6, st2, 0, .25, 0); part(g, 3.8, 5, 3.8, st, 0, 2.6, 0);   // torreón
+  for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; part(g, .7, .55, .7, st2, Math.cos(a) * 1.6, 5.35, Math.sin(a) * 1.6); }   // almenas
+  roofs.push(part(g, 2.6, .5, 2.6, 0x7a6a9a, 0, 5.4, 0), part(g, 1.6, .55, 1.6, 0x7a6a9a, 0, 5.9, 0));
+  part(g, 1.2, 1.8, .2, dark, 0, 1, 1.92, false); part(g, .5, .7, .2, dark, -1, 3.3, 1.92, false); part(g, .5, .7, .2, dark, 1, 3.3, 1.92, false);
+  for (const [x, z] of [[-3.3, -3.3], [3.3, -3.3], [-3.3, 3.3], [3.3, 3.3]]) {   // torres de las esquinas
+    part(g, 1.5, 3.6, 1.5, st, x, 1.8, z); part(g, 1.8, .4, 1.8, st2, x, 3.7, z); roofs.push(part(g, 1.3, .7, 1.3, 0x7a6a9a, x, 4.2, z), part(g, .7, .5, .7, 0x7a6a9a, x, 4.75, z));
+  }
+  for (const [x, z, w, d] of [[0, -3.3, 5.1, .6], [-3.3, 0, .6, 5.1], [3.3, 0, .6, 5.1], [-2.1, 3.3, 1.9, .6], [2.1, 3.3, 1.9, .6]]) { part(g, w, 2, d, st, x, 1, z); part(g, w + .1, .3, d + .1, st2, x, 2.1, z); }   // muralla con puerta al frente
+  part(g, .14, 2.2, .14, 0x5a3a24, 0, 7.2, 0); s.flag = part(g, 1.2, .7, .08, 0x7a6a9a, .6, 7.9, 0, false);
+  part(g, .5, 1.6, .5, 0x9a9488, 1.6, .8, 4.4); part(g, .8, .7, .5, 0x9a9488, 1.6, 1.9, 4.4); part(g, .4, .4, .4, 0x9a9488, 1.6, 2.45, 4.4);   // estatua del coloso
+  finishSite(s, g, roofs, [0, 6, 0], 20);
+}
 export function buildTown(s) {
   if (s.camp) return buildCamp(s);
+  if (s.watch) return buildWatch(s);
+  if (s.keep) return buildKeep(s);
   const big = s.fortified ? 1.5 : 1, g0 = new THREE.Group(), g = CIV.grp(g0, 0, 0, 0, big), roofs = [], cv = civOf(sideAt(s.x, s.z)), [wc, wc2] = cv.wall;
   if (s.fortified) {   // dos casas más, muralla baja con puerta al frente y dos torres
     cv.house(CIV.grp(g, -2.5, 0, 1.3, .5, .35)); cv.house(CIV.grp(g, 2.4, 0, 1.4, .5, -.35));
@@ -104,7 +143,7 @@ export function buildTown(s) {
 }
 // cada nivel de mejora se ve en el pueblo: nivel 2, una casa más; nivel 3, otra casa y remates dorados en la torre
 export function townLevelLook(s) {
-  if (s.camp || !s.townG) return;
+  if (s.camp || s.watch || s.keep || !s.townG) return;
   if (s.lvlG) { s.townG.remove(s.lvlG); for (const c of s.lvlG.children) c.geometry?.dispose(); s.lvlG = null; }
   if (s.lvl < 2) return;
   const g = new THREE.Group(), lots = s.fortified ? [[1.7, -2.2, .5, -.2], [-.2, -2.5, .5, .15]] : [[1.75, .95, .55, -.3], [-1.85, .85, .55, .3]];   // x, z, escala, giro
@@ -157,8 +196,8 @@ export function buildWalls(f) {
 // aspecto del pueblo según su dueño conocido
 function townLook(s) {
   const sd = s.known, col = sd < 0 ? null : TEAM[sd];
-  for (const m of s.roofs) m.material = mat(col ? (s.camp ? mixHex(0xd8c89a, col.c, .55) : col.c) : s.camp ? 0xd8c89a : civOf(sideAt(s.x, s.z)).wall[1]);
-  s.flag.material = mat(col ? col.c : s.camp ? TEAM[2].c : 0xffffff);
+  for (const m of s.roofs) m.material = mat(col ? (s.camp ? mixHex(0xd8c89a, col.c, .55) : col.c) : s.camp ? 0xd8c89a : s.keep ? 0x7a6a9a : civOf(sideAt(s.x, s.z)).wall[1]);
+  s.flag.material = mat(col ? col.c : s.camp ? TEAM[2].c : s.keep ? 0x7a6a9a : 0xffffff);
   s.zone.material = basic(col ? col.c : 0xfff4d6, .85);
   s.beacon.visible = false;
   paintRegion(s.region);
@@ -169,13 +208,15 @@ export function setOwner(s, sd) {
   const prev = s.owner; s.owner = sd; if (sd < 0 && s.lvl > 1) { s.lvl = 1; townLevelLook(s); }
   const p = spotPos(s), col = sd < 0 ? null : TEAM[sd];
   if (sd >= 0 && s.camp) { s.genT = GAME.campGen; for (let k = 0; k < 3; k++) campSpawn(s); }   // el campamento da tropas aunque no se vea
+  if (sd >= 0 && s.keep) { s.genT = GAME.keepGen; for (let k = 0; k < 2; k++) keepSpawn(s); }
   if (!seenAt(p) && prev !== 0) return;   // en la niebla no te enteras (salvo que pierdas un pueblo tuyo)
   s.known = sd; s.anim = 1.4; townLook(s);
   if (sd >= 0) {
     burst(spotPos(s, 1), [0xffd23f, 0xffe98a, col.c], 22, 3, 7, 1.1, .26); burst(spotPos(s, 4), [col.c, col.l, 0xffffff], 34, 4, 6, 1.6, .18); ping(p, '#e8c870'); ping(p, col.css);
-    floatText(spotPos(s, 5.5), sd === 0 ? (s.camp ? 'JINETES ARQUEROS' : '+1,5 ORO/S') : 'PUEBLO PERDIDO', sd === 0 ? '#e8c870' : '#d83a4a', 10);
+    const gain = s.camp ? 'JINETES ARQUEROS' : s.keep ? 'COLOSOS' : s.watch ? 'VISIÓN Y TORRE' : `+${String(Math.round(townIncNow(s) * 10) / 10).replace('.', ',')} ORO/S`;
+    floatText(spotPos(s, s.watch ? 11 : 5.5), sd === 0 ? gain : 'PUEBLO PERDIDO', sd === 0 ? '#e8c870' : '#d83a4a', 10);
     if (sd === 0) floatText(spotPos(s, 3.4), `+${GAME.capTown} TROPAS`, '#8ad8f0', 9);
-    toast(sd === 0 ? (s.camp ? `¡${s.name} ES TUYO! JINETES ARQUEROS · +${GAME.capTown} TROPAS` : `¡${s.name} ES TUYO! +1,5 ORO/S · +${GAME.capTown} TROPAS`) : `EL RIVAL HA TOMADO ${s.name}`, sd === 0 ? 'good' : 'bad', s);
+    toast(sd === 0 ? `¡${s.name} ES TUYO! ${gain} · +${GAME.capTown} TROPAS` : `EL RIVAL HA TOMADO ${s.name}`, sd === 0 ? 'good' : 'bad', s);
     sfx(sd === 0 ? 'capture' : 'deny'); if (sd === 0) track('town_captured');
   } else {
     burst(spotPos(s, 1), [0xffffff, TEAM[prev].c], 14, 3, 4, .8, .22); ping(p, '#ffffff');
