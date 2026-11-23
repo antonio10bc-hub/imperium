@@ -18,18 +18,30 @@ function baseGround(rng) {
     for (let z = 0; z < MD; z++) RIVX[z] = geoR.div ? geoR.div(z + .5) : MW / 2;   // divisoria del reparto 50/50
     return;
   }
+  riverGround(rng, EL, RIVX);
+}
+// río con vados entre dos llanuras: rellena las alturas y la x del río en cada fila
+function riverGround(rng, el, rivx) {
   const ph = rng() * 6.28; rng();   // la segunda tirada se conserva para que cada semilla siga dando el mismo mapa
   const fords = [.1, .27, .43, .58, .74, .9].map(k => MD * k + (rng() - .5) * 10);
-  for (let z = 0; z < MD; z++) {   // río con vados entre dos llanuras
-    const cz = z + .5, xr = MW / 2 + Math.sin(cz * .03 + ph) * 22 + (n2(0, cz, .02, 3, 12) - .5) * 26, ford = fords.some(f => Math.abs(cz - f) < 3); RIVX[z] = xr;
+  for (let z = 0; z < MD; z++) {
+    const cz = z + .5, xr = MW / 2 + Math.sin(cz * .03 + ph) * 22 + (n2(0, cz, .02, 3, 12) - .5) * 26, ford = fords.some(f => Math.abs(cz - f) < 3); rivx[z] = xr;
     for (let x = 0; x < MW; x++) {
       const cx = x + .5, dr = Math.abs(cx - xr); let g = plains(cx, cz);
       if (dr < 4) g = ford ? 1 : -1.2 - (4 - dr) * .6;
       else if (dr < 5.5) g = Math.min(g, 1.2);
       else if (dr < 9) g = Math.min(g, 2.2);
-      EL[idx(x, z)] = g;
+      el[idx(x, z)] = g;
     }
   }
+}
+// vista previa de una geografía para el menú: un ejemplo con semilla fija (alturas, tipos de casilla y sitio de las fortalezas)
+const previews = new Map();
+export function previewMap(key) {
+  let p = previews.get(key); if (p) return p;
+  if (key === 'rio') { const el = new Float32Array(N); riverGround(rngOf(4242), el, new Float32Array(MD)); p = { HM: el, TT: new Uint8Array(N), F: [[MW * .15, MD / 2], [MW * .85, MD / 2]] }; }
+  else { const g = GEO.build(key, 4242); p = { HM: g.HM, TT: g.TT, F: g.F }; }
+  previews.set(key, p); return p;
 }
 // ---------- Mapa de alturas ----------
 const RIVX = new Float32Array(MD).fill(MW / 2);   // x del río en cada fila: separa las dos mitades del mapa

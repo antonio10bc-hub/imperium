@@ -2,10 +2,11 @@
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { BONUS, CIV, CIVS, civPick } from './civs.js';
-import { TEAM } from './config.js';
+import { MW, TEAM, idx } from './config.js';
 import { newGame } from './game.js';
 import { GEO } from './geo.js';
 import { syncDiff } from './hud.js';
+import { previewMap } from './map.js';
 import { resize } from './overlay.js';
 import { part } from './render.js';
 import { $, S } from './state.js';
@@ -58,6 +59,21 @@ export function showPortraits(onlySide = -1, dir = 0) {
 }
 
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
+// miniatura de la geografía elegida: agua, alturas, bosque denso, pantano y arena, con tu fortaleza (azul) y la del rival (roja)
+const PREV_COL = { deep: 0x4594c6, shallow: 0x5fb0d4, forest: 0x2f5a35, swamp: 0x6c9a92, sand: 0xdccb95, oasis: 0x4f9a3a, rock: 0x9a9488, snow: 0xe4e2da, grass: [0x7db45b, 0x8bbd61, 0x9fc56c] };
+function drawGeoPreview() {
+  const c = $('geoPrev'), x = c.getContext('2d'), W = c.width, H = c.height, key = S.wantScen;
+  if (!GEO.LIST[key]) { x.fillStyle = '#262a3b'; x.fillRect(0, 0, W, H); x.fillStyle = '#e8c870'; x.font = '40px Silkscreen, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('?', W / 2, H / 2 + 2); return; }
+  const p = previewMap(key), img = x.createImageData(W, H), k = MW / W;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const c0 = idx(i * k | 0, j * k | 0), h = p.HM[c0], t = p.TT[c0], C = PREV_COL;
+    const col = h <= 0 ? (h < -1.5 ? C.deep : C.shallow) : t === 1 ? C.forest : t === 2 ? C.swamp : t === 4 ? C.oasis : t === 3 || h <= 1 ? C.sand : h >= 9 ? C.snow : h >= 6 ? C.rock : C.grass[Math.min(2, Math.max(0, Math.round(h) - 2))];
+    const o = (j * W + i) * 4; img.data[o] = col >> 16 & 255; img.data[o + 1] = col >> 8 & 255; img.data[o + 2] = col & 255; img.data[o + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  p.F.forEach(([fx, fz], sd) => { const px = fx / k, pz = fz / k; x.fillStyle = '#0f0f1b'; x.fillRect(px - 5, pz - 5, 10, 10); x.fillStyle = TEAM[sd].css; x.fillRect(px - 3.5, pz - 3.5, 7, 7); });
+}
+
 export function init() {
   document.querySelectorAll('#start .arr').forEach(b => b.addEventListener('click', () => {
     const sd = +b.dataset.side, d = +b.dataset.d, o = civOpts(), i = o.indexOf(civPick[sd]);
@@ -72,7 +88,8 @@ export function init() {
   { const el = $('geo');
     el.innerHTML = '<option value="random">ALEATORIO</option>' + GEO.keys.map(k => `<option value="${k}">${GEO.LIST[k]}</option>`).join('');
     el.value = GEO.LIST[S.wantScen] ? S.wantScen : 'random';
-    el.addEventListener('change', () => { S.wantScen = el.value; try { localStorage.setItem('imperium-geo', S.wantScen); } catch (e) {} sfx('select'); S.menuDirty = true; });
+    el.addEventListener('change', () => { S.wantScen = el.value; try { localStorage.setItem('imperium-geo', S.wantScen); } catch (e) {} sfx('select'); S.menuDirty = true; drawGeoPreview(); });
+    setTimeout(drawGeoPreview, 0);
   }
   $('howBtn').addEventListener('click', () => { sfx('select'); $('start').hidden = true; $('how').hidden = false; });
   $('howBack').addEventListener('click', () => { sfx('select'); $('how').hidden = true; $('start').hidden = false; });
