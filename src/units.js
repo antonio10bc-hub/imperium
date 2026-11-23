@@ -160,7 +160,7 @@ export function spawnUnit(side, type, at = BARR0) {
   const b = spots[at + side], k = spots[side], ang = Math.atan2(k.z - b.z, k.x - b.x) + (Math.random() - .5) * 1.6;
   const u = spawnAt(side, type, b.x + Math.cos(ang) * 2.8, b.z + Math.sin(ang) * 2.8, ang);
   const r = S.rally[RALLY_OF[at]];
-  if (side === 0 && !sideState[0].ai && r) orderMove([u], r.x, r.z, false);
+  if (side === 0 && r) orderMove([u], r.x, r.z, false);   // punto de reunión del edificio (si tu bando lo lleva la IA, ella decide luego)
   return u;
 }
 export function spawnAt(side, type, x, z, ang = Math.random() * 6.28) {

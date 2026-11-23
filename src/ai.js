@@ -10,9 +10,12 @@ import { DIFF, GAME, TOWN0, TYPES, UNITS } from './config.js';
 import { capR, elapsed, noGold, enqueue, fields, hasGod, heroCount, heroesOf, startRitual, summonGod, summonHero, townInc, upgradeTown } from './game.js';
 import { spots } from './map.js';
 import { MERC, ev, hireMercs } from './events.js';
-import { UGRID, alive, sideState, units } from './units.js';
+import { UGRID, alive, followField, sideState, stepToward, units } from './units.js';
 import { hiddenFrom } from './rules.js';
 import { weatherVis } from './ambient.js';
+import { BRIDGE_COST, R, buildBridge, hitBridge, lastBridge, startChop } from './rules.js';
+import { GEOT, cellOf } from './map.js';
+import { bfs, nearestNode } from './nav.js';
 
 // valor aproximado de cada tropa para medir fuerzas (coste, con algo de peso al héroe)
 const WORTH = { sword: 40, bow: 55, horse: 80, harcher: 70, titan: 150, hero: 260, god: 400, cart: 0 };
@@ -121,6 +124,8 @@ function smartPlan(A) {
   // --- templo: con territorio y oro de sobra (y sin amenaza encima) empieza el ritual; después invoca a su dios en cuanto puede
   if (wantRitual && st.gold >= GAME.ritualCost) startRitual(side);
   else if (wantGod && st.gold >= UNITS.god.cost) summonGod(side);
+  // --- geografía: talar, saquear tesoros, derribar o reparar puentes (cada pocos segundos)
+  if ((A.geoT = (A.geoT ?? 8) - Df.plan) <= 0) { A.geoT = 12; geoTasks(A, mine, myW, foeW); }
   // --- mercenarios: si hay oferta y le sobra oro, los contrata
   if (ev.merc && !ev.merc.hired[side] && st.gold >= MERC.cost + 60 && !saving) hireMercs(side);
   // --- mejoras: con oro de sobra, primero los pueblos que más rinden y sin enemigos cerca
@@ -150,6 +155,37 @@ function smartPlan(A) {
   else if (mine.length >= Df.attackAt || (mine.length >= 2 && spots.some(s => s.kind === 'town' && s.owner === -1))) A.stance = 'attack';
   else if (mine.length <= 1) A.stance = 'defend';
 }
+// tareas de la IA con las reglas de cada geografía. Cada tarea la hacen unas pocas tropas libres (u.aiJob)
+const freeUnits = (A, mine, x, z, n) => mine.filter(u => !u.leader && !u.retreat && !u.aiJob && !A.roles.has(u) && u.type !== 'god').sort((a, b) => Math.hypot(a.pos.x - x, a.pos.z - z) - Math.hypot(b.pos.x - x, b.pos.z - z)).slice(0, n);
+function geoTasks(A, mine, myW, foeW) {
+  const side = A.side, st = sideState[side], base = spots[side];
+  // tesoros: una tropa va a por el más cercano que no esté lejísimos
+  for (const t of R.treasures || []) { if (t.taken || t.claimed?.[side]) continue; const d = Math.hypot(t.x - base.x, t.z - base.z); if (d > 170) continue;
+    const u = freeUnits(A, mine, t.x, t.z, 1)[0]; if (u) { u.aiJob = { type: 'go', x: t.x, z: t.z, f: null, until: elapsed + 90, done: () => t.taken }; (t.claimed ??= [])[side] = true; } break; }
+  // tala: si un pueblo que quiere tomar queda mucho más lejos por camino que en línea recta y hay bosque en medio, abre paso
+  if (R.on.chop && !R.jobs.some(j => j.side === side)) {
+    let best = null, br = 1.8;
+    for (let t = TOWN0; t < spots.length; t++) { const s = spots[t]; if (s.owner === side) continue; const e = Math.hypot(s.x - base.x, s.z - base.z), r = fields[t][base.node] / Math.max(1, e); if (r > br && e < 150) { br = r; best = s; } }
+    if (best) for (let k = 1; k < 20; k++) { const x = base.x + (best.x - base.x) * k / 20, z = base.z + (best.z - base.z) * k / 20, i = cellOf(x, z);
+      if (GEOT[i] === 1 || GEOT[i] === 16) { const us = freeUnits(A, mine, x, z, 3); if (us.length && startChop(x, z, us)) for (const u of us) u.aiJob = { type: 'go', x, z, f: null, until: elapsed + 60, done: () => !R.jobs.some(j => Math.hypot(j.x - x, j.z - z) < 4) }; break; } }
+  }
+  // puentes: si va perdiendo, derriba el puente por el que llega el enemigo; si va ganando y tiene oro, repara los caídos
+  for (const b of R.bridges) {
+    if (b.built && foeW > myW * 1.3 && !lastBridge(b) && memNear(A, b.x, b.z, 30, 20) > 0 && Math.hypot(b.x - base.x, b.z - base.z) < Math.hypot(b.x - spots[1 - side].x, b.z - spots[1 - side].z)) {
+      for (const u of freeUnits(A, mine, b.x, b.z, 4)) u.aiJob = { type: 'demolish', b, until: elapsed + 60, done: () => !b.built }; break; }
+    if (!b.built && myW > foeW && st.gold > BRIDGE_COST + 200) { buildBridge(side, b); break; }
+  }
+}
+function aiJobStep(u, dt) {
+  const j = u.aiJob;
+  if (elapsed > j.until || j.done()) { u.aiJob = null; return false; }
+  if ((u.think -= dt) <= 0) { u.think = .4; u.enemy = nearestEnemy(u, 4); }
+  if (alive(u.enemy) && strike(u, u.enemy, dt)) return true;
+  if (j.type === 'demolish') { if (u.order?.b !== j.b) u.order = { type: 'demolish', b: j.b }; hitBridge(u, j.b, dt); return true; }
+  if (!j.f) j.f = bfs([nearestNode(j.x, j.z)]);
+  if (Math.hypot(u.pos.x - j.x, u.pos.z - j.z) > 2.5) followField(u, j.f, dt) || stepToward(u, j.x, j.z, u.def.speed, dt);
+  return true;
+}
 // en difícil, cada tropa elige objetivo: los que puede vencer, los débiles y el héroe antes que el más cercano
 function pickTarget(u, range) {
   let best = null, bs = 1e9;
@@ -163,6 +199,7 @@ function pickTarget(u, range) {
 }
 function smartUnit(u, dt, A) {
   if (u.leader) return escortUnit(u, dt);
+  if (u.aiJob && aiJobStep(u, dt)) return;
   const side = u.side, k = u.hp / u.maxHp;
   if (k < .3 && u.type !== 'hero') u.retreat = true; else if (k > .85) u.retreat = false;
   if ((u.think -= dt) <= 0) { u.think = .3; const r = u.retreat ? 1.8 : u.def.aggro; u.enemy = A.Df.focus && !u.retreat ? pickTarget(u, r) : nearestEnemy(u, r); }

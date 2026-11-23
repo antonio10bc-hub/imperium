@@ -11,7 +11,7 @@ import { spots } from './map.js';
 import { bfs, cellX, cellZ, inMain, nearestNode } from './nav.js';
 import { alive, followField, sel, setMax, sideState, spawnAt, units } from './units.js';
 
-export const MERC = { cost: 220, time: 45, types: ['horse', 'horse', 'bow', 'sword'], rank: 2 };
+export const MERC = { cost: 180, time: 45, types: ['horse', 'horse', 'bow', 'sword'], rank: 2 };
 const CARAVAN_GOLD = 150, CARAVAN_CARTS = 3, CARAVAN_GAP = 2.4;   // oro total, carros y segundos entre uno y el siguiente
 export const ev = { t: 0, last: '', merc: null, cara: null };   // cara: carros de la caravana que faltan por salir   // merc: oferta en curso { t, hired: [false, false] }
 

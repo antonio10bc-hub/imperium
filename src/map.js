@@ -130,7 +130,14 @@ export function sideAt(x, z) {   // 0 = orilla oeste (tu civilización), 1 = ori
   const d = x - RIVX[THREE.MathUtils.clamp(z | 0, 0, MD - 1)] + (n2(x, z, .08, 2, 61) - .5) * 26, t = THREE.MathUtils.clamp(d / 24 + .5, 0, 1);
   return t <= 0 ? 0 : t >= 1 ? 1 : n2(x, z, .11, 2, 63) < t ? 1 : 0;   // manchas irregulares en la franja de mezcla, sin damero
 }
-export const biomeAt = (x, z) => civOf(sideAt(x, z)).map;
+// algunas geografías mandan sobre el suelo de cada civilización: el desierto es arena y el cañón, tierra ocre, en las dos mitades
+const GEO_GROUND = {
+  oasis: { ground: [0xe2ca96, 0xd9c08a, 0xe8d4a4, 0xcfb47a], lush: 0x9aa860, sand: 0xe6d29c, road: 0xc8a878, trees: ['palm', 'palm'], treeCol: 0x4f8a3a, dens: .35, feature: null },
+  canon: { ground: [0xc8a070, 0xbc9464, 0xd0ac7c, 0xb48a5a], lush: 0x8a8a50, sand: 0xd8b888, road: 0xa8845a, trees: ['olive', 'pine'], treeCol: 0x5a7a3a, dens: .45, feature: null },
+};
+const bioCache = new Map();
+export const bioOf = side => { const k = scen + side; let b = bioCache.get(k); if (!b) { const G = GEO_GROUND[scen]; b = G ? { ...civOf(side).map, ...G } : civOf(side).map; bioCache.set(k, b); } return b; };
+export const biomeAt = (x, z) => bioOf(sideAt(x, z));
 // rasgo de paisaje de cada bioma (solo color de suelo; Galos y mexicas añaden piezas en buildVoxels)
 function featureAt(x, z, side, B) {
   const cx = x + .5, cz = z + .5, f = n2(cx, cz, .055, 3, 33 + side * 8);
@@ -153,7 +160,7 @@ function featureAt(x, z, side, B) {
 export function terrainColor(x, z) {
   const i = idx(x, z), h = HM[i], cx = x + .5, cz = z + .5;
   const pc = groundPaint(cx, cz); if (pc >= 0) return pc;
-  const side = sideAt(cx, cz), B = civOf(side).map, gt = GEOT[i];
+  const side = sideAt(cx, cz), B = bioOf(side), gt = GEOT[i];
   if (roadCell && roadCell[i]) { const rc = h <= 1 ? TP.ford : B.road; if (roadCell[i] === 1) return rc;   // borde difuminado del camino: mitad camino, mitad suelo
     const t2 = n2(cx, cz, .045, 3, 21 + side * 7), g2 = B.ground[THREE.MathUtils.clamp(Math.floor((t2 - .34) / .09), 0, 3)]; return mixHex(rc, g2, .5); }
   if (gt === 1) return B.lush;
@@ -188,7 +195,7 @@ export function parseCode(t) {
 }
 export let sizeKey = 'n';
 export function generate(newSeed, tries = 0) {
-  setSeed(newSeed); sizeKey = MAP_SIZES[S.mapSize] ? S.mapSize : 'n'; setMapSize(sizeKey); RIVX = new Float32Array(MD).fill(MW / 2); ocean.position.set(MW / 2, -3, MD / 2);
+  setSeed(newSeed); bioCache.clear(); sizeKey = MAP_SIZES[S.mapSize] ? S.mapSize : 'n'; setMapSize(sizeKey); RIVX = new Float32Array(MD).fill(MW / 2); ocean.position.set(MW / 2, -3, MD / 2);
   meshes.forEach(m => { m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); }); meshes = [];
   EL = new Float32Array(N); G = new Float32Array(N); HM = new Int8Array(N);
   const rng = rngOf(seed);
@@ -392,7 +399,7 @@ function buildVoxels() {
     if (h < 2 || h > 4 || nearFlat(cx, cz, 3)) continue;
     let ok = true; for (let dz = -2; dz <= 2 && ok; dz++) for (let dx = -2; dx <= 2; dx++) { const j = idx(x + dx, z + dz); if (hAt(x + dx, z + dz) <= 1 || (Math.abs(dx) <= 1 && Math.abs(dz) <= 1 && roadCell[j])) { ok = false; break; } }
     if (!ok) continue;
-    const f = n2(cx, cz, .055, 3, 22), side = sideAt(cx, cz), B = civOf(side).map;
+    const f = n2(cx, cz, .055, 3, 22), side = sideAt(cx, cz), B = bioOf(side);
     if (B.feature === 'nile' && geoRiver && Math.abs(cx - RIVX[z]) > 22) continue;   // en Egipto, solo palmerales junto al río
     if (featureAt(x, z, side, B) >= 0 && B.feature !== 'nile') continue;
     if (f > .62 && hash(x * 3, 1, z * 11) < (.4 + (f - .62) * 2.5) * B.dens) treeCell[i] = 1;
@@ -425,7 +432,7 @@ function buildVoxels() {
     else if (treeCell[i]) { const B = biomeAt(cx, cz), r2 = hash(x * 5, 7, z * 3); treeBoxes(L, B.trees[r2 > .55 ? 1 : 0], cx, h, cz, r2); }
     else if (GEOT[i] === 14 && hash(x, 11, z) < .35) { for (let k = 0; k < 3; k++) L.box(cx + (k - 1) * .25, h + .35 + k * .05, cz + (k % 2) * .2 - .1, .08, .7 + k * .1, .08, k % 2 ? 0x6a8a3a : 0x8aa04a); L.box(cx, h + .78, cz, .1, .16, .1, 0x7a5a34); }   // juncos
     else if (!nearFlat(cx, cz, 1) && !roadCell[i] && h > 1 && GEOT[i] < 5) {   // piezas pequeñas del paisaje
-      const side = sideAt(cx, cz), B = civOf(side).map;
+      const side = sideAt(cx, cz), B = bioOf(side);
       if (B.feature === 'rocks' && featureAt(x, z, side, B) === 0x8a8e88 && hash(x, 9, z) < .18) { L.box(cx, h + .18, cz, .62, .36, .5, 0x8a8a86); L.box(cx + .15, h + .42, cz + .05, .34, .2, .3, 0x9a9a96); }
       else if (B.feature === 'garden' && !geoR?.snow && featureAt(x, z, side, B) === 0x5a9a44 && hash(x, 13, z) < .3) { if (hash(x, 5, z) < .25) { L.box(cx, h + .7, cz, .4, 1.4, .4, 0x2f5a35); L.box(cx, h + 1.5, cz, .24, .3, .24, 0x2f5a35); } else L.box(cx, h + .12, cz, .3, .24, .3, [0xd84a6a, 0xe8c050, 0xf0f0f0][(x * 7 + z) % 3]); }   // flores y cipreses del jardín
       else if (B.feature === 'scrub' && featureAt(x, z, side, B) === 0xd8d4c4 && hash(x, 9, z) < .14) { L.box(cx, h + .16, cz, .6, .32, .5, 0xe0dccc); L.box(cx - .12, h + .38, cz + .05, .3, .16, .26, 0xd0ccbc); }

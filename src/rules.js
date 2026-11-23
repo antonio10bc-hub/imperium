@@ -119,7 +119,7 @@ function updateCycle(dt) {
 }
 
 // ---------- puentes ----------
-export const BRIDGE_COST = 150;
+export const BRIDGE_COST = 120;
 // tres estilos en el cañón: de piedra con arcos (aguanta mucho), fortificado con dos torres que disparan (se conquista) y colgante (cae antes y se balancea)
 const BRIDGE_HP = { stone: 900, fort: 650, rope: 280, wood: 450 };
 function makeBridge(site) {

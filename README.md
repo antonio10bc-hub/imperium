@@ -26,7 +26,7 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 - El límite de tropas crece con el territorio: 30 de base y 6 por cada pueblo o campamento (hasta 100).
 - Las tropas seleccionadas muestran una línea hasta su destino (verde: mover, roja: atacar o asediar, amarilla: conquistar).
 - Las fortalezas dañadas echan humo y fuego, y los pueblos mejorados ganan construcciones.
-- Cada fortaleza tiene castillo, cuartel, salón de héroes y templo. En el templo, un ritual (500 de oro, 1 minuto) permite invocar al dios de la civilización (uno por bando): flota, golpea cuerpo a cuerpo y, asignado a un héroe, va detrás de él curando a su escolta.
+- Cada fortaleza tiene castillo, cuartel, salón de héroes y templo. En el templo, un ritual (400 de oro, 1 minuto) permite invocar al dios de la civilización (uno por bando): flota, golpea cuerpo a cuerpo y, asignado a un héroe, va detrás de él curando a su escolta.
 - Cuartel, salón de héroes y templo tienen cada uno su punto de reunión (clic derecho con el edificio seleccionado).
 - Eventos neutrales cada ~2 minutos: bandidos que asaltan al líder en territorio, mercenarios veteranos a la venta y caravanas de tres carros con oro.
 - IA rival: en fácil, la IA simple con menos oro; en normal y difícil, una IA sin trampas (mismo oro que tú, solo sabe lo que ven sus tropas) que contrarresta tu ejército, defiende sus pueblos, cura a sus heridos y concentra fuerzas. En difícil decide más a menudo y concentra el fuego.
