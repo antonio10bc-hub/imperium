@@ -31,23 +31,28 @@
 <div id="toast" hidden></div>
 <div id="pause" hidden>PAUSA</div>
 <div id="start" class="overlay" hidden><div class="menu3">
-  <section class="mp side heroes" aria-label="Héroes: arriba el tuyo, abajo el del rival">
-    <div class="tri top"></div><div class="tri bot"></div><div class="diag"></div>
-    <div class="slot s0"><div class="stage" data-kind="hero" data-side="0"></div><span class="nm"></span><button type="button" class="arr l" data-side="0" data-d="-1" aria-label="Tu civilización anterior">◀</button><button type="button" class="arr r" data-side="0" data-d="1" aria-label="Tu civilización siguiente">▶</button></div><div class="slot s1"><div class="stage" data-kind="hero" data-side="1"></div><span class="nm"></span><button type="button" class="arr l" data-side="1" data-d="-1" aria-label="Rival: civilización anterior">◀</button><button type="button" class="arr r" data-side="1" data-d="1" aria-label="Rival: civilización siguiente">▶</button></div>
+  <section class="mp side maps" aria-label="Mapa">
+    <div class="mapbox"><canvas id="geoPrev" width="384" height="256" aria-label="Vista previa del mapa"></canvas></div>
+    <div class="mapbar"><button type="button" class="arr" data-geo="-1" aria-label="Mapa anterior">◀</button><span class="nm" id="geoName"></span><button type="button" class="arr" data-geo="1" aria-label="Mapa siguiente">▶</button></div>
+    <p class="mapnote">EJEMPLO DE ESTA GEOGRAFÍA: CADA PARTIDA CAMBIA</p>
   </section>
   <section class="mp mid">
     <h2>IMPERIUM</h2>
-    <div class="civsel"><label for="civ0">TÚ</label><select id="civ0"></select></div>
-    <div class="civsel"><label for="civ1">RIVAL</label><select id="civ1"></select></div>
-    <p class="civinfo" id="civInfo0"></p><p class="civinfo r" id="civInfo1"></p>
-    <div class="civsel geosel"><label for="geo"><canvas id="geoPrev" width="96" height="64" title="Ejemplo de esta geografía"></canvas><span>MAPA</span></label><select id="geo"></select></div>
-    <div class="diff"><button type="button" data-d="easy">FÁCIL</button><button type="button" data-d="normal">NORMAL</button><button type="button" data-d="hard">DIFÍCIL</button></div>
-    <button id="go" type="button">JUGAR</button>
-    <button id="howBtn" type="button" class="alt">INSTRUCCIONES</button>
+    <div class="mcard">
+      <h3>CIVILIZACIONES</h3>
+      <div class="civbox b"><div class="civsel"><label for="civ0">TÚ</label><select id="civ0"></select></div><p class="civinfo" id="civInfo0"></p></div>
+      <div class="civbox r"><div class="civsel"><label for="civ1">RIVAL</label><select id="civ1"></select></div><p class="civinfo r" id="civInfo1"></p></div>
+    </div>
+    <div class="mcard"><div class="civsel"><label for="geo">MAPA</label><select id="geo"></select></div></div>
+    <div class="mcard">
+      <div class="diff"><button type="button" data-d="easy">FÁCIL</button><button type="button" data-d="normal">NORMAL</button><button type="button" data-d="hard">DIFÍCIL</button></div>
+      <div class="playrow"><button id="go" type="button">JUGAR</button><button id="howBtn" type="button" class="alt">INSTRUCCIONES</button></div>
+    </div>
   </section>
-  <section class="mp side cities" aria-label="Fortalezas: arriba la tuya, abajo la del rival">
+  <section class="mp side cities" aria-label="Fortaleza y héroe: arriba los tuyos, abajo los del rival">
     <div class="tri top"></div><div class="tri bot"></div><div class="diag"></div>
-    <div class="slot s0"><div class="stage" data-kind="city" data-side="0"></div><span class="nm"></span></div><div class="slot s1"><div class="stage" data-kind="city" data-side="1"></div><span class="nm"></span></div>
+    <div class="slot s0"><div class="stage" data-side="0"></div><span class="nm"></span><button type="button" class="arr l" data-side="0" data-d="-1" aria-label="Tu civilización anterior">◀</button><button type="button" class="arr r" data-side="0" data-d="1" aria-label="Tu civilización siguiente">▶</button></div>
+    <div class="slot s1"><div class="stage" data-side="1"></div><span class="nm"></span><button type="button" class="arr l" data-side="1" data-d="-1" aria-label="Rival: civilización anterior">◀</button><button type="button" class="arr r" data-side="1" data-d="1" aria-label="Rival: civilización siguiente">▶</button></div>
   </section>
 </div></div>
 <div id="how" class="overlay" hidden><div class="card">
