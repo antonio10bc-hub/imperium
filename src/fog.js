@@ -55,6 +55,7 @@ export function updateFog(snapTo) {
   for (const d of decos) d.visible = exploredAt(d.position.x, d.position.z);
   for (const b of R.bridges) b.group.visible = b.built && exploredAt(b.x, b.z);   // los puentes no se ven hasta explorarlos
   for (const t of R.treasures || []) t.g.visible = !t.taken && exploredAt(t.x, t.z);
+  if (R.lava) R.lava.visible = exploredAt(R.lava.position.x, R.lava.position.z);   // la lava del cráter, solo si se ha explorado
   refreshKnownTowns(false);
 }
 const fogIdx = (x, z) => THREE.MathUtils.clamp(Math.floor(z), 0, FH - 1) * FW + THREE.MathUtils.clamp(Math.floor(x), 0, FW - 1);
