@@ -168,15 +168,15 @@ export const GEO = (() => {
       const edge = (f, dir) => { let x = ic[0]; while (f(x, zc) < 1 && Math.abs(x - ic[0]) < 60) x += dir * .25; return x; };
       const iW = edge(isl, -1), iE = edge(isl, 1), bW = edge(basin, -1), bE = edge(basin, 1);
       const bz = [H * .17 + (r() - .5) * 6, H * .83 + (r() - .5) * 6];
-      const bridges = [[atZ(bz[0]), bz[0], 14], [(bW + iW) / 2, zc, (iW - bW) / 2 + 2], [(iE + bE) / 2, zc, (bE - iE) / 2 + 2], [atZ(bz[1]), bz[1], 14]];
+      const bridges = [[atZ(bz[0]), bz[0], 10], [(bW + iW) / 2, zc, (iW - bW) / 2 + 2], [(iE + bE) / 2, zc, (bE - iE) / 2 + 2], [atZ(bz[1]), bz[1], 10]];
       M.each((x, z) => {
         const bNear = bz.find(b => Math.abs(z - b) < 5), nearB = bNear != null || Math.abs(z - zc) < 4.5, d = Math.abs(x - atZ(bNear ?? z)) + (nearB ? 0 : (fbm(x * .15, z * .15, s + 60) - .5) * 1.6);   // junto a un puente la garganta va recta (paredes paralelas al tablero)
         const row = Math.abs(z - zc) < 4.5, inBasin = row ? (x > bW && x < iW) || (x > iE && x < bE) : basin(x, z) < 1, onIsl = row ? x >= iW && x <= iE : isl(x, z) < 1, onB = bz.some(b => Math.abs(z - b) < 2.4) || (Math.abs(z - zc) < 2.4 && inBasin);
         if (onIsl) return [4, 0];
-        if (d < 5.4 || inBasin) return onB ? [4, 9] : [1, 17];
-        if ((bz.some(b => Math.abs(z - b) < 7) && d < 15) || basin(x, z) < 1.25) return [4, 0];   // explanadas junto a los puentes y alrededor de la cuenca
+        if (d < 3.8 || inBasin) return onB ? [4, 9] : [1, 17];   // garganta estrecha
+        if ((bz.some(b => Math.abs(z - b) < 7) && d < 12) || basin(x, z) < 1.25) return [4, 0];   // explanadas junto a los puentes y alrededor de la cuenca
         return [3.6 + fbm(x * .05, z * .05, s + 61) * 1.6, 0]; });
-      M.bridges = bridges; M.bridgeStyles = ['wood', 'stone', 'stone', 'wood'];   // de madera al norte y al sur; de piedra a la isla M.confluence = ic; return bridges.map(b => [b[0], b[1]]);
+      M.bridges = bridges; M.bridgeStyles = ['wood', 'stone', 'stone', 'wood']; M.confluence = ic; return bridges.map(b => [b[0], b[1]]);   // de madera al norte y al sur; de piedra a la isla
     },
     // costa: las dos fortalezas en lo alto de un acantilado; abajo, una llanura costera con playas. Pocas rampas unen los dos niveles
     costa(M, r, s, F) {

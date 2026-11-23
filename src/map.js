@@ -234,7 +234,9 @@ export function generate(newSeed, tries = 0) {
   // sitios propios de la geografía: una atalaya en cada puerto de la cordillera y la ciudadela en el paso del istmo
   const onLand = ([x, z], max = 8) => { const n = nearestNode(x, z); return Math.hypot(cellX(n) - x, cellZ(n) - z) < max && spots.every(o => Math.hypot(o.x - cellX(n), o.z - cellZ(n)) > 18) ? n : -1; };
   if (scen === 'cordillera') for (const p of geoR.passes) { const n = onLand(p); if (n >= 0) addTown(cellX(n), cellZ(n), { watch: true }); }
-  if (geoR?.confluence) { const n = onLand(geoR.confluence, 16); if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }   // afluentes: la ciudadela en la confluencia
+  if (geoR?.confluence) {   // la ciudadela en la confluencia (afluentes) o en el centro de la isla (cañón: siempre dentro de la isla)
+    const n = scen === 'canon' ? nearestNode(geoR.confluence[0], geoR.confluence[1]) : onLand(geoR.confluence, 16);
+    if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }
   if (scen === 'istmo' && geoR.passes[0]) { const n = onLand(geoR.passes[0], 14); if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }
   const halves = [pool.filter(i => cellX(i) < MW / 2), pool.filter(i => cellX(i) >= MW / 2)];
   while (spots.filter(s => s.kind === 'town').length < GAME.towns) {   // mismo número de pueblos en cada mitad
