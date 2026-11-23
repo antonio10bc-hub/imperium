@@ -9,6 +9,7 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 
 ## Qué tiene
 
+- De 2 a 5 jugadores, todos contra todos (hasta 3 en el mapa normal y 5 en el grande): las fortalezas se reparten alrededor del mapa, cada una con el suelo de su civilización, y un rival cuya fortaleza cae queda eliminado.
 - Tres tamaños de mapa (288×192, 384×256 y 480×320, con 12, 16 o 22 pueblos) y código de mapa (`GEOGRAFÍA-SEMILLA[-P|-G]`, también como `?mapa=` en la dirección) para repetir o compartir un mapa.
 - Mapas con catorce geografías (cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto, caldera, valle helado, cañón, costa y ruinas), elegibles en el menú o al azar. El generador descarta las semillas desequilibradas (mismos pueblos por mitad y distancias por camino parecidas).
 - Cada geografía tiene una regla propia (`src/rules.js`): nieve y atalayas en los puertos de la cordillera, ciudadela en el istmo, mareas en el archipiélago, emboscadas en los barrancos, rampas estrechas en la meseta, crecidas en los afluentes, pantanos que ocultan en el delta, tala en el bosque, sed en el desierto, volcán en la caldera, hielo que se rompe en el valle helado, tres puentes distintos en el cañón (se derriban con tropas; el fortificado se conquista) y tesoros en las ruinas.
