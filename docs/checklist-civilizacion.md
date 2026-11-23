@@ -53,5 +53,6 @@ Todas las civilizaciones comparten la misma lógica (estadísticas, costes, coun
 - [ ] **Partida completa** contra cada civilización y en espejo contra sí misma.
 - [ ] **Navegación**: las tropas salen del recinto por las tres puertas y llegan a un punto exterior sin atascarse.
 - [ ] **Niebla de guerra**: edificios y murallas quedan ocultos hasta explorarlos.
-- [ ] **Rendimiento**: piezas por tropa parecidas a las demás; 80 tropas en pantalla sin bajones.
+- [ ] **Rendimiento**: los modelos se funden solos en dos mallas (tropas y edificios), así que el número de piezas casi no cuesta. Basta con construirlos con `P()` (cajas); cualquier otra geometría quedaría suelta y sí costaría. 80 tropas en pantalla sin bajones.
+- [ ] **Piezas animadas o que cambian de color** en edificios: hay que dejarlas fuera de la fusión pasándolas en el `skip` de `bake()` (como las banderas y los tejados de los pueblos).
 - [ ] **Móvil**: se ve y se selecciona bien en pantalla pequeña.

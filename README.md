@@ -13,3 +13,11 @@ Para jugar, abre `index.html` en el navegador.
 - Barra inferior: minimapa, panel de selección (cuartel, altar, pueblos con mejoras, tropas agrupadas por tipo) y herramientas.
 - Las tropas seleccionadas se mueven en formación y al paso del más lento. **E** activa ataque-mover.
 - El héroe aparece a la izquierda con sus tropas asignadas (hasta 50), que forman delante de él en bloque, línea o cuña.
+
+## Notas técnicas (rendimiento)
+
+- **Modelos fundidos**: tropas y edificios se escriben con cajas sueltas, pero `bake()` y `unitTemplate()` las funden en dos mallas (color por vértice y contorno). Cada combinación civilización + tipo + bando se construye una vez y todas las tropas la comparten; el rango es una variante de color de la plantilla.
+- **Recursos compartidos**: materiales, anillos y sombras salen de cachés; partículas y flechas, de un pool. Al empezar otra partida se liberan las geometrías de edificios y murallas.
+- **Rejilla espacial** (`UGRID`): separación, enemigo más cercano, conquista, torres y murallas consultan solo las celdas cercanas. Devuelve las unidades por id para que los desempates sean los de siempre.
+- **Navegación**: `stepMask` guarda por casilla a qué vecinas se puede pasar; `bfs(origen, stop)` puede parar al llegar a una casilla (persecuciones).
+- `window.__game` expone el estado y `step(n)` para pruebas automáticas.
