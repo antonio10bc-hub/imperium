@@ -33,7 +33,7 @@ export const mat = c => { let m = matCache.get(c); if (!m) { m = toon(c); m.user
 const basicCache = new Map(), geoCache = new Map();
 export const basic = (c, o = 1) => { const k = c + '|' + o; let m = basicCache.get(k); if (!m) basicCache.set(k, (m = new THREE.MeshBasicMaterial({ color: c, transparent: o < 1, opacity: o, depthWrite: o === 1 }))); return m; };
 const sharedGeo = (k, make) => { let g = geoCache.get(k); if (!g) geoCache.set(k, (g = make())); return g; };
-const ringGeo = (r1, r2) => sharedGeo('r' + r1 + ',' + r2, () => new THREE.RingGeometry(r1, r2, 28));
+export const ringGeo = (r1, r2) => sharedGeo('r' + r1 + ',' + r2, () => new THREE.RingGeometry(r1, r2, 28));
 export const discGeo = (r, n = 28) => sharedGeo('c' + r + ',' + n, () => new THREE.CircleGeometry(r, n));
 export function part(g, w, h, d, color, x, y, z, hull = true) {
   const m = new THREE.Mesh(BOX, mat(color)); m.scale.set(w, h, d); m.position.set(x, y, z); g.add(m);

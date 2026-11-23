@@ -4,10 +4,10 @@ import { makeAI, updateAIs } from './ai.js';
 import { raidersAt, resetEvents, updateEvents } from './events.js';
 import { sfx, startMusic } from './audio.js';
 import { updateUnit } from './behavior.js';
-import { buildAltar, buildBarracks, buildCastle, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
+import { buildAltar, buildBarracks, buildCastle, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
 import { BONUS, bonusOf, civOf, resolveCivs, uname } from './civs.js';
 import { alarm, applyRank, corpses, damage, raiseAlarm, shoot } from './combat.js';
-import { ALT0, BARR0, BASE0, BASE1, DIFF, GAME, TEAM, TOWN0, UNITS } from './config.js';
+import { ALT0, BARR0, BASE0, BASE1, DIFF, GAME, TEAM, TEMP0, TOWN0, UNITS } from './config.js';
 import { burst, dropBox, floatText, ping, seenAt } from './effects.js';
 import { resetFog } from './fog.js';
 import { GEO } from './geo.js';
@@ -45,8 +45,42 @@ export function summonHero(side) {
   if (side === 0) { sfx('select'); track('hero_summon'); refreshPanel(); }
   return true;
 }
+// ---------- Templo: ritual y dios ----------
+// un dios por bando: el que camina o el que se está invocando
+export const hasGod = side => !!sideState[side].godQ || units.some(u => u.side === side && u.type === 'god');
+export function startRitual(side) {
+  const st = sideState[side];
+  if (state !== 'play' || st.ritual.state !== 'none' || st.gold < GAME.ritualCost) { if (side === 0) sfx('deny'); return false; }
+  st.gold -= GAME.ritualCost; st.ritual = { state: 'ritual', t: GAME.ritualTime };
+  burst(spotPos(spots[TEMP0 + side], 1), [0xffe9a0, 0xffffff], 20, 2.5, 6, 1, .24);
+  if (side === 0) { sfx('hero'); toast('EL RITUAL HA COMENZADO EN EL TEMPLO', 'good', spots[TEMP0]); track('ritual_start'); refreshPanel(); }
+  else toast('EL RIVAL HA COMENZADO UN RITUAL EN SU TEMPLO', 'bad');
+  return true;
+}
+export function summonGod(side) {
+  const st = sideState[side];
+  if (state !== 'play' || st.ritual.state !== 'done' || hasGod(side) || st.gold < UNITS.god.cost || popOf(side) >= capOf(side)) { if (side === 0) sfx('deny'); return false; }
+  st.gold -= UNITS.god.cost; st.godQ = { t: UNITS.god.time };
+  if (side === 0) { sfx('select'); track('god_summon'); refreshPanel(); }
+  return true;
+}
+function updateTemple(side, dt) {
+  const st = sideState[side], r = st.ritual, tp = spots[TEMP0 + side];
+  if (r.state === 'ritual' && (r.t -= dt) <= 0) {
+    r.state = 'done'; burst(spotPos(tp, 2), [0xffe9a0, 0xffffff, TEAM[side].c], 40, 4, 8, 1.6, .3); ping(spotPos(tp), '#e8c870');
+    toast(side === 0 ? `¡TEMPLO CONSAGRADO! YA PUEDES INVOCAR A ${uname(0, 'god')}` : 'EL TEMPLO RIVAL ESTÁ CONSAGRADO', side === 0 ? 'good' : 'bad', side === 0 ? tp : null); sfx('win', side);
+    if (side === 0) refreshPanel();
+  }
+  if (st.godQ && (st.godQ.t -= dt) <= 0) {
+    st.godQ = null; const u = spawnUnit(side, 'god', TEMP0); u.bounty = GAME.godBounty;
+    burst(u.pos, [0xffe9a0, 0xffffff, TEAM[side].c], 40, 4, 9, 1.4, .3); ping(u.pos, '#e8c870');
+    toast(side === 0 ? `¡${uname(0, 'god')} HA DESCENDIDO!` : `¡EL RIVAL HA INVOCADO A ${uname(1, 'god')}!`, side === 0 ? 'good' : 'bad', u.pos); sfx('hero', side);
+    if (side === 0) refreshPanel();
+  }
+}
 function updateProduction(dt) {
   for (const side of [0, 1]) {
+    updateTemple(side, dt);
     const st = sideState[side], q = st.queue;
     if (q.length) {
       q[0].t -= dt;
@@ -87,13 +121,13 @@ export function newGame(s, keepCivs = false) {
   requestAnimationFrame(() => setTimeout(() => {
     clearWorld(); resetFog(false); if (!keepCivs) resolveCivs(true);
     generate(s);
-    const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, town: buildTown };
+    const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, temple: buildTemple, town: buildTown };
     for (const sp of spots) B[sp.kind](sp);
     for (const f of forts) buildWalls(f);
     spawnGuards(); makeThumbs();
     regions.forEach((_, r) => paintRegion(r));
     fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2));
-    for (const st of sideState) Object.assign(st, { gold: GAME.startGold, queue: [], heroQ: [] });
+    for (const st of sideState) Object.assign(st, { gold: GAME.startGold, queue: [], heroQ: [], ritual: { state: 'none', t: 0 }, godQ: null });
     sideState[0].ai = S.aiPlayer ? makeAI(0, S.aiPlayer.diff, S.aiPlayer.brain) : null; sideState[1].ai = makeAI(1, S.diff, S.aiRival);   // el bando 0 lo juega la IA solo en pruebas
     elapsed = 0; resetEvents(); S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
     focusOn(spots[BASE0].x, spots[BASE0].z, true);

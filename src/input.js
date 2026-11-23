@@ -4,7 +4,7 @@ import { sfx } from './audio.js';
 import { orderMove } from './behavior.js';
 import { spotPos } from './buildings.js';
 import { alarm, assign, unassign } from './combat.js';
-import { ALT0, BARR0, BASE0, BASE1, GAME, MD, MW, TYPES } from './config.js';
+import { ALT0, BARR0, BASE0, BASE1, GAME, MD, MW, TEMP0, TYPES } from './config.js';
 import { ping } from './effects.js';
 import { exploredAt, toggleFog } from './fog.js';
 import { enqueue, heroesOf, newGame, startGame, state, toast } from './game.js';
@@ -151,7 +151,7 @@ export function init() {
         else if (u) { if (d.shift && sel.has(u)) { sel.delete(u); updateCtx(); } else { setSelection([u], d.shift); if (!d.shift) { S.follow = u; S.focusGoal = null; } } }
         else {
           S.follow = null; const sp = pickSpot(e.clientX, e.clientY);
-          if (sp && sp.side === 0 && (sp.kind === 'barracks' || sp.kind === 'altar')) { selectBuilding(sp.kind); sfx('select'); }
+          if (sp && sp.side === 0 && (sp.kind === 'barracks' || sp.kind === 'altar' || sp.kind === 'temple')) { selectBuilding(sp.kind); sfx('select'); }
           else if (sp && sp.side === 0) { selectBuilding('barracks'); sfx('select'); }
           else if (sp && (sp.kind === 'town' || sp.kind === 'base')) { selectSpot(sp); sfx('select'); }
           else { S.selBld = null; setSelection([], d.shift); }
@@ -176,6 +176,7 @@ export function init() {
     else if (k === '1' || k === '2' || k === '3') enqueue(0, TYPES[+k - 1]);
     else if (k === 'b') { selectBuilding('barracks'); focusOn(spots[BARR0].x, spots[BARR0].z); }
     else if (k === 'g') heroButton();
+    else if (k === 't') { selectBuilding('temple'); focusOn(spots[TEMP0].x, spots[TEMP0].z); }
     else if (k === 'h') focusOn(spots[BASE0].x, spots[BASE0].z);
     else if (k === 'p') { S.paused = !S.paused; syncTools(); }
     else if (k === 'v') { S.speed = S.speed === 1 ? 2 : 1; syncTools(); }

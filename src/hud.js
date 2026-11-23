@@ -3,9 +3,9 @@ import { ac, audio, master, sfx, startMusic } from './audio.js';
 import { SHAPES } from './behavior.js';
 import { uname } from './civs.js';
 import { assign } from './combat.js';
-import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, RANKS, TEAM, TYPES, UNITS } from './config.js';
+import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, RANKS, TEAM, TEMP0, TYPES, UNITS } from './config.js';
 import { ping } from './effects.js';
-import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, heroCount, heroOf, heroesOf, incomeOf, newGame, popOf, state, summonHero, toast, towerDmg, towerRange, townInc, upgradeTown } from './game.js';
+import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, popOf, state, summonHero, toast, towerDmg, towerRange, townInc, upgradeTown } from './game.js';
 import { focusOn, heroButton } from './input.js';
 import { MERC, ev, hireMercs, mercRoom } from './events.js';
 import { regions, spots } from './map.js';
@@ -42,7 +42,7 @@ export function updateHud() {
 }
 const hpCol = k => k > .5 ? '#7ed957' : k > .25 ? '#e8c870' : '#d83a4a';
 const pct = k => Math.round(Math.max(0, Math.min(1, k)) * 100) + '%';
-const VS = { sword: 'VENCE A JINETE', bow: 'VENCE A ESPADA', horse: 'VENCE A ARCO', harcher: 'RÁPIDO Y A DISTANCIA', hero: 'CARGA CON SU ESCOLTA' };
+const VS = { sword: 'VENCE A JINETE', bow: 'VENCE A ESPADA', horse: 'VENCE A ARCO', harcher: 'RÁPIDO Y A DISTANCIA', hero: 'CARGA CON SU ESCOLTA', god: 'CURA A LA ESCOLTA DE SU HÉROE' };
 // Retrato del héroe a la izquierda (como en Imperium), con las tropas asignadas
 let heroesHtml = '';
 function renderHeroes() {
@@ -67,12 +67,29 @@ function panelContent() {
     const q = st.queue.map((it, i) => `<button type="button" class="q" data-act="cancel" data-i="${i}" title="Cancelar (devuelve el oro)"><img alt="${uname(0, it.type)}" src="${THUMB[it.type] || ''}">${i === 0 ? `<i><b style="width:${pct(1 - it.t / UNITS[it.type].time)}"></b></i>` : ''}</button>`).join('');
     return `<div class="ph" title="Clic derecho en el mapa: punto de reunión"><h3>CUARTEL</h3><em>COLA ${st.queue.length}/${GAME.queueMax}</em><em>TROPAS ${popOf(0)}/${capOf(0)}</em></div>${cards}<div class="qu">${q || '<span class="none">COLA VACÍA</span>'}</div>`;
   }
+  if (S.selBld === 'temple') {   // templo: primero el ritual; después, invocar al dios (uno por bando)
+    const r = st.ritual, god = uname(0, 'god'), d = UNITS.god;
+    let info, act = '';
+    if (r.state === 'none') {
+      info = `<div class="note g">COMIENZA EL RITUAL PARA PODER INVOCAR A ${god}.</div><div class="note">DURA ${GAME.ritualTime} S. LUEGO, ${god} SE INVOCA AQUÍ.</div>`;
+      act = `<button type="button" class="y" data-act="ritual" ${st.gold < GAME.ritualCost ? 'disabled' : ''}>COMENZAR RITUAL · ${GAME.ritualCost} ORO</button>`;
+    } else if (r.state === 'ritual') {
+      info = `<div class="hpb"><b style="width:${pct(1 - r.t / GAME.ritualTime)};background:var(--yellow)"></b><span>RITUAL ${Math.ceil(r.t)} S</span></div><div class="note">CUANDO TERMINE PODRÁS INVOCAR A ${god}.</div>`;
+    } else {
+      const g = units.find(u => u.side === 0 && u.type === 'god');
+      info = st.godQ ? `<div class="hpb"><b style="width:${pct(1 - st.godQ.t / d.time)};background:var(--yellow)"></b><span>DESCIENDE EN ${Math.ceil(st.godQ.t)} S</span></div>`
+        : g ? `<div class="note g">${god} YA LUCHA A TU LADO.</div>` : `<div class="note g">FLOTA, GOLPEA CUERPO A CUERPO Y CURA A LA ESCOLTA DE SU HÉROE.</div>`;
+      info += `<div class="note">UN DIOS POR BANDO. ASÍGNALO A UN HÉROE: IRÁ DETRÁS DE ÉL.</div>`;
+      act = g ? `<button type="button" data-act="god">SELECCIONAR</button>` : st.godQ ? '' : `<button type="button" class="y" data-act="summonGod" ${st.gold < d.cost || popOf(0) >= capOf(0) ? 'disabled' : ''}>INVOCAR · ${d.cost} ORO</button>`;
+    }
+    return `<div class="ph"><h3>TEMPLO</h3><em>${r.state === 'done' ? 'CONSAGRADO' : r.state === 'ritual' ? 'RITUAL EN CURSO' : 'SIN CONSAGRAR'}</em></div><img class="big" alt="" src="${THUMB.god || ''}"><div class="info">${info}</div>${act ? `<div class="act">${act}</div>` : ''}`;
+  }
   if (S.selBld === 'altar') {
     const n = heroCount(0), alive = heroesOf(0).length, tr = st.heroQ.filter(h => h.state === 'training'), dead = st.heroQ.filter(h => h.state === 'dead');
     let btn = n < GAME.maxHeroes ? `<button type="button" class="y" data-act="summon" ${st.gold < UNITS.hero.cost ? 'disabled' : ''}>INVOCAR · ${UNITS.hero.cost} ORO</button>` : `<button type="button" disabled>MÁXIMO ${GAME.maxHeroes} HÉROES</button>`;
     if (alive) btn = `<button type="button" data-act="hero">SELECCIONAR</button>` + btn;
     const note = `HÉROES ${n}/${GAME.maxHeroes}` + (tr.length ? ` · LLEGA EN ${Math.ceil(tr[0].t)} S` : '') + (dead.length ? ` · VUELVE EN ${Math.ceil(dead[0].t)} S` : '');
-    return `<div class="ph"><h3>ALTAR</h3><em>${note}</em></div><img class="big" alt="" src="${THUMB.hero || ''}"><div class="info"><div class="note">MÁS FUERTE, CARGA CONTRA EL ENEMIGO.</div><div class="note">HASTA ${GAME.escortMax} TROPAS EN FORMACIÓN.</div></div><div class="act">${btn}</div>`;
+    return `<div class="ph"><h3>SALÓN DE HÉROES</h3><em>${note}</em></div><img class="big" alt="" src="${THUMB.hero || ''}"><div class="info"><div class="note">MÁS FUERTE, CARGA CONTRA EL ENEMIGO.</div><div class="note">HASTA ${GAME.escortMax} TROPAS EN FORMACIÓN.</div></div><div class="act">${btn}</div>`;
   }
   if (S.selSpot) {
     const s = S.selSpot;
@@ -136,7 +153,7 @@ function assignSelected() {
 }
 export function updateCtx() {
   refreshPanel();
-  for (const k of [BARR0, ALT0]) if (spots[k]?.sel) spots[k].sel.visible = S.selBld === spots[k].kind;
+  for (const k of [BARR0, ALT0, TEMP0]) if (spots[k]?.sel) spots[k].sel.visible = S.selBld === spots[k].kind;
 }
 // Iconos pixelados 7×7 para la interfaz
 const UI_IC = {
@@ -170,6 +187,9 @@ export function init() {
     if (a === 'rec') enqueue(0, b.dataset.t);
     else if (a === 'cancel') cancelQueue(+b.dataset.i);
     else if (a === 'summon') summonHero(0);
+    else if (a === 'ritual') startRitual(0);
+    else if (a === 'summonGod') summonGod(0);
+    else if (a === 'god') { const g = units.find(u => u.side === 0 && u.type === 'god'); if (g) { setSelection([g], false); S.follow = g; S.focusGoal = null; } }
     else if (a === 'hero') heroButton();
     else if (a === 'assign') assignSelected();
     else if (a === 'upgrade' && S.selSpot) upgradeTown(0, S.selSpot);

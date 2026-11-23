@@ -7,7 +7,7 @@ import { escortUnit, spreadTo } from './behavior.js';
 import { spotPos } from './buildings.js';
 import { assign, nearestEnemy, siege, strike } from './combat.js';
 import { DIFF, GAME, TOWN0, TYPES, UNITS } from './config.js';
-import { capR, elapsed, enqueue, fields, heroCount, heroesOf, summonHero, townInc, upgradeTown } from './game.js';
+import { capR, elapsed, enqueue, fields, hasGod, heroCount, heroesOf, startRitual, summonGod, summonHero, townInc, upgradeTown } from './game.js';
 import { spots } from './map.js';
 import { MERC, ev, hireMercs } from './events.js';
 import { UGRID, alive, sideState, units } from './units.js';
@@ -102,7 +102,10 @@ function smartPlan(A) {
   // --- producción: contrarresta lo más numeroso que ha visto, sin descuidar el equilibrio propio
   const towns = spots.filter(s => s.kind === 'town' && s.owner === side).length;
   const wantH = Df.hero && (towns >= 2 || off(A, 'hero2')) ? Math.min(GAME.maxHeroes, 1 + Math.floor(mine.length / 10)) : 0, hc = heroCount(side);   // sin territorio, primero tropas: ahorrar para el héroe ahogaría la expansión
-  const saving = hc < wantH && mine.length >= 4;
+  // templo: con territorio, ejército y sin ir por detrás, ahorra para el ritual (si no, el oro se va siempre en tropas y mejoras)
+  const wantRitual = st.ritual?.state === 'none' && towns >= 4 && elapsed > 240 && mine.length >= 8 && foeW < myW * 1.2;
+  const wantGod = st.ritual?.state === 'done' && !hasGod(side);   // con el templo consagrado, el dios va antes que más tropas
+  const saving = (hc < wantH && mine.length >= 4) || wantRitual || wantGod;
   if (hc < wantH && mine.length >= 3 && st.gold >= UNITS.hero.cost) summonHero(side);
   else if (!saving && st.queue.length < 2 && st.gold >= UNITS[A.next].cost && enqueue(side, A.next)) {
     const own = t => mine.filter(u => u.type === t).length + st.queue.filter(q => q.type === t).length;
@@ -113,6 +116,9 @@ function smartPlan(A) {
     h.formShape = A.stance === 'attack' ? 'wedge' : 'block';
     if (h.escort.length < 20) { const free = mine.filter(u => !u.leader && !u.retreat && !A.roles.has(u)).sort((a, b) => a.pos.distanceTo(h.pos) - b.pos.distanceTo(h.pos)); if (free.length > 1) assign(free[0], h); }
   }
+  // --- templo: con territorio y oro de sobra (y sin amenaza encima) empieza el ritual; después invoca a su dios en cuanto puede
+  if (wantRitual && st.gold >= GAME.ritualCost) startRitual(side);
+  else if (wantGod && st.gold >= UNITS.god.cost) summonGod(side);
   // --- mercenarios: si hay oferta y le sobra oro, los contrata
   if (ev.merc && !ev.merc.hired[side] && st.gold >= MERC.cost + 60 && !saving) hireMercs(side);
   // --- mejoras: con oro de sobra, primero los pueblos que más rinden y sin enemigos cerca

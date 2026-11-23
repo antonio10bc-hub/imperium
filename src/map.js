@@ -207,7 +207,7 @@ export function generate(newSeed, tries = 0) {
   // cada civilización coloca castillo, cuartel y altar a su manera (coordenadas locales del recinto, +z hacia el centro del mapa)
   const lay = (sd, kind) => { const f = forts[sd], [lx, lz, ry, sc] = civOf(sd).map.layout[kind], a = f.tb - Math.PI / 2;
     return { kind: kind === 'castle' ? 'base' : kind, side: sd, x: f.x + lx * Math.cos(a) - lz * Math.sin(a), z: f.z + lx * Math.sin(a) + lz * Math.cos(a), ry, sc }; };
-  spots = [lay(0, 'castle'), lay(1, 'castle'), lay(0, 'barracks'), lay(1, 'barracks'), lay(0, 'altar'), lay(1, 'altar')];
+  spots = [lay(0, 'castle'), lay(1, 'castle'), lay(0, 'barracks'), lay(1, 'barracks'), lay(0, 'altar'), lay(1, 'altar'), lay(0, 'temple'), lay(1, 'temple')];   // mismo orden que BASE0…TEMP1 en config
   const names = [...TOWN_NAMES].sort(() => rng() - .5);
   let pool = mainList.filter(i => HM[i] <= 7 && cellX(i) > 10 && cellX(i) < MW - 10 && cellZ(i) > 10 && cellZ(i) < MD - 10);
   if (geoR?.oasis) pool = pool.filter(i => GEOT[i] === 4);   // en el desierto, los pueblos están en los oasis

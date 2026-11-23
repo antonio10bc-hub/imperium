@@ -6,6 +6,7 @@ import { GAME, TEAM, mixHex } from './config.js';
 import { burst, floatText, fxRand, ping, plume, seenAt } from './effects.js';
 import { visibleAt } from './fog.js';
 import { campSpawn, toast } from './game.js';
+import { sideState } from './units.js';
 import { fortPt, forts, inGate, paintRegion, sideAt, spots, surfY, wallR } from './map.js';
 import { hash } from './noise.js';
 import { BOX, bake, basic, discGeo, mat, part, ring, world } from './render.js';
@@ -16,7 +17,7 @@ export const spotPos = (s, lift = 0) => new THREE.Vector3(s.x, s.y + lift, s.z);
 function placeSpot(s, g, face) {
   let m = 1; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) m = Math.max(m, surfY(s.x + dx, s.z + dz));
   s.y = m; g.position.set(s.x, s.y, s.z); g.rotation.y = face; world.add(g); s.group = g; s.base = g.position.clone(); g.updateMatrixWorld();
-  const r = ({ base: 4.4, barracks: 2.9, altar: 2.7, town: 3.3 }[s.kind] || 3) * (s.fortified ? 1.5 : 1);   // sombra suave desplazada hacia donde cae la luz
+  const r = ({ base: 4.4, barracks: 2.9, altar: 2.9, temple: 3, town: 3.3 }[s.kind] || 3) * (s.fortified ? 1.5 : 1);   // sombra suave desplazada hacia donde cae la luz
   const sh = new THREE.Mesh(discGeo(r), basic(0x0f1a2a, .22)); sh.rotation.x = -Math.PI / 2; sh.position.set(s.x + r * .18, s.y + .04, s.z - r * .22); world.add(sh); decos.push(sh); s.shadow = sh;
   s.flags = [];
 }
@@ -37,11 +38,39 @@ export function buildBarracks(s) {
   s.sel = ring(g, 3, 3.3, 0xffe03a, .2); s.sel.visible = S.selBld === 'barracks' && s.side === 0;
   placeSpot(s, g, camFace(s, .4));
 }
+// salón de héroes: un cuartel especial (el cuartel de la civilización, con estandartes del bando y una corona dorada encima)
 export function buildAltar(s) {
-  const g = new THREE.Group(), f = forts[s.side];
-  civOf(s.side).map.altar(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c); bake(g);
+  const g = new THREE.Group(), inner = CIV.grp(g, 0, 0, 0, s.sc * .62), T = TEAM[s.side].c;
+  civOf(s.side).barracks(inner, T);
+  inner.updateMatrixWorld(true); const top = new THREE.Box3().setFromObject(inner).max.y;
+  for (const sx of [-1.5, 1.5]) { part(g, .1, top + .9, .1, 0x5a3a24, sx, (top + .9) / 2, 1.3); part(g, .55, .8, .06, T, sx + .3, top + .2, 1.3); part(g, .2, .2, .2, 0xe8c050, sx, top + 1, 1.3); }
+  part(g, .8, .2, .5, 0xe8c050, 0, top + .2, 0); for (const sx of [-.3, 0, .3]) part(g, .14, .3, .14, 0xe8c050, sx, top + .45, 0);   // corona
+  bake(g);
   s.sel = ring(g, 2.6, 2.9, 0xffe03a, .2); s.sel.visible = false;
   placeSpot(s, g, camFace(s, .4));
+}
+// templo de la civilización: tras el ritual se invoca en él al dios. Durante el ritual se alza una columna de luz
+export function buildTemple(s) {
+  const g = new THREE.Group(); civOf(s.side).map.altar(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c); bake(g);
+  s.sel = ring(g, 2.9, 3.2, 0xffe03a, .2); s.sel.visible = false;
+  s.beamMat = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  s.beam = new THREE.Mesh(BOX, s.beamMat); s.beam.scale.set(1.3, 40, 1.3); s.beam.position.y = 20; s.beam.visible = false; g.add(s.beam);
+  placeSpot(s, g, camFace(s, .4));
+}
+// efectos del templo en cada fotograma: columna que late y chispas doradas mientras dura el ritual; un brillo suave cuando ya está consagrado
+export function templeFx(dt, now) {
+  for (const s of spots) {
+    if (s.kind !== 'temple' || !s.beam || !s.group?.visible) continue;
+    const r = sideState[s.side].ritual, on = r?.state === 'ritual';
+    s.beam.visible = on || r?.state === 'done';
+    if (!s.beam.visible) continue;
+    s.beamMat.opacity = on ? .22 + Math.sin(now / 180) * .1 : .07 + Math.sin(now / 600) * .03;
+    s.beam.scale.x = s.beam.scale.z = on ? 1.3 + Math.sin(now / 250) * .2 : .8;
+    if (on && (s.fxT = (s.fxT ?? 0) - dt) <= 0) {
+      s.fxT = .08; const p = spotPos(s, .5 + fxRand() * 2); p.x += (fxRand() - .5) * 4; p.z += (fxRand() - .5) * 4;
+      plume(p, fxRand() < .5 ? 0xffe9a0 : 0xffffff, .22, 1.6, 2.4, -1.2);
+    }
+  }
 }
 function buildCamp(s) {
   const g = new THREE.Group(), roofs = [], canvas = 0xd8c89a;

@@ -4,7 +4,7 @@ import { sfx } from './audio.js';
 import { spotPos } from './buildings.js';
 import { nearestEnemy, siege, strike } from './combat.js';
 import { BASE1, GAME, MD, MW, idx } from './config.js';
-import { burst, floatText, ping } from './effects.js';
+import { burst, floatText, ping, plume } from './effects.js';
 import { aiUnit } from './ai.js';
 import { bonusOf } from './civs.js';
 import { caravanUnit, raiderUnit } from './events.js';
@@ -21,7 +21,7 @@ import { UGRID, _nearSep, alive, sideState, followField, place, roadK, slotOk, s
 export const SHAPES = { block: 'BLOQUE', line: 'LÍNEA', wedge: 'CUÑA' };
 const FS = 1.75;   // separación entre puestos
 export function layout(list, shape, z0) {
-  const by = t => list.filter(u => u.type === t), sw = by('sword'), bw = by('bow'), hr = list.filter(u => u.type === 'horse' || u.type === 'harcher'), heroes = by('hero'), slots = new Map();
+  const by = t => list.filter(u => u.type === t), sw = by('sword'), bw = by('bow'), hr = list.filter(u => u.type === 'horse' || u.type === 'harcher'), heroes = by('hero'), gods = by('god'), slots = new Map();
   let depth, rowW;
   if (shape === 'wedge') {
     const seq = [...sw, ...bw], rows = [];
@@ -42,6 +42,7 @@ export function layout(list, shape, z0) {
     hr.forEach((u, k) => { const sd = k % 2 ? 1 : -1, j = k >> 1, col = Math.floor(j / depth), row = j % depth; slots.set(u, [sd * (half + col * FS), zf - row * FS]); });
   }
   heroes.forEach((u, k) => slots.set(u, [(k - (heroes.length - 1) / 2) * FS * 1.5, z0 - FS * 1.3]));
+  gods.forEach((u, k) => slots.set(u, [(k - (gods.length - 1) / 2) * FS * 1.8, z0 - FS * 2.9]));   // el dios va detrás del héroe; el resto, delante
   return slots;
 }
 // Órdenes de movimiento en grupo: cada tropa recibe su puesto en un bloque orientado hacia el destino y el grupo avanza al paso del más lento
@@ -149,8 +150,16 @@ export function spreadTo(u, cx, cz, field, r0, k, dt, disc = 0) {
   const d = Math.hypot(tx - u.pos.x, tz - u.pos.z); if (d < .4) return false;
   return stepToward(u, tx, tz, spd(u) * (d < 2 ? .6 : 1), dt) || (field[u.node] > 1 && followField(u, field, dt));
 }
+// dios: destellos a su alrededor y, si escolta a un héroe, cura poco a poco al héroe y a su escolta cercana
+function godTick(u, dt) {
+  if ((u.fxT = (u.fxT ?? 0) - dt) <= 0) { u.fxT = .22; const p = u.pos.clone(); p.x += (Math.sin(u.id + elapsed * 7)) * .9; p.z += Math.cos(u.id * 3 + elapsed * 5) * .9; p.y += 1.4; plume(p, (u.id + elapsed * 10 | 0) % 2 ? 0xffe9a0 : 0xffffff, .16, .9, 1.6, -.5); }
+  const h = u.leader; if (!h) return;
+  let healed = 0;
+  for (const o of [h, ...h.escort]) if (o !== u && !o.dead && o.hp < o.maxHp && o.pos.distanceTo(u.pos) < GAME.godHealR) { o.hp = Math.min(o.maxHp, o.hp + GAME.godHeal * dt); if (healed++ < 3 && (o.godFx = (o.godFx ?? 0) - dt) <= 0) { o.godFx = 1.2; plume(o.pos.clone().setY(o.pos.y + 1), 0x9ad86a, .2, .8, 1.4, -.6); } }
+}
 export function updateUnit(u, dt) {
   u.cd -= dt; u.block -= dt; u.moving = false; u.lunge = Math.max(0, u.lunge - dt * 4); u.flash -= dt; u.combatT -= dt;
+  if (u.type === 'god') godTick(u, dt);
   if (u.type === 'hero') {
     u.chargeCd -= dt; u.chargeT -= dt;
     if (u.escort.length && ((u.fieldT = (u.fieldT || 0) - dt) <= 0)) { u.fieldT = .6; u.field = bfs([u.node]); }

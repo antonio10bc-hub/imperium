@@ -21,17 +21,17 @@ Todas las civilizaciones comparten la misma lógica (estadísticas, costes, coun
 - [ ] **Silueta única**: un rasgo (escudo, casco, montura o arma) que ninguna otra civilización tenga.
 
 ## Tropas
-- [ ] **Espada, arco, jinete y héroe**: los cuatro modelos, construidos dentro del grupo que recibe la función (el `body`), para que funcionen golpe, retroceso y caída.
+- [ ] **Espada, arco, jinete, héroe y dios**: los cinco modelos (el dios, con `godBody`: flota, sin piernas), construidos dentro del grupo que recibe la función (el `body`), para que funcionen golpe, retroceso y caída.
 - [ ] **Color de bando visible**: escudo, estandarte o penacho con el color `T` que recibe la función. El anillo lo pone el juego.
 - [ ] **Tamaño dentro de la huella**: monturas grandes (elefante, carro) sin pasar de ~1,5 casillas de ancho.
 - [ ] **Prueba de distancia**: se distingue de las demás en una línea de batalla con el mismo color de bando.
-- [ ] **Nombres de las 4 tropas** (`names`): en singular; revisar cómo queda el plural en el panel de selección.
+- [ ] **Nombres de las 5 tropas** (`names`, el quinto es el dios): en singular; revisar cómo queda el plural en el panel de selección.
 - [ ] **Miniaturas**: el retrato de 72 px (se genera solo a partir del modelo) se lee bien.
 - [ ] **Cresta de rango**: el cubo de bronce, plata u oro queda por encima de la cabeza o del penacho (se coloca solo según la altura del modelo; comprobarlo).
 
 ## Fortaleza
-- [ ] **Castillo, cuartel y altar**: los tres modelos (`castle`, `barracks` y `MAPS.altar`).
-- [ ] **Distribución propia** (`layout`): posición, giro y escala de los tres edificios en coordenadas locales del recinto (+z = hacia el centro del mapa), sin solaparse con la muralla.
+- [ ] **Castillo, cuartel y templo**: los tres modelos (`castle`, `barracks` y `MAPS.altar`, que es el templo; el salón de héroes se hace solo con el cuartel).
+- [ ] **Distribución propia** (`layout`): posición, giro y escala de los cuatro edificios (castillo, cuartel, salón de héroes en `altar` y templo en `temple`) en coordenadas locales del recinto (+z = hacia el centro del mapa), sin solaparse con la muralla.
 - [ ] **Muralla** (`shape` y `wall`): forma del recinto, anillos (`rings`), altura, grosor, almenas, torres, contrafuertes o empalizada.
 - [ ] **Tres puertas**: el juego las abre siempre hacia el centro del mapa y a ±120°. El modelo de puerta (`wall.gate`) deja libre un hueco de 3,6 casillas.
 - [ ] **Suelo del recinto**: `plaza`, `wallbase`, `path`, `between` (si hay doble muralla) e `inside` (calles o ejes interiores).

@@ -1,7 +1,7 @@
 // Punto de entrada: bucle principal y arranque.
 import * as THREE from 'three';
 import { layout, orderMove } from './behavior.js';
-import { damageFx, setOwner } from './buildings.js';
+import { damageFx, setOwner, templeFx } from './buildings.js';
 import { alarm, assign, corpses, promote } from './combat.js';
 import { CFG, MD, MW } from './config.js';
 import { dropBox } from './effects.js';
@@ -53,7 +53,7 @@ function frame(now) {
   if (state === 'play' && !S.paused) { for (let i = 0; i < S.speed; i++) if (state === 'play') updateGame(dt); if ((hudT -= dt) <= 0) { hudT = .1; updateHud(); } }
   const live = state !== 'play' || !S.paused;
   if (live) {
-    damageFx(dt);
+    damageFx(dt); templeFx(dt, now);
     for (const s of spots) if (s.shake > 0) { s.shake -= dt; s.group.position.copy(s.base).add(_h.set(Math.random() - .5, 0, Math.random() - .5).multiplyScalar(s.shake * 1.5)); if (s.shake <= 0) s.group.position.copy(s.base); }
     for (let i = corpses.length - 1; i >= 0; i--) {
       const c = corpses[i]; c.t += dt; const k = Math.min(1, c.t / .35);

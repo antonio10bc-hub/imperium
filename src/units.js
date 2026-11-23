@@ -5,7 +5,7 @@ import { CIV_SLOT, civOf, defOf } from './civs.js';
 import { BARR0, GAME, MD, MW, RANKS, TEAM, TYPES, mixHex } from './config.js';
 import { GEOT, HM, cellOf, roadCell, spots } from './map.js';
 import { NBO, cellX, cellZ, inMain, nearestNode, stepMask, walk } from './nav.js';
-import { BOX, FLASH, HULLMAT, VCMAT, basic, collectParts, discGeo, mergeBoxes, part, ring, world } from './render.js';
+import { BOX, FLASH, HULLMAT, VCMAT, basic, collectParts, discGeo, mergeBoxes, part, ring, ringGeo, world } from './render.js';
 import { S } from './state.js';
 
 // ---------- Unidades ----------
@@ -70,7 +70,11 @@ function buildUnit(type, side, parent = world) {
   const crest = new THREE.Group(); part(crest, .18, .18, .18, 0xffffff, 0, t.crestY, 0); crest.visible = false; body.add(crest);
   const sh = new THREE.Mesh(discGeo(.62, 20), basic(0x0f0f1b, .28)); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; g.add(sh);
   const team = ring(g, .46, .66, TEAM[side].c, .05), selR = ring(g, .7, .86, 0xffe03a, .07); selR.visible = false;
-  g.scale.setScalar(type === 'hero' ? (side < 2 ? 1.8 : 1.95) : 1.3); parent.add(g);
+  if (type === 'god') {   // el dios: halo dorado tras la cabeza y un aura de luz en el suelo
+    const halo = new THREE.Mesh(ringGeo(.3, .4), basic(0xffe9a0, .9)); halo.position.set(0, t.crestY - .2, -.24); body.add(halo);
+    ring(g, .2, 1.15, 0xffe9a0, .04, .3);
+  }
+  g.scale.setScalar(type === 'god' ? 2.1 : type === 'hero' ? (side < 2 ? 1.8 : 1.95) : 1.3); parent.add(g);
   return { g, body, mesh, tpl: t, team, selR, crest, sh };
 }
 export const THUMB = {};
@@ -89,7 +93,7 @@ export function makeThumbs() {
     const r = offscreen(); r.setSize(72, 72, false);
     const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, .1, 50);
     const l = new THREE.DirectionalLight(0xfff6e8, 2.2); l.position.set(3, 5, 4); sc.add(l, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25));
-    for (const t of [...TYPES, 'hero', 'harcher']) {
+    for (const t of [...TYPES, 'hero', 'harcher', 'god']) {
       const u = buildUnit(t, 0, sc); u.team.visible = false; u.sh.visible = false;
       const box = new THREE.Box3().setFromObject(u.g), c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3()).length();
       cam.position.copy(c).add(new THREE.Vector3(1.1, .6, 1.2).normalize().multiplyScalar(s * 1.25)); cam.lookAt(c);
@@ -143,6 +147,7 @@ export function spawnAt(side, type, x, z, ang = Math.random() * 6.28) {
 export function place(u, dt = 0) {
   u.g.position.copy(u.pos); u.g.rotation.y = Math.atan2(u.fwd.x, u.fwd.z);
   u.body.position.set(0, u.moving ? Math.abs(Math.sin(u.bob)) * .12 : 0, u.lunge * .35);
+  if (u.type === 'god') u.body.position.y += .55 + Math.sin(performance.now() / 520 + u.id) * .12;   // flota sobre el suelo
   u.hitT = Math.max(0, (u.hitT || 0) - dt); u.body.rotation.x = u.lunge * .45 - u.hitT * 2.2;   // se inclina al golpear y retrocede al recibir
   if (u.capT > 0) { u.capT -= dt; u.body.position.y += Math.abs(Math.sin(performance.now() / 120 + u.id * 1.7)) * .5; }   // salto de conquista
   const fl = u.flash > 0; if (fl !== u.flashOn) { u.flashOn = fl; u.mesh.material = fl ? FLASH : VCMAT; }   // destello blanco al recibir daño

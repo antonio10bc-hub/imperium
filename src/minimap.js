@@ -47,7 +47,7 @@ export function drawMinimap() {
     if (s.kind === 'town') { const r = s.fortified ? 10 : 7, ko = s.known ?? s.owner; mctx.fillStyle = ko < 0 ? '#f4f4e8' : TEAM[ko].css; mctx.beginPath(); mctx.moveTo(s.x, s.z - r); mctx.lineTo(s.x + r, s.z); mctx.lineTo(s.x, s.z + r); mctx.lineTo(s.x - r, s.z); mctx.closePath(); mctx.fill(); mctx.stroke(); }
     else if (s.kind === 'base') { mctx.fillStyle = TEAM[s.side].css; mctx.fillRect(s.x - 8, s.z - 8, 16, 16); mctx.strokeRect(s.x - 8, s.z - 8, 16, 16); }
   }
-  for (const u of units) { if (u.side !== 0 && !visibleAt(u.pos.x, u.pos.z)) continue; const k = u.type === 'hero' ? 4 : 2; mctx.fillStyle = sel.has(u) ? '#e8c870' : u.type === 'hero' ? '#fff' : TEAM[u.side].css; mctx.fillRect(u.pos.x - k, u.pos.z - k, k * 2, k * 2); }
+  for (const u of units) { if (u.side !== 0 && !visibleAt(u.pos.x, u.pos.z)) continue; const k = u.type === 'hero' || u.type === 'god' ? 4 : 2; mctx.fillStyle = sel.has(u) ? '#e8c870' : u.type === 'god' ? '#ffe9a0' : u.type === 'hero' ? '#fff' : TEAM[u.side].css; mctx.fillRect(u.pos.x - k, u.pos.z - k, k * 2, k * 2); }
   if (alarm.t > 0 && alarm.pos) { mctx.strokeStyle = (alarm.t * 4 | 0) % 2 ? '#d83a4a' : '#fff'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.arc(alarm.pos.x, alarm.pos.z, 8 + (1 - alarm.t % 1) * 12, 0, 7); mctx.stroke(); }
   for (let i = miniPings.length - 1; i >= 0; i--) {   // destellos de avisos
     const p = miniPings[i]; p.t += .15; const r = 6 + (p.t % .9) * 30;

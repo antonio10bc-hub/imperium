@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { spotPos } from './buildings.js';
 import { BARR0, BASE1, CFG, GAME, RANKS, TEAM, UNITS } from './config.js';
+import { uname } from './civs.js';
 import { exploredAt, visibleAt } from './fog.js';
 import { state } from './game.js';
 import { drag, mouse, pickEnemy, pickSpot, pickUnit, project } from './input.js';
@@ -44,6 +45,7 @@ const ICONS = {
   horse: ['0002200', '0022220', '0222020', '2222000', '0222000', '0202000', '0202000'],
   harcher: ['0002200', '0022220', '2222020', '2222000', '0222000', '0202000', '0202000'],
   hero:  ['2020202', '2222222', '2222222', '0000000', '0222220', '0222220', '0000000'],
+  god:   ['2002002', '0222220', '0200020', '2202022', '0200020', '0222220', '2002002'],
   shield: ['2222222', '2000002', '2022202', '2022202', '0200020', '0020200', '0002000'],
 };
 // icono grande de acción sobre un edificio (con un pequeño bote)
@@ -61,7 +63,7 @@ function unitIcon(x, y, type, css) {
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (m[j][i] === '2') octx.fillRect(x0 + 3 + i * k, y0 + 3 + j * k, k, k);
   octx.fillStyle = '#0f0f1b'; octx.fillRect(Math.round(x) - 1, y0 + w, 2, 3);
 }
-export const tmpP = {}, LBL = { barracks: 'CUARTEL', altar: 'ALTAR DEL HÉROE' }, _h = new THREE.Vector3();
+export const tmpP = {}, LBL = { barracks: 'CUARTEL', altar: 'SALÓN DE HÉROES', temple: 'TEMPLO' }, _h = new THREE.Vector3();
 // líneas de destino de lo seleccionado: verde al moverse, roja al atacar o asediar, amarilla al conquistar; azul del cuartel al punto de reunión
 const _lp = new THREE.Vector3(), LA = {}, LB = {};
 const scr = (x, y, z, out) => { _lp.set(x, y, z).project(camera); out.x = (_lp.x * .5 + .5) * S.VW; out.y = (-_lp.y * .5 + .5) * S.VH; return _lp.z < 1; };   // false si queda detrás de la cámara
@@ -109,11 +111,12 @@ export function drawOverlay(dt) {
       const q = s.kind === 'barracks' ? sideState[s.side].queue[0] : null, h = s.kind === 'altar' ? sideState[s.side].heroQ.find(e => e.state === 'training') : null;
       if (s.side === 0 && state === 'play') {   // tus edificios con acciones: reclutar tropas y el héroe
         const ic = project(spotPos(s, s.kind === 'barracks' ? 4.6 : 5.2), tmpQ);
-        actionIcon(ic.x, ic.y - 6, s.kind === 'barracks' ? 'sword' : 'hero', S.selBld === s.kind ? '#f4f4e8' : '#e8c870');
+        actionIcon(ic.x, ic.y - 6, s.kind === 'barracks' ? 'sword' : s.kind === 'temple' ? 'god' : 'hero', S.selBld === s.kind ? '#f4f4e8' : '#e8c870');
       }
       if (s.side === 0 && S.selBld === s.kind) continue;
       if (s.side === 0 && q) bar(top.x, top.y + 6, 44, 4, 1 - q.t / UNITS[q.type].time, '#e8c870');
       if (s.side === 0 && h?.state === 'training') bar(top.x, top.y + 6, 44, 4, 1 - h.t / UNITS.hero.time, '#e8c870');
+      if (s.kind === 'temple' && s.side === 0) { const st = sideState[0]; if (st.ritual?.state === 'ritual') bar(top.x, top.y + 6, 44, 4, 1 - st.ritual.t / GAME.ritualTime, '#ffe9a0'); else if (st.godQ) bar(top.x, top.y + 6, 44, 4, 1 - st.godQ.t / UNITS.god.time, '#ffe9a0'); }
     }
   }
   if (state === 'play' && showUI) orderLines();
@@ -123,11 +126,12 @@ export function drawOverlay(dt) {
     if (!u.vis || !showUI) continue;
     const tip = project(_h.copy(u.pos).setY(u.pos.y + 1.6), tmpQ), small = Math.hypot(tip.x - u.sx, tip.y - u.sy) < 16;
     if (small) unitIcon(tip.x, tip.y - 4, u.type, sel.has(u) ? '#e8c870' : TEAM[u.side].css);
-    const hero = u.type === 'hero', t = project(_h.copy(u.pos).setY(u.pos.y + (hero ? 4.2 : 2.4)), tmpP);
+    const god = u.type === 'god', hero = u.type === 'hero' || god, t = project(_h.copy(u.pos).setY(u.pos.y + (god ? 5.6 : hero ? 4.2 : 2.4)), tmpP);
     if (hero || sel.has(u) || u.hp < u.maxHp) {
       const k = u.hp / u.maxHp;
       bar(t.x, t.y, hero ? 40 : 20, hero ? 4 : 3, k, k > .5 ? '#9ad86a' : k > .25 ? '#e8c870' : '#d83a4a');
-      if (hero) label(t.x, t.y - 4, u.chargeT > 0 ? '¡CARGA!' : 'HÉROE', u.chargeT > 0 ? '#e8c870' : TEAM[u.side].css, u.chargeT > 0 ? '#0f0f1b' : '#fff', 7);
+      if (god) label(t.x, t.y - 4, uname(u.side, 'god'), '#ffe9a0', '#0f0f1b', 7);
+      else if (hero) label(t.x, t.y - 4, u.chargeT > 0 ? '¡CARGA!' : 'HÉROE', u.chargeT > 0 ? '#e8c870' : TEAM[u.side].css, u.chargeT > 0 ? '#0f0f1b' : '#fff', 7);
     }
     let px = t.x - (hero ? 26 : 16);
     if (u.rank) { pip(px, t.y + 1, RANKS[u.rank].css); px -= 9; }
