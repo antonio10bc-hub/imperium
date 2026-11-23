@@ -74,12 +74,13 @@ export let regions = [], regionCell = null;
 function regionAt(x, z) { let b = 0, bd = 1e9; for (let r = 0; r < regions.length; r++) { const s = regions[r], d = (s.x - x) ** 2 + (s.z - z) ** 2; if (d < bd) { bd = d; b = r; } } return b; }
 export const regionOwner = r => { const s = regions[r]; return s.kind === 'base' ? s.side : s.owner; };
 export const regionShown = r => { const s = regions[r]; return s.kind === 'base' ? s.side : (s.known ?? s.owner); };   // lo que sabes de quién es
-export let landBase = [], landEdge = [], regionLand = [], treeCell = null, roadCell = null, chunks = [], tileCh = null, tileV = null;
-const tintLand = (h, edge, own) => edge ? (own < 0 ? mixHex(h, 0xf4f4e8, .3) : mixHex(h, TEAM[own].c, .55)) : own >= 0 ? mixHex(h, TEAM[own].c, .07) : h;
+export let landBase = [], regionLand = [], treeCell = null, roadCell = null, chunks = [], tileCh = null, tileV = null;
+// sin líneas de frontera entre regiones (daban demasiadas pistas): solo un tinte muy suave del dueño conocido
+const tintLand = (h, own) => own >= 0 ? mixHex(h, TEAM[own].c, .07) : h;
 export function paintRegion(r) {
   const own = regionShown(r);
   for (const i of regionLand[r]) {
-    const c = tintLand(landBase[i], landEdge[i], own), ch = chunks[tileCh[i]], a = ch.col.array, v0 = tileV[i] * 3;
+    const c = tintLand(landBase[i], own), ch = chunks[tileCh[i]], a = ch.col.array, v0 = tileV[i] * 3;
     for (let k = 0; k < 12; k += 3) { a[v0 + k] = c >> 16 & 255; a[v0 + k + 1] = c >> 8 & 255; a[v0 + k + 2] = c & 255; }
     ch.dirty = true;
   }
@@ -296,7 +297,7 @@ function treeBoxes(L, type, cx, h, cz, r2) {
   }
 }
 function buildVoxels() {
-  landBase = []; landEdge = []; regionLand = regions.map(() => []); chunks = []; tileCh = new Uint8Array(N); tileV = new Int32Array(N);
+  landBase = []; regionLand = regions.map(() => []); chunks = []; tileCh = new Uint8Array(N); tileV = new Int32Array(N);
   const H4 = [[1, 0, 0], [-1, 0, 1], [0, 1, 4], [0, -1, 5]];   // dx, dz, cara
   const hAt = (x, z) => (x < 0 || z < 0 || x >= MW || z >= MD) ? 0 : HM[idx(x, z)];
   const nearFlat = (x, z, m = 1) => flats.some(f => Math.hypot(x - f.x, z - f.z) < f.r1 + m);
@@ -332,8 +333,7 @@ function buildVoxels() {
     }
     let col = terrainColor(x, z); if (shadow[i]) col = mixHex(col, 0x10203a, shadow[i]);
     const reg = regionCell[i], t = landBase.length;
-    const edge = !nearFlat(cx, cz, -2) && H4.some(([a, b]) => { const nx = x + a, nz = z + b; return hAt(nx, nz) > 0 && regionCell[idx(nx, nz)] !== reg; });
-    regionLand[reg].push(t); landBase[t] = col; landEdge[t] = edge; tileCh[t] = ck;
+    regionLand[reg].push(t); landBase[t] = col; tileCh[t] = ck;
     tileV[t] = L.quad(2, x, x + 1, h, h, z, z + 1, col);
     const sc = h <= 1 ? TP.cliffS : TP.cliff, lip = mixHex(col, 0x10203a, .14);   // escalón de 1: color del suelo; más hondo: ladera
     for (const [a, b, f] of H4) { const hn = Math.max(0, hAt(x + a, z + b)); if (hn >= h) continue; L.quad(f, x, x + 1, h - 1, h, z, z + 1, h <= 1 ? sc : lip); if (hn < h - 1) L.quad(f, x, x + 1, hn, h - 1, z, z + 1, sc); }
