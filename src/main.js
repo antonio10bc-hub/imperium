@@ -79,7 +79,17 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 init_minimap(); init_fog(); init_hud(); init_input(); init_menu(); init_overlay();
-window.__game = { WEATHER: WEA, ambientInfo, S, gl, units, triggerEvent, ev, R, buildBridge, breakBridge, startChop, canBreak, get scen() { return scen; },
+// pruebas: imagen del mapa entero visto desde arriba (sin niebla del cielo); devuelve un dataURL PNG
+function mapShot(w = 1536) {
+  const h = Math.round(w * MD / MW), rt = new THREE.WebGLRenderTarget(w, h), cam = new THREE.OrthographicCamera(-MW / 2, MW / 2, MD / 2, -MD / 2, 1, 1000);
+  cam.position.set(MW / 2, 400, MD / 2 + 160); cam.lookAt(MW / 2, 0, MD / 2); cam.zoom = 1; cam.top = MD / 2 * .93; cam.bottom = -MD / 2 * .93; cam.updateProjectionMatrix();
+  const f = scene.fog; scene.fog = null; gl.setRenderTarget(rt); gl.render(scene, cam); gl.setRenderTarget(null); scene.fog = f;
+  const px = new Uint8Array(w * h * 4); gl.readRenderTargetPixels(rt, 0, 0, w, h, px); rt.dispose();
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'), im = x.createImageData(w, h);
+  for (let j = 0; j < h; j++) im.data.set(px.subarray((h - 1 - j) * w * 4, (h - j) * w * 4), j * w * 4);
+  x.putImageData(im, 0, 0); return c.toDataURL('image/png');
+}
+window.__game = { mapShot, WEATHER: WEA, ambientInfo, S, gl, units, triggerEvent, ev, R, buildBridge, breakBridge, startChop, canBreak, get scen() { return scen; },
   // pruebas: pone un cerebro de IA en un bando (diff: dificultad base; over: ajustes que la sobrescriben) o se lo quita con diff = null
   setAI(sd, diff, brain, over) { sideState[sd].ai = diff ? makeAI(sd, diff, brain) : null; if (over && sideState[sd].ai) { const A = sideState[sd].ai; A.Df = { ...A.Df, ...over }; if (over.inc != null) A.inc = over.inc; } }, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
   step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) S.camGoal = S.camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, spawnAt, dbg: () => ({ fields, walk, HM, GEOT, MW, wallHit, promote }) };
