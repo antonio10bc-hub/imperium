@@ -167,7 +167,7 @@ export const GEO = (() => {
       const bz = [H * .17 + (r() - .5) * 6, H * .83 + (r() - .5) * 6];
       const bridges = [[atZ(bz[0]), bz[0], 14], [ic[0] - 16, zc, 10], [ic[0] + 16, zc, 10], [atZ(bz[1]), bz[1], 14]];
       M.each((x, z) => {
-        const nearB = bz.some(b => Math.abs(z - b) < 4.5) || Math.abs(z - zc) < 4.5, d = Math.abs(x - atZ(z)) + (nearB ? 0 : (fbm(x * .15, z * .15, s + 60) - .5) * 1.6);
+        const bNear = bz.find(b => Math.abs(z - b) < 5), nearB = bNear != null || Math.abs(z - zc) < 4.5, d = Math.abs(x - atZ(bNear ?? z)) + (nearB ? 0 : (fbm(x * .15, z * .15, s + 60) - .5) * 1.6);   // junto a un puente la garganta va recta (paredes paralelas al tablero)
         const inBasin = basin(x, z) < 1, onIsl = isl(x, z) < 1, onB = bz.some(b => Math.abs(z - b) < 2.4) || (Math.abs(z - zc) < 2.4 && inBasin);
         if (onIsl) return [4, 0];
         if (d < 5.4 || inBasin) return onB ? [4, 9] : [1, 17];
