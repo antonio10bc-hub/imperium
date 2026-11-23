@@ -29,7 +29,21 @@ import { WEA, ambientInfo, updateLife } from './ambient.js';
 
 // ---------- Bucle ----------
 let prev = performance.now(), hudT = 0, miniT = 0, fogT = 0;
+// el bucle nunca se detiene: si algo falla en un fotograma se anota y el juego sigue (antes un error congelaba la partida)
+let lastErr = '';
+// los errores se guardan en el navegador (localStorage «imperium-errors», los 8 últimos) para poder revisarlos después
+function logError(e) {
+  console.error(e); const t = String(e && e.stack || e).slice(0, 600); window.__errors = (window.__errors || []).concat(t);
+  try { const l = JSON.parse(localStorage.getItem('imperium-errors') || '[]'); l.push(new Date().toISOString() + ' ' + t); localStorage.setItem('imperium-errors', JSON.stringify(l.slice(-8))); } catch (x) {}
+}
+addEventListener('error', ev => logError(ev.error || ev.message)); addEventListener('unhandledrejection', ev => logError(ev.reason));
 function frame(now) {
+  requestAnimationFrame(frame);
+  try { frameBody(now); } catch (e) {
+    const m = String(e && e.message || e); if (m !== lastErr) { lastErr = m; logError(e); }
+  }
+}
+function frameBody(now) {
   const dt = Math.min(.05, (now - prev) / 1000); prev = now;
   S.camDist += (S.camGoal - S.camDist) * Math.min(1, dt * 8);
   // desplazamiento: WASD / flechas / borde de pantalla
@@ -76,7 +90,6 @@ function frame(now) {
   gl.setRenderTarget(target); gl.render(scene, camera); gl.setRenderTarget(null); gl.render(postScene, postCam);
   drawOverlay(live ? dt : 0);
   if ((miniT -= dt) <= 0) { miniT = .15; drawMinimap(); }
-  requestAnimationFrame(frame);
 }
 init_minimap(); init_fog(); init_hud(); init_input(); init_menu(); init_overlay();
 // pruebas: imagen del mapa entero visto desde arriba (sin niebla del cielo); devuelve un dataURL PNG

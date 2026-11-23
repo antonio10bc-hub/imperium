@@ -120,7 +120,12 @@ function clearWorld() {
 // keepCivs: conserva las civilizaciones de la partida actual (reiniciar el mismo mapa)
 export function newGame(s, keepCivs = false) {
   $('loading').hidden = false; $('end').hidden = true; $('start').hidden = true; $('menu').hidden = true; S.menuOpen = false; $('ui').classList.add('hidden-ui');
-  requestAnimationFrame(() => setTimeout(() => {
+  requestAnimationFrame(() => setTimeout(() => { try { buildGame(s, keepCivs); } catch (e) {   // si la generación falla, otra semilla (antes se quedaba en «cargando» para siempre)
+    console.error(e); window.__errors = (window.__errors || []).concat(String(e && e.stack || e).slice(0, 500));
+    if ((S.genFails = (S.genFails || 0) + 1) < 4) newGame(s + 7777, keepCivs); } }, 30));
+}
+function buildGame(s, keepCivs) {
+  {
     clearWorld(); resetFog(false); if (!keepCivs) resolveCivs(true);
     generate(s); resetFog(false); UGRID.resize();
     const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, temple: buildTemple, town: buildTown };
@@ -138,7 +143,8 @@ export function newGame(s, keepCivs = false) {
     updateCtx(); syncDiff();
     $('loading').hidden = true; state = 'menu'; S.menuDirty = false;
     if (S.pendingStart) { S.pendingStart = false; startGame(); } else { $('start').hidden = false; showPortraits(); }
-  }, 30));
+    S.genFails = 0;
+  }
 }
 export function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; toast('MAPA: ' + GEO.NAME[scen] + (geoR?.mix ? ': ' + geoR.mix.map(k => GEO.NAME[k]).join(' + ') : '')); { const b = BONUS[civOf(0).id]; if (b) toast(`${civOf(0).name} · ${b.name}: ${b.text.toUpperCase()}`, 'good'); } resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
 export function endGame(win, surrender = false) {

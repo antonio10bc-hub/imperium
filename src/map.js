@@ -220,7 +220,7 @@ export function generate(newSeed, tries = 0) {
   let A, B;
   if (geoR) { const fi = ([x, z]) => { const n = nearestNode(x, z); return Math.hypot(cellX(n) - x, cellZ(n) - z) < 12 ? n : -1; }; A = fi(geoR.F[0]); B = fi(geoR.F[1]); }
   else { A = pick(.1, .2); B = pick(.8, .9); }
-  if ((A < 0 || B < 0) && tries < 40) return generate(newSeed + 104729, tries + 1);
+  if ((A < 0 || B < 0) && tries < 45) return generate(newSeed + 104729, Math.max(tries + 1, 20));   // sin sitio para las fortalezas: otra semilla (y desde el intento 20, el río clásico, que siempre vale)
   const mkFort = (i, side) => {
     const x = cellX(i), z = cellZ(i), tb = Math.atan2(MD / 2 - z, MW / 2 - x), M = civOf(side).map, pts = M.shape();
     const maxR = Math.max(...pts.map(([a, b]) => Math.hypot(a, b))), k = 12.3 / maxR, n = 96;
