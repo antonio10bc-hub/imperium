@@ -182,7 +182,7 @@ button.alt{background:var(--paper)}
       <button id="fEnemy" type="button" class="tl" title="Fortaleza rival"><img class="ic" data-ic="target" data-c="#d83a4a" alt=""></button>
       <button id="spd" type="button" class="tl" title="Velocidad">×1<kbd>V</kbd></button>
       <button id="pz" type="button" class="tl" title="Pausa"><img class="ic" data-ic="pause" data-c="#f4f4e8" alt=""><kbd>P</kbd></button>
-      <button id="snd" type="button" class="tl" title="Sonido">♪ SÍ</button>
+      <button id="snd" type="button" class="tl" title="Sonido">♪ NO</button>
     </div>
   </div>
 </div>
@@ -1469,7 +1469,7 @@ const ping = (loc, color) => { if (seenAt(loc)) pings.push({ local: loc.clone(),
 
 // ---------- Sonido y música ----------
 // Todo sintetizado con WebAudio, pero buscando timbres reales: metal, madera, cuerno, tambor y una pequeña sala con reverberación
-let ac = null, soundOn = true, master = null, sfxBus = null, musBus = null, verb = null, noiseBuf = null; const lastSfx = {};
+let ac = null, soundOn = false, master = null, sfxBus = null, musBus = null, verb = null, noiseBuf = null; const lastSfx = {};
 function audio() {
   if (ac) return ac;
   try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
@@ -2442,7 +2442,9 @@ $('fBarr').addEventListener('click', () => { selectBuilding('barracks'); focusOn
 $('fHero').addEventListener('click', heroButton);
 $('spd').addEventListener('click', () => { speed = speed === 1 ? 2 : 1; syncTools(); });
 $('pz').addEventListener('click', () => { paused = !paused; syncTools(); });
-$('snd').addEventListener('click', () => { soundOn = !soundOn; $('snd').textContent = '♪ ' + (soundOn ? 'SÍ' : 'NO'); if (audio()) master.gain.setTargetAtTime(soundOn ? .9 : 0, ac.currentTime, .05); });
+try { soundOn = localStorage.getItem('imperium-sound') === '1'; } catch (e) {}   // por defecto, sin sonido
+$('snd').textContent = '♪ ' + (soundOn ? 'SÍ' : 'NO');
+$('snd').addEventListener('click', () => { soundOn = !soundOn; $('snd').textContent = '♪ ' + (soundOn ? 'SÍ' : 'NO'); try { localStorage.setItem('imperium-sound', soundOn ? '1' : '0'); } catch (e) {} if (soundOn && state === 'play') startMusic(); if (audio()) master.gain.setTargetAtTime(soundOn ? .9 : 0, ac.currentTime, .05); });
 document.querySelectorAll('.diff button[data-d]').forEach(b => b.addEventListener('click', () => { diff = b.dataset.d; try { localStorage.setItem('imperium-diff', diff); } catch (e) {} syncDiff(); sfx('select'); }));
 let miniDrag = false;
 const miniGo = e => { const r = mini.getBoundingClientRect(); focusOn((e.clientX - r.left) / r.width * MW, (e.clientY - r.top) / r.height * MD, true); };
