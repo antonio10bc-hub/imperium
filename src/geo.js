@@ -189,14 +189,6 @@ export const GEO = (() => {
         return [4 + Math.max(0, fbm(x * .05, z * .05, s + 73) - .6) * 2, 0]; });
       return ramps.map(rx => [rx, zc(rx)]);
     },
-    // llanura abierta: casi sin obstáculos, unas charcas y arboledas sueltas; ideal para la caballería
-    llanura(M, r, s, F) {
-      const ponds = scatter(r, 4, 40, [40, 14, W - 40, H - 14], p => F.every(f => Math.hypot(f[0] - p[0], f[1] - p[1]) > 26)).map((p, i) => blobR(p[0], p[1], 3 + r() * 3, 2.5 + r() * 2, .6, s + 80 + i));
-      const groves = scatter(r, 7, 26, [30, 10, W - 30, H - 10], p => F.every(f => Math.hypot(f[0] - p[0], f[1] - p[1]) > 24)).map((p, i) => blobR(p[0], p[1], 2.5 + r() * 3, 2 + r() * 2, .8, s + 90 + i));
-      M.each((x, z) => { if (ponds.some(f => f(x, z) < 1)) return [-1, 0]; if (groves.some(f => f(x, z) < 1)) return [2, 1];
-        return [2 + Math.max(0, fbm(x * .04, z * .04, s + 81) - .62) * 4, 0]; });
-      return [];
-    },
     // ruinas: grupos de restos repartidos por el mapa (7 = piedra en ruinas): tramos de muralla rotos, esquinas, torres redondas
     // a medio caer, recintos sin techo e hileras de columnas, cada uno con su orientación. Hay un tesoro escondido en cada grupo
     ruinas(M, r, s, F) {
@@ -231,25 +223,8 @@ export const GEO = (() => {
   };
 
 
-  const LIST = { cordillera: 'CORDILLERA', istmo: 'ISTMO', archipielago: 'ARCHIPIÉLAGO', barrancos: 'BARRANCOS', meseta: 'MESETA', afluentes: 'AFLUENTES', delta: 'DELTA', bosque: 'BOSQUE', oasis: 'DESIERTO', lago: 'CALDERA', helado: 'VALLE HELADO', canon: 'CAÑÓN', costa: 'COSTA', llanura: 'LLANURA', ruinas: 'RUINAS', mezcla: 'MEZCLA' };
-  // mezcla: la mitad oeste de una geografía y la este de otra (elegidas con la semilla), con una franja de transición.
-  // Cada regla de geografía se aplica solo en su mitad. El cañón no entra: su garganta cae justo en la costura
-  const MIXABLE = ['cordillera', 'istmo', 'archipielago', 'barrancos', 'meseta', 'afluentes', 'delta', 'bosque', 'oasis', 'lago', 'helado', 'costa', 'llanura', 'ruinas'];
-  function mix(seed) {
-    const r = rngOf(seed), a = MIXABLE[r() * MIXABLE.length | 0]; let b = a; while (b === a) b = MIXABLE[r() * MIXABLE.length | 0];
-    const A = build(a, (seed * 7 + 11) % 2147483000 + 1), B = build(b, (seed * 13 + 5) % 2147483000 + 1), HMg = new Float32Array(MW * MD), TTg = new Uint8Array(MW * MD), sd = seed % 997;
-    const seam = z => MW / 2 + (fbm(3.7, z / MD * 4, sd + 9, 3) - .5) * MW * .12, band = MW * .035;
-    for (let gz = 0; gz < MD; gz++) { const sx = seam(gz + .5); for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, t = sm((gx + .5 - sx + band) / (2 * band));
-      HMg[i] = Math.round(A.HM[i] * (1 - t) + B.HM[i] * t); TTg[i] = t < .5 ? A.TT[i] : B.TT[i];
-      if ((TTg[i] === 9) || (HMg[i] > 0 && (A.HM[i] <= 0) !== (B.HM[i] <= 0) && t > .2 && t < .8 && TTg[i] !== 0)) TTg[i] = 0; } }
-    const west = p => p[0] < seam(p[1]), east = p => !west(p), pick = (la, lb) => [...(la || []).filter(west), ...(lb || []).filter(east)];
-    return { HM: HMg, TT: TTg, F: [A.F[0], B.F[1]], passes: [], special: pick(A.special, B.special), div: seam,
-      volcano: A.volcano && west(A.volcano) ? A.volcano : B.volcano && east(B.volcano) ? B.volcano : null, bridges: [], treasures: pick(A.treasures, B.treasures),
-      snow: a === 'helado' || b === 'helado', snowSide: a === 'helado' ? 0 : b === 'helado' ? 1 : null,
-      sea: A.sea || B.sea, river: A.river || B.river, goldTop: a === 'meseta' || b === 'meseta', oasis: false, mix: [a, b], seam };
-  }
+  const LIST = { cordillera: 'CORDILLERA', istmo: 'ISTMO', archipielago: 'ARCHIPIÉLAGO', barrancos: 'BARRANCOS', meseta: 'MESETA', afluentes: 'AFLUENTES', delta: 'DELTA', bosque: 'BOSQUE', oasis: 'DESIERTO', lago: 'CALDERA', helado: 'VALLE HELADO', canon: 'CAÑÓN', costa: 'COSTA', ruinas: 'RUINAS' };
   function build(id, seed) {
-    if (id === 'mezcla') return mix(seed);
     const r = rngOf(seed), s = seed % 997, F = fortsFor(r), HMg = new Float32Array(MW * MD), TTg = new Uint8Array(MW * MD);
     const M = { each(fn) { for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, o = fn((gx + .5) * W / MW, (gz + .5) * H / MD, HMg[i], TTg[i]); if (o) { HMg[i] = Math.min(12, Math.round(o[0])); TTg[i] = o[1]; } } } };
     const passes = GEN[id](M, r, s, F) || [];
@@ -267,8 +242,7 @@ export const GEO = (() => {
     bosque: 'Un bosque cerrado: tala sendas para avanzar y encontrar los claros escondidos.', oasis: 'Dunas y sed. Pocos oasis, muy valiosos.',
     lago: 'Un lago con un volcán gigante en el centro que entra en erupción.', helado: 'Lagos helados: el hielo se rompe si cargas demasiadas tropas encima.',
     canon: 'Una garganta seca con una isla fortificada en el centro. Quien controle los puentes, controla el mapa.', costa: 'Las fortalezas en lo alto del acantilado y pocas rampas hasta el llano.',
-    llanura: 'Campo abierto para la caballería: los jinetes van más rápido.', ruinas: 'Restos de una ciudad antigua, con tesoros escondidos entre los muros.',
-    mezcla: 'Dos geografías al azar, una en cada mitad, cada una con su regla.' };
+    ruinas: 'Restos de una ciudad antigua, con tesoros escondidos entre los muros.', };
   const NAME = { ...LIST, rio: 'RÍO' };   // el río clásico ya no se elige, pero queda como mapa de reserva
   return { build, LIST, NAME, DESC, keys: Object.keys(LIST) };
 })();

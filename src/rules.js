@@ -5,7 +5,7 @@
 // · Bosque: se puede talar el bosque denso; dentro, cobertura contra flechas.
 // · Desierto: lejos del agua y de los caminos, las tropas pasan sed.   · Caldera: el volcán entra en erupción de vez en cuando.
 // · Valle helado: el hielo se rompe si hay demasiadas tropas encima.  · Cañón: tres puentes que se pueden destruir y reparar.
-// · Llanura: los jinetes van más rápido.   · Ruinas: tesoros por las calles para el primero que llegue.   · Costa: dos niveles unidos por pocas rampas.
+// · Ruinas: tesoros por las calles para el primero que llegue.   · Costa: dos niveles unidos por pocas rampas.
 // (Istmo y cordillera colocan además la ciudadela y las atalayas en sus pasos; la meseta tiene tres rampas estrechas.)
 import * as THREE from 'three';
 import { sfx } from './audio.js';
@@ -39,7 +39,7 @@ export function setupRules() {
   on.canyon = has('barrancos'); on.swamp = has('delta');
   on.chop = has('bosque'); on.cover = has('bosque');
   on.thirst = has('oasis'); on.volcano = has('lago') && !!geoR?.volcano;
-  on.ice = has('helado'); on.plains = has('llanura'); on.treasures = has('ruinas') || has('bosque');
+  on.ice = has('helado'); on.treasures = has('ruinas') || has('bosque');
   // casillas donde las tropas se ocultan: el fondo de los barrancos y los pantanos del delta
   if (on.canyon || on.swamp) { R.hide = new Uint8Array(N); for (let i = 0; i < N; i++) if ((on.canyon && HM[i] === 1 && inK('barrancos', i)) || (on.swamp && GEOT[i] === 2 && inK('delta', i))) R.hide[i] = 1; }
   // cobertura: junto al bosque denso o entre árboles
@@ -250,8 +250,6 @@ function updateTreasures() {
   }
 }
 export const TREASURE = 80;
-// llanura abierta: los jinetes van un 15 % más rápido
-export const geoSpeed = u => R.on.plains && (!R.half.llanura || R.half.llanura(u.pos.x, u.pos.z)) && (u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.def.speed >= 4.5)) ? 1.15 : 1;
 
 // ---------- tala del bosque denso ----------
 // clic derecho sobre el bosque con tropas: van al borde y, mientras alguna esté al lado, lo talan en unos segundos

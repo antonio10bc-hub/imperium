@@ -110,7 +110,7 @@ const PLACES = {
   afluentes: [['mill', 'bank', 2], ['boat', 'water', 2]], delta: [['hut', 'bank', 3], ['boat', 'water', 3]], bosque: [['totem', 'clearing', 3]],
   oasis: [['pyramid', 'sand', 2], ['columns', 'sand', 2]], lago: [['boat', 'water', 2], ['shrine', 'land', 1]], helado: [['fishhut', 'ice', 3]],
   canon: [['statue', 'edge', 3]], costa: [['lighthouse', 'coast', 1], ['wreck', 'beach', 2], ['boat', 'water', 2]],
-  llanura: [['windmill', 'land', 3], ['haystack', 'land', 4]], ruinas: [['statue', 'land', 2], ['columns', 'land', 3]],
+  ruinas: [['statue', 'land', 2], ['columns', 'land', 3]],
 };
 const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const hAt = (x, z) => x < 0 || z < 0 || x >= MW || z >= MD ? 0 : HM[idx(x, z)];
