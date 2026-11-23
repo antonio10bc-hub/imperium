@@ -319,7 +319,11 @@ export function generate(newSeed, tries = 0) {
 // para que no salgan caminos que rodean medio mapa (al otro lado de un cañón, un lago o un brazo de mar) ni ramales sueltos
 function buildRoads() {
   roadCell = new Uint8Array(N);
-  const Rg = regions, n = Rg.length, F = Rg.map(r => bfs([r.node])), D = (a, b) => F[a][Rg[b].node];
+  // los caminos van por terreno bajo: nunca cruzan montañas (altura 8 o más; la cima de la meseta llega a 7)
+  const low = i => HM[i] <= 7, q = new Int32Array(N);
+  const lowBfs = src => { const f = new Int32Array(N).fill(1e9); let h = 0, t = 0; f[src] = 0; q[t++] = src;
+    while (h < t) { const v = q[h++], dv = f[v] + 1, m = stepMask[v]; for (let k = 0; k < 8; k++) if (m >> k & 1) { const j = v + NBO[k]; if (f[j] > dv && low(j)) { f[j] = dv; q[t++] = j; } } } return f; };
+  const Rg = regions, n = Rg.length, F = Rg.map(r => lowBfs(r.node)), D = (a, b) => F[a][Rg[b].node];
   const inT = [0], edges = [], adj = Rg.map(() => []);
   while (inT.length < n) {
     let best = null, bd = 1e9;
@@ -340,7 +344,7 @@ function buildRoads() {
       for (let k = 0, m = stepMask[v]; k < 8; k++) { if (!(m >> k & 1)) continue; const j = v + NBO[k]; if (f[j] !== f[v] - 1) continue; const d = Math.sqrt((cellX(j) - A.x) ** 2 + (cellZ(j) - A.z) ** 2) + (n2(cellX(j), cellZ(j), .06, 2, 91 + a) - .5) * 9; if (d < bd) { bd = d; best = j; } }
       if (best < 0) break;
       // ancho irregular: el centro casi siempre es camino; los bordes a veces se difuminan o desaparecen, y en algunos tramos se ensancha
-      const w = n2(x, z, .09, 2, 97), mark = (j, faded) => { if (j >= 0 && j < N && HM[j] > 0 && walk[j] && roadCell[j] !== 1) roadCell[j] = faded ? 2 : 1; };
+      const w = n2(x, z, .09, 2, 97), mark = (j, faded) => { if (j >= 0 && j < N && HM[j] > 0 && low(j) && walk[j] && roadCell[j] !== 1) roadCell[j] = faded ? 2 : 1; };
       mark(v, hash(x, 17, z) < .08);
       if (x + 1 < MW) mark(v + 1, w < .45); mark(v + MW, w < .35 || hash(x, 19, z) < .2);
       if (w > .68 && x > 0) mark(v - 1, true); if (w > .74) mark(v - MW, true);
