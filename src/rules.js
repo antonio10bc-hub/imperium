@@ -4,6 +4,8 @@
 // · Afluentes: crecidas que cierran los vados un rato.        · Delta: los pantanos ocultan a las tropas y atascan a los jinetes.
 // · Bosque: se puede talar el bosque denso; dentro, cobertura contra flechas.
 // · Desierto: lejos del agua y de los caminos, las tropas pasan sed.   · Caldera: el volcán entra en erupción de vez en cuando.
+// · Valle helado: el hielo se rompe si hay demasiadas tropas encima.  · Cañón: tres puentes que se pueden destruir y reparar.
+// · Llanura: los jinetes van más rápido.   · Ruinas: tesoros por las calles para el primero que llegue.   · Costa: dos niveles unidos por pocas rampas.
 // (Istmo y cordillera colocan además la ciudadela y las atalayas en sus pasos; la meseta tiene tres rampas estrechas.)
 import * as THREE from 'three';
 import { sfx } from './audio.js';
@@ -23,7 +25,7 @@ const _near = [];
 // ---------- preparación al empezar cada partida ----------
 export function setupRules() {
   for (const m of R.meshes) { world.remove(m); m.traverse(o => { if (o.isMesh && o.userData.own) { o.geometry.dispose(); o.material.dispose(); } }); }
-  Object.assign(R, { on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false, bombs: [] });
+  Object.assign(R, { on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false, bombs: [], breaks: [], treasures: null });
   const on = R.on;
   on.bridges = bridgeSites.length > 0;
   on.snow = scen === 'cordillera'; on.highVision = scen === 'cordillera';
@@ -31,6 +33,7 @@ export function setupRules() {
   on.canyon = scen === 'barrancos'; on.swamp = scen === 'delta';
   on.chop = scen === 'bosque'; on.cover = scen === 'bosque';
   on.thirst = scen === 'oasis'; on.volcano = scen === 'lago' && !!geoR?.volcano;
+  on.ice = scen === 'helado'; on.plains = scen === 'llanura'; on.treasures = scen === 'ruinas';
   // casillas donde las tropas se ocultan: el fondo de los barrancos y los pantanos del delta
   if (on.canyon || on.swamp) { R.hide = new Uint8Array(N); for (let i = 0; i < N; i++) if (on.canyon ? HM[i] === 1 : GEOT[i] === 2) R.hide[i] = 1; }
   // cobertura: junto al bosque denso o entre árboles
@@ -44,7 +47,9 @@ export function setupRules() {
       if (on.tides ? GEOT[i] === 2 && HM[i] === 1 : HM[i] === 1 && GEOT[i] === 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => HM[idx(x + a, z + b)] <= 0)) cells.push(i); }
     if (cells.length) { const g = { cells, open: true, layer: waterLayer(cells) }; R.gates.push(g); R.cycle = { phase: 'open', t: on.tides ? 100 : 140 }; }
   }
-  for (const b of bridgeSites) R.bridges.push(makeBridge(b));
+  for (const b of bridgeSites) { const br = makeBridge(b); R.bridges.push(br); if (b.built) { br.built = true; br.group.visible = true; } }
+  R.breaks = [];
+  if (on.treasures) R.treasures = (geoR.treasures || []).map(([x, z]) => makeChest(x, z));
   if (on.volcano) {   // lava en el cráter (brilla siempre) y humo constante
     const [x, z] = geoR.volcano, y = HM[idx(Math.floor(x), Math.floor(z))]; R.volcano = { x, z, y: y + 1, t: 150, phase: 'calm' };
     const lava = new THREE.Mesh(new THREE.BoxGeometry(2.6, .2, 2.6), new THREE.MeshBasicMaterial({ color: 0xff7a1a })); lava.position.set(Math.floor(x) + .5, y + .12, Math.floor(z) + .5); lava.userData.own = true; world.add(lava); R.meshes.push(lava);
@@ -61,20 +66,20 @@ function wetMap(r) {
 }
 const spots0 = () => geoR?.F ? geoR.F.map(([x, z]) => ({ x, z })) : [];
 // capa de agua sobre unas casillas (se ve cuando están cerradas)
-function waterLayer(cells) {
+function waterLayer(cells, color = 0x5fb0d4) {
   const p = [], ix = [];
   for (const c of cells) { const x = c % MW, z = (c / MW) | 0, y = HM[c] + .07, v = p.length / 3; p.push(x, y, z, x + 1, y, z, x + 1, y, z + 1, x, y, z + 1); ix.push(v, v + 2, v + 1, v, v + 3, v + 2); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setIndex(ix); g.computeBoundingSphere();
-  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x5fb0d4, transparent: true, opacity: .92, depthWrite: false })); m.visible = false; m.userData.own = true; m.renderOrder = 1;
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .92, depthWrite: false })); m.visible = false; m.userData.own = true; m.renderOrder = 1;
   world.add(m); R.meshes.push(m); return m;
 }
 
 // ---------- casillas que se abren y se cierran ----------
-function setGate(g, open) {
+function setGate(g, open, drown = false) {
   g.open = open; g.layer.visible = !open; g.layer.material.opacity = .92;
   for (const c of g.cells) blocked[c] = open ? 0 : 1;
   refreshCells(g.cells);
-  if (!open) evict(g.cells);
+  if (!open) evict(g.cells, drown);
   refreshFields();
 }
 // las tropas que se quedan en una casilla cerrada saltan a la tierra más cercana (o se ahogan si no la hay)
@@ -104,19 +109,19 @@ function updateCycle(dt) {
 export const BRIDGE_COST = 150;
 function makeBridge(site) {
   const xs = site.cells.map(c => c % MW), zs = site.cells.map(c => (c / MW) | 0), x0 = Math.min(...xs), x1 = Math.max(...xs) + 1, z0 = Math.min(...zs), z1 = Math.max(...zs) + 1;
-  const b = { kind: 'bridge', x: (x0 + x1) / 2, z: (z0 + z1) / 2, y: 1, cells: site.cells, h0: site.cells.map(c => HM[c]), built: false, name: 'PUENTE', group: new THREE.Group() };
+  const hb = site.h ?? 1, b = { kind: 'bridge', x: (x0 + x1) / 2, z: (z0 + z1) / 2, y: hb, hb, cells: site.cells, h0: site.cells.map(c => site.h0 ?? HM[c]), built: false, breakable: !!site.breakable, name: 'PUENTE', group: new THREE.Group() };
   const g = b.group, L = site.axis === 'x' ? x1 - x0 + 1.5 : z1 - z0 + 1.5, W = site.axis === 'x' ? z1 - z0 : x1 - x0, wood = 0x8a5a34, wood2 = 0x6a4224, stone = 0xa8a49a;
   const P = (w, h, d, c, x, y, z) => site.axis === 'x' ? part(g, w, h, d, c, x, y, z) : part(g, d, h, w, c, z, y, x);
   P(L, .25, W, wood, 0, .88, 0);
   for (let k = 0; k < L; k += 1.1) P(.12, .04, W + .1, wood2, -L / 2 + k, 1.02, 0);   // tablones
   for (const s of [-1, 1]) { P(L, .12, .14, wood2, 0, 1.55, s * (W / 2 - .05)); for (let k = 0; k <= L; k += 2) P(.16, .7, .16, wood2, -L / 2 + k, 1.25, s * (W / 2 - .05)); }
-  for (let k = 2; k < L - 1; k += 4) P(.8, 1.8, W - .4, stone, -L / 2 + k, -.1, 0);   // pilares
-  bake(g); g.position.set(b.x, 0, b.z); g.visible = false; world.add(g); R.meshes.push(g);
+  for (let k = 2; k < L - 1; k += 4) P(.8, 1.8 + hb, W - .4, stone, -L / 2 + k, .8 - (1.8 + hb) / 2, 0);   // pilares hasta el agua
+  bake(g); g.position.set(b.x, hb - 1, b.z); g.visible = false; world.add(g); R.meshes.push(g);
   return b;
 }
 export function setBridge(b, built) {
   b.built = built; b.group.visible = built;
-  b.cells.forEach((c, k) => { HM[c] = built ? 1 : b.h0[k]; });
+  b.cells.forEach((c, k) => { HM[c] = built ? b.hb : b.h0[k]; });
   refreshCells(b.cells); if (!built) evict(b.cells, true);
   refreshFields();
 }
@@ -125,9 +130,61 @@ export function buildBridge(side, b) {
   if (b.built || st.gold < BRIDGE_COST) { if (side === 0) sfx('deny'); return false; }
   st.gold -= BRIDGE_COST; setBridge(b, true);
   burst(new THREE.Vector3(b.x, 1.5, b.z), [0x8a5a34, 0xffffff, 0xe8c870], 24, 3, 5, 1, .25); ping(new THREE.Vector3(b.x, 1, b.z), '#e8c870');
-  toast(side === 0 ? '¡PUENTE CONSTRUIDO!' : 'EL RIVAL HA CONSTRUIDO UN PUENTE', side === 0 ? 'good' : 'bad', b); sfx('capture');
+  toast(side === 0 ? (b.breakable ? '¡PUENTE REPARADO!' : '¡PUENTE CONSTRUIDO!') : 'EL RIVAL HA CONSTRUIDO UN PUENTE', side === 0 ? 'good' : 'bad', b); sfx('capture');
   return true;
 }
+
+// cañón: destruir un puente propio (hace falta una tropa tuya cerca y que quede al menos otro en pie)
+export const canBreak = (side, b) => b.breakable && b.built && R.bridges.some(o => o !== b && o.built) && units.some(u => u.side === side && Math.hypot(u.pos.x - b.x, u.pos.z - b.z) < 12);
+export function breakBridge(side, b) {
+  if (!canBreak(side, b)) { if (side === 0) sfx('deny'); return false; }
+  setBridge(b, false);
+  burst(new THREE.Vector3(b.x, b.hb, b.z), [0x8a5a34, 0x6a4224, 0xa8a49a], 30, 4, 4, 1.2, .3); plume(new THREE.Vector3(b.x, b.hb, b.z), 0x8a8a86, 1.4, 1.6);
+  toast(side === 0 ? 'HAS DESTRUIDO EL PUENTE' : '¡EL RIVAL HA DESTRUIDO UN PUENTE!', side === 0 ? 'good' : 'bad', b); sfx('lost');
+  return true;
+}
+
+// ---------- hielo que se rompe ----------
+// si diez tropas o más pisan el mismo trozo de hielo, cruje dos segundos y se rompe: quien esté encima cae al agua. Vuelve a helarse en 90 s
+function updateIce(dt) {
+  for (let k = R.breaks.length - 1; k >= 0; k--) {
+    const b = R.breaks[k]; b.t -= dt;
+    if (b.phase === 'crack') { if ((b.fx = (b.fx ?? 0) - dt) <= 0) { b.fx = .15; burst(new THREE.Vector3(b.x + Math.random() * 8 - 4, 1.1, b.z + Math.random() * 8 - 4), [0xffffff, 0xbcd8e8], 3, 2, 2, .4, .16); }
+      if (b.t <= 0) { b.phase = 'broken'; b.t = 90; b.gate = { cells: b.cells, open: true, layer: waterLayer(b.cells, 0x3a7aa8) }; setGate(b.gate, false, true); burst(new THREE.Vector3(b.x, 1.2, b.z), [0xffffff, 0xbcd8e8, 0x3a7aa8], 40, 4, 5, 1, .26); sfx('lost'); } }
+    else if (b.t <= 0) { setGate(b.gate, true); world.remove(b.gate.layer); b.gate.layer.geometry.dispose(); b.gate.layer.material.dispose(); R.breaks.splice(k, 1); }
+  }
+  if ((R.iceT = (R.iceT ?? 0) - dt) > 0) return; R.iceT = .5;
+  for (const u of units) {
+    if (u.dead || GEOT[u.node] !== 6 || R.breaks.some(b => Math.hypot(b.x - u.pos.x, b.z - u.pos.z) < 10)) continue;
+    const on = UGRID.near(u.pos.x, u.pos.z, 5, _near).filter(o => GEOT[o.node] === 6 && Math.hypot(o.pos.x - u.pos.x, o.pos.z - u.pos.z) < 5);
+    if (on.length < 10) continue;
+    const cx = Math.floor(u.pos.x), cz = Math.floor(u.pos.z), cells = [];
+    for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const x = cx + dx, z = cz + dz; if (x >= 0 && z >= 0 && x < MW && z < MD && dx * dx + dz * dz <= 36 && GEOT[idx(x, z)] === 6) cells.push(idx(x, z)); }
+    R.breaks.push({ x: u.pos.x, z: u.pos.z, cells, t: 2, phase: 'crack' });
+    if (on.some(o => o.side === 0) || u.vis) toast('¡EL HIELO SE AGRIETA! SALID DE AHÍ', 'bad', u.pos);
+  }
+}
+
+// ---------- tesoros de las ruinas ----------
+function makeChest(x, z) {
+  const g = new THREE.Group(), y = HM[idx(Math.floor(x), Math.floor(z))];
+  part(g, .9, .5, .6, 0x7a4a24, 0, .25, 0); part(g, .94, .2, .64, 0x5a3418, 0, .58, 0); part(g, .2, .2, .1, 0xffc83a, 0, .4, .32); part(g, .5, .12, .3, 0xffd23f, 0, .72, 0);
+  bake(g); g.position.set(x, y, z); world.add(g); R.meshes.push(g);
+  return { x, z, y, g, taken: false };
+}
+function updateTreasures() {
+  for (const t of R.treasures) {
+    if (t.taken) continue;
+    if ((t.fx = (t.fx ?? 0) - .25) <= 0) { t.fx = 1.2; plume(new THREE.Vector3(t.x, t.y + 1, t.z), 0xffe9a0, .18, .9, 1.4, -.6); }   // brillo
+    const u = UGRID.near(t.x, t.z, 1.8, _near).find(o => o.side < 2 && Math.hypot(o.pos.x - t.x, o.pos.z - t.z) < 1.8); if (!u) continue;
+    t.taken = true; t.g.visible = false; sideState[u.side].gold += TREASURE;
+    burst(new THREE.Vector3(t.x, t.y + .5, t.z), [0xffd23f, 0xffffff, 0xe8c870], 24, 3, 5, 1, .22);
+    toast(u.side === 0 ? `¡TESORO ENCONTRADO! +${TREASURE} ORO` : 'EL RIVAL HA ENCONTRADO UN TESORO', u.side === 0 ? 'good' : 'bad', t); if (u.side === 0) sfx('capture');
+  }
+}
+export const TREASURE = 80;
+// llanura abierta: los jinetes van un 15 % más rápido
+export const geoSpeed = u => R.on.plains && (u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.def.speed >= 4.5)) ? 1.15 : 1;
 
 // ---------- tala del bosque denso ----------
 // clic derecho sobre el bosque con tropas: van al borde y, mientras alguna esté al lado, lo talan en unos segundos
@@ -214,6 +271,8 @@ export function updateRules(dt) {
   if (R.hide && (R.hideT = (R.hideT ?? 0) - dt) <= 0) { R.hideT = .3; updateHide(); }
   if (R.wet && (R.thirstT = (R.thirstT ?? 0) - dt) <= 0) { R.thirstT = 1; updateThirst(); }
   if (R.volcano) updateVolcano(dt);
+  if (R.on.ice) updateIce(dt);
+  if (R.treasures && (R.trT = (R.trT ?? 0) - dt) <= 0) { R.trT = .25; updateTreasures(); }
 }
 // para pruebas y para el panel: estado de las reglas
 export const rulesInfo = () => ({ on: R.on, cycle: R.cycle && { ...R.cycle }, bridges: R.bridges.map(b => b.built), jobs: R.jobs.length, volcano: R.volcano && R.volcano.phase });

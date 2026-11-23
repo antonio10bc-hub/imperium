@@ -129,10 +129,64 @@ export const GEO = (() => {
       M.special = islands.slice(0, 1); M.volcano = vol;
       return gaps.map(g => { let k = 1; while (k < 1.6 && f(cx + Math.cos(g) * 40 * k, cz + Math.sin(g) * 25 * k) < 1.25) k += .02; return [cx + Math.cos(g) * 40 * k, cz + Math.sin(g) * 25 * k]; });
     },
+    // ===== geografías nuevas =====
+    // valle helado: lagos helados que se cruzan a pie (6 = hielo) entre lomas nevadas
+    helado(M, r, s, F) {
+      const lakes = scatter(r, 7, 24, [36, 12, W - 36, H - 12], p => F.every(f => Math.hypot(f[0] - p[0], f[1] - p[1]) > 30)).map((p, i) => blobR(p[0], p[1], 7 + r() * 9, 5 + r() * 6, .7, s + 50 + i));
+      M.each((x, z) => { let v = 9; for (const f of lakes) v = Math.min(v, f(x, z));
+        if (v < 1) return [1, 6]; if (v < 1.12) return [1, 3];
+        return [2 + Math.max(0, fbm(x * .05, z * .05, s + 51) - .45) * 7, 0]; });
+      M.snow = true; return [];
+    },
+    // cañón: una garganta con río al fondo parte el mapa; se cruza por tres puentes (9 = tablero del puente) que se pueden destruir y reparar
+    canon(M, r, s, F) {
+      const P = wander(r, 96 + (r() - .5) * 20, -4, 96 + (r() - .5) * 20, H + 4, 22, 16), atZ = z => { for (let i = 0; i + 1 < P.length; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1]; if ((az - z) * (bz - z) <= 0) return ax + (bx - ax) * ((z - az) / ((bz - az) || 1)); } return 96; };
+      M.div = atZ;
+      const bz = [.2, .5, .8].map(k => H * k + (r() - .5) * 10), bridges = bz.map(z => [atZ(z), z]);
+      M.each((x, z) => { const d = Math.abs(x - atZ(z)) + (fbm(x * .15, z * .15, s + 60) - .5) * 1.4, onB = bz.some(b => Math.abs(z - b) < 1.6);
+        if (d < 3.4) return onB ? [4, 9] : [d < 2 ? -2 : -1, 0];
+        if (bz.some(b => Math.abs(z - b) < 6) && d < 12) return [4, 0];   // explanada a cada lado del puente
+        return [3.6 + fbm(x * .05, z * .05, s + 61) * 1.6, 0]; });
+      M.bridges = bridges; return bridges;
+    },
+    // costa: las dos fortalezas en lo alto de un acantilado; abajo, una llanura costera con playas. Pocas rampas unen los dos niveles
+    costa(M, r, s, F) {
+      for (const f of F) f[1] = 32 + r() * 18;
+      const zc = x => 72 + (fbm(x * .02, 1, s + 70) - .5) * 26, zs = x => 114 + (fbm(x * .03, 2, s + 71) - .5) * 14, ramps = [0, 1, 2, 3, 4].map(k => 22 + k * 37 + (r() - .5) * 14);
+      M.each((x, z) => { const c = zc(x), sea = zs(x);
+        if (z > sea) return [-2, 0]; if (z > sea - 4) return [1, 3];
+        if (Math.abs(z - c) < 2.5 && ramps.some(rx => Math.abs(x - rx) < 3)) return [3, 0];   // rampa
+        if (z > c) return [2 + Math.max(0, fbm(x * .06, z * .06, s + 72) - .55) * 3, 0];
+        return [4 + Math.max(0, fbm(x * .05, z * .05, s + 73) - .6) * 2, 0]; });
+      return ramps.map(rx => [rx, zc(rx)]);
+    },
+    // llanura abierta: casi sin obstáculos, unas charcas y arboledas sueltas; ideal para la caballería
+    llanura(M, r, s, F) {
+      const ponds = scatter(r, 4, 40, [40, 14, W - 40, H - 14], p => F.every(f => Math.hypot(f[0] - p[0], f[1] - p[1]) > 26)).map((p, i) => blobR(p[0], p[1], 3 + r() * 3, 2.5 + r() * 2, .6, s + 80 + i));
+      const groves = scatter(r, 7, 26, [30, 10, W - 30, H - 10], p => F.every(f => Math.hypot(f[0] - p[0], f[1] - p[1]) > 24)).map((p, i) => blobR(p[0], p[1], 2.5 + r() * 3, 2 + r() * 2, .8, s + 90 + i));
+      M.each((x, z) => { if (ponds.some(f => f(x, z) < 1)) return [-1, 0]; if (groves.some(f => f(x, z) < 1)) return [2, 1];
+        return [2 + Math.max(0, fbm(x * .04, z * .04, s + 81) - .62) * 4, 0]; });
+      return [];
+    },
+    // ciudad en ruinas: en el centro, manzanas con muros de piedra rotos (7 = ruina) entre calles; hay tesoros por las calles
+    ruinas(M, r, s, F) {
+      const cx = 96 + (r() - .5) * 16, cz = 64 + (r() - .5) * 12, city = blobR(cx, cz, 46, 34, .5, s + 100), G = 11;
+      const inCity = (x, z) => city(x, z) < 1, cell = v => Math.floor(((v % G) + G) % G);
+      M.each((x, z) => {
+        if (inCity(x, z)) { const u = cell(x - cx + 2), v = cell(z - cz + 2), bx = Math.floor((x - cx + 2) / G), bzz = Math.floor((z - cz + 2) / G);
+          if (u < 3 || v < 3) return [2, 0];   // calle
+          const edge = u === 3 || u === G - 1 || v === 3 || v === G - 1, gap = hsh(bx, bzz, s) < .5 ? Math.abs(u - 7) < 1.5 && (v === 3 || v === G - 1) : Math.abs(v - 7) < 1.5 && (u === 3 || u === G - 1);
+          if (edge && !gap && hsh(Math.floor(x), Math.floor(z), s + 3) > .12) return [4, 7];   // muro (con huecos)
+          return [2, hsh(Math.floor(x * 3), Math.floor(z * 3), s + 4) < .06 ? 7 : 0]; }   // patio con cascotes
+        return [2 + Math.max(0, fbm(x * .05, z * .05, s + 101) - .5) * 5, 0]; });
+      const streets = []; M.each((x, z, h, t) => { if (inCity(x, z) && h === 2 && (cell(x - cx + 2) < 3 || cell(z - cz + 2) < 3) && city(x, z) < .8) streets.push([x, z]); return null; });
+      const pick = []; for (let k = 0; k < 400 && pick.length < 7; k++) { const q = streets[(r() * streets.length) | 0]; if (q && pick.every(o => Math.hypot(o[0] - q[0], o[1] - q[1]) > 12)) pick.push(q); }
+      M.treasures = pick; return [[cx, cz]];
+    },
   };
 
 
-  const LIST = { rio: 'RÍO', cordillera: 'CORDILLERA', istmo: 'ISTMO', archipielago: 'ARCHIPIÉLAGO', barrancos: 'BARRANCOS', meseta: 'MESETA', afluentes: 'AFLUENTES', delta: 'DELTA', bosque: 'BOSQUE', oasis: 'DESIERTO', lago: 'CALDERA' };
+  const LIST = { rio: 'RÍO', cordillera: 'CORDILLERA', istmo: 'ISTMO', archipielago: 'ARCHIPIÉLAGO', barrancos: 'BARRANCOS', meseta: 'MESETA', afluentes: 'AFLUENTES', delta: 'DELTA', bosque: 'BOSQUE', oasis: 'DESIERTO', lago: 'CALDERA', helado: 'VALLE HELADO', canon: 'CAÑÓN', costa: 'COSTA', llanura: 'LLANURA', ruinas: 'RUINAS' };
   function build(id, seed) {
     const r = rngOf(seed), s = seed % 997, F = fortsFor(r), HMg = new Float32Array(MW * MD), TTg = new Uint8Array(MW * MD);
     const M = { each(fn) { for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, o = fn((gx + .5) / 2, (gz + .5) / 2, HMg[i], TTg[i]); if (o) { HMg[i] = Math.min(12, Math.round(o[0])); TTg[i] = o[1]; } } } };
@@ -140,8 +194,8 @@ export const GEO = (() => {
     for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 11 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
     const up = p => [p[0] * 2, p[1] * 2];
     return { HM: HMg, TT: TTg, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z / 2) * 2 : null,
-      volcano: M.volcano ? up(M.volcano) : null,
-      sea: id === 'istmo' || id === 'archipielago', river: id === 'afluentes', goldTop: id === 'meseta', oasis: id === 'oasis' };
+      volcano: M.volcano ? up(M.volcano) : null, bridges: (M.bridges || []).map(up), treasures: (M.treasures || []).map(up), snow: !!M.snow,
+      sea: id === 'istmo' || id === 'archipielago' || id === 'costa', river: id === 'afluentes', goldTop: id === 'meseta', oasis: id === 'oasis' };
   }
   return { build, LIST, keys: Object.keys(LIST) };
 })();

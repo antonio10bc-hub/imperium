@@ -12,7 +12,7 @@ import { mapCode, regions, spots } from './map.js';
 import { seed } from './noise.js';
 import { $, S, track } from './state.js';
 import { THUMB, alive, sel, sideState, units } from './units.js';
-import { BRIDGE_COST, buildBridge } from './rules.js';
+import { BRIDGE_COST, breakBridge, buildBridge, canBreak } from './rules.js';
 
 // ---------- HUD ----------
 // Grupos con F1–F5 (sin barra visible: la barra inferior queda libre para la selección)
@@ -95,7 +95,9 @@ function panelContent() {
   if (S.selSpot) {
     const s = S.selSpot;
     if (s.kind === 'bridge') {   // sitio de puente (río): se construye con oro
-      return `<div class="ph"><h3>PUENTE</h3><em>${s.built ? 'EN PIE' : 'SIN CONSTRUIR'}</em></div><div class="info"><div class="note g">${s.built ? 'LAS TROPAS CRUZAN EL RÍO POR AQUÍ.' : 'UN PASO NUEVO SOBRE EL RÍO, LEJOS DE LOS VADOS.'}</div></div>${s.built ? '' : `<div class="act"><button type="button" class="y" data-act="bridge" ${sideState[0].gold < BRIDGE_COST ? 'disabled' : ''}>CONSTRUIR · ${BRIDGE_COST} ORO</button></div>`}`;
+      const brk = s.breakable && s.built ? `<button type="button" data-act="breakBridge" ${canBreak(0, s) ? '' : 'disabled'} title="Necesitas una tropa cerca y que quede otro puente en pie">DESTRUIR</button>` : '';
+      const note = s.built ? (s.breakable ? 'SE PUEDE DESTRUIR PARA CORTAR EL PASO (CON UNA TROPA CERCA Y OTRO PUENTE EN PIE).' : 'LAS TROPAS CRUZAN EL RÍO POR AQUÍ.') : s.breakable ? 'DESTRUIDO. SE PUEDE REPARAR CON ORO.' : 'UN PASO NUEVO SOBRE EL RÍO, LEJOS DE LOS VADOS.';
+      return `<div class="ph"><h3>PUENTE</h3><em>${s.built ? 'EN PIE' : s.breakable ? 'DESTRUIDO' : 'SIN CONSTRUIR'}</em></div><div class="info"><div class="note g">${note}</div></div><div class="act">${brk}${s.built ? '' : `<button type="button" class="y" data-act="bridge" ${sideState[0].gold < BRIDGE_COST ? 'disabled' : ''}>${s.breakable ? 'REPARAR' : 'CONSTRUIR'} · ${BRIDGE_COST} ORO</button>`}</div>`;
     }
     if (s.kind === 'base') { const k = s.hp / GAME.baseHp;
       return `<div class="ph"><h3>${s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA RIVAL'}</h3></div><div class="info"><div class="hpb"><b style="width:${pct(k)};background:${TEAM[s.side].css}"></b><span>${Math.max(0, Math.ceil(s.hp))}/${GAME.baseHp}</span></div><div class="note">${s.side === 1 ? 'CLIC DERECHO CON TROPAS: ASALTAR.' : 'SI CAE, PIERDES LA PARTIDA.'}</div></div>`; }
@@ -205,6 +207,7 @@ export function init() {
     else if (a === 'assign') assignSelected();
     else if (a === 'upgrade' && S.selSpot) upgradeTown(0, S.selSpot);
     else if (a === 'bridge' && S.selSpot?.kind === 'bridge') { buildBridge(0, S.selSpot); refreshPanel(); }
+    else if (a === 'breakBridge' && S.selSpot?.kind === 'bridge') { breakBridge(0, S.selSpot); refreshPanel(); }
     else if (a === 'type') { const l = [...sel].filter(u => u.type === b.dataset.t); if (e.shiftKey) { l.forEach(u => sel.delete(u)); updateCtx(); } else setSelection(l, false); }
     else if (a === 'esc') { const h = heroOf(0); if (h) setSelection(h.escort.filter(u => u.type === b.dataset.t), false); }
     else if (a === 'shape') { const h = heroOf(0); if (h) { h.formShape = b.dataset.s; sfx('cmd'); } }

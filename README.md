@@ -9,8 +9,8 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 
 ## Qué tiene
 
-- Mapas de 384×256 con once geografías irregulares (río, cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto y caldera), elegibles en el menú o al azar. El generador descarta las semillas desequilibradas (mismos pueblos por mitad y distancias por camino parecidas).
-- Cada geografía tiene una regla propia (`src/rules.js`): puentes en el río, nieve y atalayas en los puertos de la cordillera, ciudadela en el istmo, mareas en el archipiélago, emboscadas en los barrancos, rampas estrechas en la meseta, crecidas en los afluentes, pantanos que ocultan en el delta, tala en el bosque, sed en el desierto y volcán en la caldera.
+- Mapas de 384×256 con dieciséis geografías (río, cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto, caldera, valle helado, cañón, costa, llanura y ruinas), elegibles en el menú o al azar. El generador descarta las semillas desequilibradas (mismos pueblos por mitad y distancias por camino parecidas).
+- Cada geografía tiene una regla propia (`src/rules.js`): puentes en el río, nieve y atalayas en los puertos de la cordillera, ciudadela en el istmo, mareas en el archipiélago, emboscadas en los barrancos, rampas estrechas en la meseta, crecidas en los afluentes, pantanos que ocultan en el delta, tala en el bosque, sed en el desierto, volcán en la caldera, hielo que se rompe en el valle helado, puentes destruibles en el cañón, jinetes rápidos en la llanura y tesoros en las ruinas.
 - Terreno con reglas: pantanos y bajíos frenan (más a los jinetes), el bosque denso no se atraviesa, los tiradores desde dos niveles por encima ganan alcance y daño, y la cima de la meseta da oro doble. Caminos entre pueblos y niebla de guerra.
 - Dos campamentos con guardianes neutrales: al conquistarlos dan jinetes arqueros (hasta 20 por campamento).
 - En el centro, una ciudadela guardada por colosos: quien la conquista recibe colosos (hasta 10), lentos, duros y cuerpo a cuerpo.

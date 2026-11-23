@@ -7,7 +7,7 @@ import { GEOT, HM, cellOf, roadCell, spots } from './map.js';
 import { NBO, cellX, cellZ, inMain, nearestNode, stepMask, walk } from './nav.js';
 import { BOX, FLASH, HULLMAT, VCMAT, basic, collectParts, discGeo, mergeBoxes, part, ring, ringGeo, world } from './render.js';
 import { S } from './state.js';
-import { geoSlow, swampMounted } from './rules.js';
+import { geoSlow, geoSpeed, swampMounted } from './rules.js';
 
 // ---------- Unidades ----------
 // Cada combinación civilización + tipo + bando se construye una sola vez con cajas y se funde en una plantilla
@@ -183,7 +183,7 @@ export const charging = u => (u.type === 'hero' ? u : u.leader)?.chargeT > 0;
 export const roadK = u => roadCell && roadCell[u.node] ? 1.35 : 1;   // los caminos dan velocidad
 const MOUNTED = u => u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.side < 2 && civOf(u.side).id !== 'mexica');
 export const slowK = u => (GEOT && GEOT[u.node] === 2 ? (MOUNTED(u) ? swampMounted() : .6) : 1) * geoSlow(u);   // pantano y bajío: más lentos, sobre todo a caballo
-export const spd = u => (u.leader ? Math.max(u.def.speed, u.leader.def.speed) : u.def.speed) * (charging(u) ? 1.6 : 1) * roadK(u) * slowK(u);
+export const spd = u => (u.leader ? Math.max(u.def.speed, u.leader.def.speed) : u.def.speed) * (charging(u) ? 1.6 : 1) * roadK(u) * slowK(u) * geoSpeed(u);
 export function stepToward(u, tx, tz, s, dt) {
   const dx = tx - u.pos.x, dz = tz - u.pos.z, L = Math.hypot(dx, dz); if (L < 1e-4) return false;
   const st = Math.min(s * dt, L), nx = u.pos.x + dx / L * st, nz = u.pos.z + dz / L * st, b = cellOf(nx, nz), a = u.node;
