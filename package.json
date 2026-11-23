@@ -5,6 +5,14 @@
   "description": "Estrategia en tiempo real con estética voxel (Three.js)",
   "scripts": {
     "start": "python3 -m http.server 8000",
-    "build": "node tools/build.mjs"
+    "build": "node tools/build.mjs",
+    "check": "node tools/check-modules.mjs src",
+    "smoke": "node tools/smoke.mjs",
+    "bench": "node tools/bench.mjs"
+  },
+  "devDependencies": {
+    "acorn": "^8.14.0",
+    "eslint-scope": "^8.2.0",
+    "playwright-core": "^1.49.0"
   }
 }

@@ -33,6 +33,14 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 - **ESC** (o el botón ☰) abre el menú de pausa: continuar, reiniciar el mismo mapa, rendirse o volver al menú principal.
 - El héroe aparece a la izquierda con sus tropas asignadas (hasta 50), que forman delante de él en bloque, línea o cuña.
 
+## Pruebas
+
+Tras `npm install` (solo herramientas de desarrollo) y `npm run build`:
+
+- `npm run check`: revisa los módulos de `src/` (importaciones sin usar, nombres sin importar, exportaciones que no existen).
+- `npm run smoke`: juega IA contra IA en cada geografía con Chrome sin ventana y falla si hay algún error (`-- --geo=canon,lago --min=4 --size=g`).
+- `npm run bench`: mapa grande con 200 tropas peleando; mide el paso de simulación y los fotogramas por segundo (`-- --units=300 --geo=helado`).
+
 ## Notas técnicas (rendimiento)
 
 - **Modelos fundidos**: tropas y edificios se escriben con cajas sueltas, pero `bake()` y `unitTemplate()` las funden en dos mallas (color por vértice y contorno). Cada combinación civilización + tipo + bando se construye una vez y todas las tropas la comparten; el rango es una variante de color de la plantilla.
