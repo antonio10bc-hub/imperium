@@ -119,7 +119,7 @@ function makeBridge(site) {
   const xs = site.cells.map(c => c % MW), zs = site.cells.map(c => (c / MW) | 0), x0 = Math.min(...xs), x1 = Math.max(...xs) + 1, z0 = Math.min(...zs), z1 = Math.max(...zs) + 1;
   const style = site.style || 'wood', hb = site.h ?? 1, b = { kind: 'bridge', style, x: (x0 + x1) / 2, z: (z0 + z1) / 2, y: hb, hb, x0, x1, z0, z1, cells: site.cells, h0: site.cells.map(c => site.h0 ?? HM[c]), built: false, breakable: !!site.breakable,
     name: { stone: 'PUENTE DE PIEDRA', fort: 'PUENTE FORTIFICADO', rope: 'PUENTE COLGANTE', wood: 'PUENTE' }[style], hp: BRIDGE_HP[style], maxHp: BRIDGE_HP[style], owner: -1, cap: [0, 0], towerCd: 0, roofs: [], group: new THREE.Group() };
-  const g = b.group, L = site.axis === 'x' ? x1 - x0 + 2 : z1 - z0 + 2, W = site.axis === 'x' ? z1 - z0 : x1 - x0, wood = 0x8a5a34, wood2 = 0x6a4224, stone = 0xb0aca0, stone2 = 0x8e8a80, rope = 0xc8b080;
+  const g = b.group, L = site.axis === 'x' ? x1 - x0 + .4 : z1 - z0 + .4, W = site.axis === 'x' ? z1 - z0 : x1 - x0, wood = 0x8a5a34, wood2 = 0x6a4224, stone = 0xb0aca0, stone2 = 0x8e8a80, rope = 0xc8b080;
   const P = (w, h, d, c, x, y, z, hull = true) => site.axis === 'x' ? part(g, w, h, d, c, x, y, z, hull) : part(g, d, h, w, c, z, y, x, hull);
   const deep = 1.8 + hb;
   if (style === 'rope') {   // colgante: tablones con huecos, cuerdas y postes altos en cada extremo; se comba en el centro
@@ -147,7 +147,7 @@ function makeBridge(site) {
 }
 export function setBridge(b, built) {
   b.built = built; b.group.visible = built; if (built) { b.hp = b.maxHp; b.group.position.y = b.hb - 1; b.group.rotation.set(0, 0, 0); }
-  b.cells.forEach((c, k) => { HM[c] = built ? b.hb : b.h0[k]; });
+  b.cells.forEach((c, k) => { HM[c] = built ? b.hb : b.h0[k]; if (b.breakable) blocked[c] = built ? 0 : 1; });   // en el cañón, sin puente no se pisa el fondo
   refreshCells(b.cells); if (!built) evict(b.cells, true);
   refreshFields();
 }

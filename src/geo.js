@@ -127,18 +127,22 @@ export const GEO = (() => {
     },
     lago(M, r, s, F) {   // un gran lago con un volcán enorme en el centro: ríos de lava bajan por sus laderas hasta el agua; fumarolas en la orilla
       const cx = 96 + (r() - .5) * 14, cz = 64 + (r() - .5) * 8, f = blobR(cx, cz, 50 + r() * 6, 33 + r() * 4, .6, s + 26), R = 15;
-      const gaps = [0, 1, 2].map(i => (i / 3) * Math.PI * 2 + r() * 1.6), flows = [0, 1, 2, 3, 4].map(i => i * 1.257 + (r() - .5) * .6);
-      const ang = (a, b) => { let d = Math.abs(a - b) % (Math.PI * 2); return d > Math.PI ? Math.PI * 2 - d : d; };
+      const gaps = [0, 1, 2].map(i => (i / 3) * Math.PI * 2 + r() * 1.6);
+      // volcán irregular: radio que cambia con el ángulo, cráter desplazado y coladas de lava que serpentean con anchuras distintas
+      const Ra = a => R * (1 + (fbm(Math.cos(a) * 1.4 + 3, Math.sin(a) * 1.4 + 5, s + 40, 3) - .5) * .7), crx = cx + (r() - .5) * 4, crz = cz + (r() - .5) * 3;
+      const flows = Array.from({ length: 3 + (r() * 3 | 0) }, (_, i) => { const a = i * 6.283 / 5 + r() * 1.4, rr = Ra(a) * 1.02; return { P: wander(r, crx, crz, cx + Math.cos(a) * rr, cz + Math.sin(a) * rr, 7, 9), w: .45 + r() * .55 }; });
       const fum = [0, 1, 2].map(i => { const a = i * 2.1 + r() * 1.2; let k = 1; while (k < 1.6 && f(cx + Math.cos(a) * 50 * k, cz + Math.sin(a) * 33 * k) < 1.12) k += .02; return [cx + Math.cos(a) * 50 * k, cz + Math.sin(a) * 33 * k]; });
       M.each((x, z) => { const v = f(x, z), dv = Math.hypot(x - cx, z - cz);
-        if (dv < R) { const a = Math.atan2(z - cz, x - cx), lava = dv > 2.6 && flows.some(fa => ang(a, fa) * dv < .9 + dv * .04);
-          return [dv < 2.6 ? 8 : 2 + (R - dv) * .78 + fbm(x * .4, z * .4, s + 3, 2), lava || dv < 2.6 ? 10 : 5]; }
+        const av = Math.atan2(z - cz, x - cx), ra = Ra(av);
+        if (dv < ra) { const dc = Math.hypot(x - crx, z - crz), k = 1 - dv / ra, crater = dc < 2.2 + fbm(x * .5, z * .5, s + 41, 2);
+          const lava = !crater && flows.some(f => polyD(x, z, f.P) < f.w * (1 + fbm(x * .3, z * .3, s + 42, 2) * .8));
+          return [crater ? 8 : 2 + Math.pow(k, .8) * 11 + (fbm(x * .35, z * .35, s + 3, 3) - .5) * 2.4, crater || lava ? 10 : 5]; }
         if (v < 1) return [v < .85 ? -2 : -1, 0];
         if (v < 1.08) return [1, 3];
         const a = Math.atan2(z - cz, x - cx), gap = gaps.some(g => Math.abs(((a - g + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < .22);
         if (v < 1.45 && !gap) return [4 + fbm(x * .1, z * .1, s + 27) * 3, 0];
         return [2 + Math.max(0, fbm(x * .05, z * .05, s + 28) - .5) * 5, 0]; });
-      M.volcano = [cx, cz]; M.lavaEnds = flows.map(a => [cx + Math.cos(a) * R, cz + Math.sin(a) * R]); M.fumaroles = fum; M.special = [];
+      M.volcano = [crx, crz]; M.lavaEnds = flows.map(f => f.P[f.P.length - 1]); M.fumaroles = fum; M.special = [];
       return gaps.map(g => { let k = 1; while (k < 1.6 && f(cx + Math.cos(g) * 50 * k, cz + Math.sin(g) * 33 * k) < 1.25) k += .02; return [cx + Math.cos(g) * 50 * k, cz + Math.sin(g) * 33 * k]; });
     },
     // ===== geografías nuevas =====
@@ -156,15 +160,20 @@ export const GEO = (() => {
       M.snow = true; return [];
     },
     // cañón: una garganta con río al fondo parte el mapa; se cruza por tres puentes (9 = tablero del puente) que se pueden destruir y reparar
-    canon(M, r, s, F) {   // una garganta ancha con río al fondo parte el mapa; tres puentes distintos (9 = tablero): de piedra, fortificado y colgante
+    canon(M, r, s, F) {   // una garganta seca (17 = fondo de roca) parte el mapa; en el centro se abre en una cuenca redonda con una isla (la ciudadela) unida a cada orilla por un puente; otro puente al norte y otro al sur
       const P = wander(r, 96 + (r() - .5) * 20, -4, 96 + (r() - .5) * 20, H + 4, 22, 16), atZ = z => { for (let i = 0; i + 1 < P.length; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1]; if ((az - z) * (bz - z) <= 0) return ax + (bx - ax) * ((z - az) / ((bz - az) || 1)); } return 96; };
       M.div = atZ;
-      const bz = [.2, .5, .8].map(k => H * k + (r() - .5) * 8), bridges = bz.map(z => [atZ(z), z]);
-      M.each((x, z) => { const d = Math.abs(x - atZ(z)) + (fbm(x * .15, z * .15, s + 60) - .5) * 1.6, onB = bz.some(b => Math.abs(z - b) < 2.4);
-        if (d < 5.4) return onB ? [4, 9] : [d < 3.4 ? -2 : -1, 0];
-        if (bz.some(b => Math.abs(z - b) < 7) && d < 15) return [4, 0];   // explanada a cada lado del puente
+      const zc = H * .5 + (r() - .5) * 6, ic = [atZ(zc), zc], isl = blobR(ic[0], ic[1], 9, 9.5, .35, s + 63), basin = blobR(ic[0], ic[1], 24, 21, .3, s + 64);
+      const bz = [H * .17 + (r() - .5) * 6, H * .83 + (r() - .5) * 6];
+      const bridges = [[atZ(bz[0]), bz[0], 14], [ic[0] - 16, zc, 10], [ic[0] + 16, zc, 10], [atZ(bz[1]), bz[1], 14]];
+      M.each((x, z) => {
+        const nearB = bz.some(b => Math.abs(z - b) < 4.5) || Math.abs(z - zc) < 4.5, d = Math.abs(x - atZ(z)) + (nearB ? 0 : (fbm(x * .15, z * .15, s + 60) - .5) * 1.6);
+        const inBasin = basin(x, z) < 1, onIsl = isl(x, z) < 1, onB = bz.some(b => Math.abs(z - b) < 2.4) || (Math.abs(z - zc) < 2.4 && inBasin);
+        if (onIsl) return [4, 0];
+        if (d < 5.4 || inBasin) return onB ? [4, 9] : [1, 17];
+        if ((bz.some(b => Math.abs(z - b) < 7) && d < 15) || basin(x, z) < 1.25) return [4, 0];   // explanadas junto a los puentes y alrededor de la cuenca
         return [3.6 + fbm(x * .05, z * .05, s + 61) * 1.6, 0]; });
-      M.bridges = bridges; M.bridgeStyles = ['stone', 'fort', 'rope']; return bridges;
+      M.bridges = bridges; M.bridgeStyles = ['stone', 'stone', 'stone', 'rope']; M.confluence = ic; return bridges.map(b => [b[0], b[1]]);
     },
     // costa: las dos fortalezas en lo alto de un acantilado; abajo, una llanura costera con playas. Pocas rampas unen los dos niveles
     costa(M, r, s, F) {
@@ -244,7 +253,7 @@ export const GEO = (() => {
     for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 11 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
     const up = p => [p[0] * MW / W, p[1] * MD / H];
     return { HM: HMg, TT: TTg, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z * H / MD) * MW / W : null,
-      volcano: M.volcano ? up(M.volcano) : null, lavaEnds: (M.lavaEnds || []).map(up), fumaroles: (M.fumaroles || []).map(up), confluence: M.confluence ? up(M.confluence) : null, bridgeStyles: M.bridgeStyles || [], bridges: (M.bridges || []).map(up), treasures: (M.treasures || []).map(up), snow: !!M.snow,
+      volcano: M.volcano ? up(M.volcano) : null, lavaEnds: (M.lavaEnds || []).map(up), fumaroles: (M.fumaroles || []).map(up), confluence: M.confluence ? up(M.confluence) : null, bridgeStyles: M.bridgeStyles || [], bridges: (M.bridges || []).map(b => [...up(b), (b[2] || 13) * MW / W]), treasures: (M.treasures || []).map(up), snow: !!M.snow,
       sea: id === 'istmo' || id === 'archipielago' || id === 'costa', river: id === 'afluentes', goldTop: id === 'meseta', oasis: id === 'oasis' };
   }
   // una frase para el menú: qué hace especial a cada geografía
@@ -254,7 +263,7 @@ export const GEO = (() => {
     afluentes: 'Dos ríos se juntan en el centro. Las crecidas cierran los vados.', delta: 'Canales y pantanos que ocultan a las tropas y atascan a los jinetes.',
     bosque: 'Un bosque cerrado: tala sendas para avanzar y encontrar los claros escondidos.', oasis: 'Dunas y sed. Pocos oasis, muy valiosos.',
     lago: 'Un lago con un volcán gigante en el centro que entra en erupción.', helado: 'Lagos helados: el hielo se rompe si cargas demasiadas tropas encima.',
-    canon: 'Tres puentes, una garganta. Quien controle los pasos, controla el mapa.', costa: 'Las fortalezas en lo alto del acantilado y pocas rampas hasta el llano.',
+    canon: 'Una garganta seca con una isla fortificada en el centro. Quien controle los puentes, controla el mapa.', costa: 'Las fortalezas en lo alto del acantilado y pocas rampas hasta el llano.',
     llanura: 'Campo abierto para la caballería: los jinetes van más rápido.', ruinas: 'Restos de una ciudad antigua, con tesoros escondidos entre los muros.',
     mezcla: 'Dos geografías al azar, una en cada mitad, cada una con su regla.' };
   const NAME = { ...LIST, rio: 'RÍO' };   // el río clásico ya no se elige, pero queda como mapa de reserva

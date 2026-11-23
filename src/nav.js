@@ -16,7 +16,7 @@ function canStep(x, z, nx, nz) {
 // y así las búsquedas (BFS, seguir un campo) no repiten las comprobaciones de desnivel y esquinas en cada paso
 // blocked: casillas cerradas por una regla de la geografía (marea alta, crecida, hielo roto…), aunque el terreno se pueda pisar
 export let blocked = null;
-const SOLID = []; SOLID[1] = SOLID[10] = SOLID[12] = SOLID[16] = 1;   // bosque denso, lava, arrecife y bosque claro no se pisan
+const SOLID = []; SOLID[1] = SOLID[10] = SOLID[12] = SOLID[16] = SOLID[17] = 1;   // bosque denso, lava, arrecife, bosque claro y el fondo del cañón no se pisan
 const baseWalk = (x, z) => { const i = idx(x, z); return HM[i] >= 1 && !SOLID[GEOT[i]] && !blocked[i] && !wallHit(x + .5, z + .5) ? 1 : 0; };
 export function buildNav() {
   walk = new Uint8Array(N); inMain = new Uint8Array(N); stepMask = new Uint8Array(N); blocked = new Uint8Array(N);
