@@ -141,6 +141,11 @@ function featureAt(x, z, side, B) {
     case 'salt': return f < .17 ? 0xece6d6 : 0xd8d0b4;
     case 'paddy': return x % 6 === 0 || z % 6 === 0 ? 0x7a9a5a : 0x7ab8c8;
     case 'maize': return z % 2 ? 0xa8b44c : 0x7a9a40;
+    case 'scrub': return f < .15 ? 0xd8d4c4 : 0x8a9a5a;   // Grecia: lajas de caliza entre matorral
+    case 'heath': return f < .15 ? 0x8a6a8a : 0x6a7a5a;   // vikingos: brezal morado
+    case 'garden': return x % 7 === 0 || z % 7 === 0 ? 0x5a9ab8 : (x + z) % 2 ? 0x6aa04a : 0x8ab85a;   // Persia: jardines cuadrados con canales
+    case 'steppe': return f < .14 ? 0xc8c08a : 0xa8b070;   // mongoles: hierba seca
+    case 'tea': return z % 3 === 0 ? 0x8a7a5a : 0x4a8040;   // Japón: hileras de té
     case 'rocks': return f < .15 ? 0x8a8e88 : 0x6a9a48;
   }
   return -1;
@@ -316,6 +321,10 @@ function treeBoxes(L, type, cx, h, cz, r2) {
     case 'bamboo': for (let k = 0; k < 3; k++) L.box(cx + (k - 1) * .22, h + .6 + k * .05, cz + (k % 2) * .16 - .08, .08, 1.2 + k * .1, .08, 0x7ab04a); L.box(cx, h + 1.15, cz, .5, .1, .3, 0x5f9a3e); break;
     case 'ceiba': L.box(cx, h + .5, cz, .2, 1, .2, 0x8a7a5a); L.box(cx, h + 1.1, cz, 1.3, .28, 1.3, 0x2f6a35); L.box(cx, h + 1.3, cz, .8, .2, .8, 0x3a7a3e); break;
     case 'jungle': L.box(cx, h + .28, cz, .95, .56, .95, 0x2f6a35); L.box(cx + .15, h + .66, cz - .1, .5, .3, .5, 0x3a8a45); break;
+    case 'birch': L.box(cx, h + .45, cz, .14, .9, .14, 0xe8e4dc); L.box(cx, h + .3, cz, .15, .06, .15, 0x2a2a2a); L.box(cx, h + .95 + t * .2, cz, .62, .6 + t * .3, .62, 0x8ab060); break;
+    case 'plane': L.box(cx, h + .3, cz, .2, .6, .2, 0xa8a090); L.box(cx, h + .75 + t * .2, cz, 1.2, .5 + t * .2, 1.2, 0x5a8a3a); L.box(cx + .1, h + 1.15 + t * .3, cz - .1, .7, .26, .7, 0x6a9a48); break;
+    case 'shrub': L.box(cx, h + .18, cz, .7, .36, .7, 0x7a8a4a); L.box(cx + .1, h + .42, cz, .36, .18, .36, 0x8a9a5a); break;
+    case 'sakura': L.box(cx, h + .3, cz, .16, .6, .16, 0x5a3a2a); L.box(cx, h + .72 + t * .15, cz, .95, .45 + t * .2, .95, 0xf0b8c8); L.box(cx + .12, h + 1.05 + t * .3, cz - .1, .5, .22, .5, 0xf8d0dc); break;
     case 'oak': L.box(cx, h + .2, cz, .2, .4, .2, 0x5a3a24); L.box(cx, h + .3 + t * .5, cz, .95, t, .95, 0x2f5a30); L.box(cx, h + .35 + t, cz, .6, .3, .6, 0x3a6a38); break;
     default: L.box(cx, h + .15, cz, .2, .3, .2, TP.trunk); L.box(cx, h + .3 + t * .35, cz, .78, t * .7, .78, TP.pine); L.box(cx, h + .3 + t * .9, cz, .42, t * .4, .42, TP.pine);   // pino
   }
@@ -372,6 +381,9 @@ function buildVoxels() {
     else if (!nearFlat(cx, cz, 1) && !roadCell[i] && h > 1) {   // piezas pequeñas del paisaje
       const side = sideAt(cx, cz), B = civOf(side).map;
       if (B.feature === 'rocks' && featureAt(x, z, side, B) === 0x8a8e88 && hash(x, 9, z) < .18) { L.box(cx, h + .18, cz, .62, .36, .5, 0x8a8a86); L.box(cx + .15, h + .42, cz + .05, .34, .2, .3, 0x9a9a96); }
+      else if (B.feature === 'scrub' && featureAt(x, z, side, B) === 0xd8d4c4 && hash(x, 9, z) < .14) { L.box(cx, h + .16, cz, .6, .32, .5, 0xe0dccc); L.box(cx - .12, h + .38, cz + .05, .3, .16, .26, 0xd0ccbc); }
+      else if (B.feature === 'heath' && featureAt(x, z, side, B) === 0x8a6a8a && hash(x, 9, z) < .12) { L.box(cx, h + .2, cz, .66, .4, .54, 0x8a8a86); L.box(cx + .14, h + .46, cz, .3, .18, .3, 0x9a9a96); }
+      else if (B.feature === 'tea' && featureAt(x, z, side, B) === 0x4a8040 && x % 2) L.box(cx, h + .2, cz, .9, .4, .7, 0x3f7a3a);
       else if (B.feature === 'maize' && featureAt(x, z, side, B) >= 0 && x % 2 === 0 && z % 2) { L.box(cx, h + .3, cz, .1, .6, .1, 0x8ab04a); L.box(cx, h + .6, cz, .12, .14, .12, 0xe0c050); }
     }
   }

@@ -18,7 +18,7 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 - En el centro, una ciudadela guardada por colosos: quien la conquista recibe colosos (hasta 10), lentos, duros y cuerpo a cuerpo.
 - Una atalaya en cada mitad, en la franja central: no da oro, pero da visión lejana y su torre dispara más lejos.
 - Oro con rendimiento decreciente: cada pueblo propio rinde un 8 % menos que el anterior (mínimo 45 %).
-- Seis civilizaciones (Roma, Cartago, Han, mexicas, Egipto y galos) con aspecto, música y ventaja propios (legiones, comercio, ballestas, conquista rápida, carros y furia); se eligen en el menú para ti y para el rival, o al azar.
+- Once civilizaciones (Roma, Cartago, Han, mexicas, Egipto, galos, Grecia, vikingos, Persia, mongoles y Japón) con aspecto, música y ventaja propios (legiones, comercio, ballestas, conquista rápida, carros, furia, falange, saqueo, inmortales, estepa y bushido); se eligen en el menú para ti y para el rival, o al azar.
 - Cada civilización trae su bioma, sus pueblos y una fortaleza con muralla y distribución propias; el mapa se reparte 50/50 entre las dos.
 - Para añadir una civilización nueva, sigue [docs/checklist-civilizacion.md](docs/checklist-civilizacion.md).
 - Barra inferior: minimapa, panel de selección (cuartel, altar, pueblos con mejoras, tropas agrupadas por tipo) y herramientas.

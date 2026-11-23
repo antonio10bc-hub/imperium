@@ -163,6 +163,141 @@ const CIVS = [
     P(g, .08, 2.1, .08, BRONZE, .32, 1.9, .1); P(g, .34, .2, .44, BRONZE, .32, 3, .14); P(g, .14, .14, .14, BRONZE, .32, 3.02, .42); P(g, .36, .3, .06, T, .32, 2.55, .1); },
   god(g, T) { godBody(g, 0x2f6a35, 0x3f7a45, SK.tan, T); P(g, .36, .06, .3, GOLD, 0, 1.13, 0); for (const s of [-1, 1]) { P(g, .07, .5, .07, 0x8a6a44, s * .2, 1.68, 0); P(g, .26, .07, .07, 0x8a6a44, s * .32, 1.82, 0); P(g, .07, .26, .07, 0x8a6a44, s * .42, 1.98, 0); P(g, .07, .2, .07, 0x8a6a44, s * .28, 2.04, 0); }
     P(g, .3, .2, .12, 0x7a5a34, 0, 1.2, .16); P(g, .7, .5, .06, T, 0, .95, -.24); P(g, .12, .3, .12, 0x9a9a9a, .42, .82, .12); } },
+{ id: 'grecia', name: 'GRECIA', era: 'Época clásica · s. V a. C.', own: 0xc8913c,
+  tag: 'Acrópolis de mármol, frisos pintados y tejas de terracota. Hoplitas con escudo redondo y lanza: falanges lentas pero muy duras.',
+  biome: 0x9ab860, plaza: 0xd8d0bc, sw: [0xece6d8, 0x4a6a9a, 0xc8913c, 0xb8422a],
+  names: ['HOPLITA', 'TOXOTA', 'CABALLERO', 'ESTRATEGO', 'ATENEA'],
+  notes: ['<b>Escudo:</b> aspis redondo y grande de bronce con el emblema del bando', '<b>Casco:</b> corintio que tapa la cara, con cresta a lo largo', '<b>Héroe:</b> estratego en caballo negro con lanza larga y aspis'],
+  castle(g, T) { const R = 0xb8ae96, M = 0xe8e2d4; P(g, 7, 1.1, 5.2, R, 0, .55, 0); P(g, 6.4, .3, 4.6, 0xd8d0bc, 0, 1.25, 0); P(g, 2, .55, 1, 0xd8d0bc, 0, .28, 3.1); P(g, 2, .55, .6, 0xd8d0bc, 0, .83, 2.85);
+    for (let i = 0; i < 7; i++) for (const z of [-1.8, 1.8]) P(g, .38, 2.4, .38, WHITE, -2.7 + i * .9, 2.6, z);
+    for (let j = 1; j < 4; j++) for (const x of [-2.7, 2.7]) P(g, .38, 2.4, .38, WHITE, x, 2.6, -1.8 + j * .9);
+    P(g, 4.2, 2.2, 2.4, 0xe0d8c4, 0, 2.5, 0); P(g, 1, 1.5, .1, 0x3a2a14, 0, 2.15, 1.22); P(g, 6.2, .35, 4.2, M, 0, 3.97, 0); P(g, 6.3, .26, 4.3, 0x4a6a9a, 0, 4.27, 0);
+    for (let i = 0; i < 4; i++) { const w = 6.2 - i * 1.55; P(g, w, .3, 4.5, 0xb8422a, 0, 4.55 + i * .3, 0); P(g, w - .2, .28, .1, M, 0, 4.55 + i * .3, 2.26, false); }
+    P(g, .5, .4, .3, T, 0, 5.85, 2.1); P(g, .1, 2, .1, WOOD, 3.3, 2.1, 2.3); P(g, .8, .6, .06, T, 3.72, 2.7, 2.3); },
+  barracks(g, T) { P(g, 3.8, .3, 2.6, 0xd8d0bc, 0, .15, 0); P(g, 3.4, 1.4, 1.2, 0xe0d8c4, 0, 1, -.5); for (let i = 0; i < 5; i++) P(g, .24, 1.4, .24, WHITE, -1.5 + i * .75, 1, .95);
+    P(g, 3.8, .25, 2.6, 0xe8e2d4, 0, 1.82, 0); for (let i = 0; i < 3; i++) P(g, 3.8 - i * 1.1, .25, 2.7, 0xb8422a, 0, 2.07 + i * .25, 0);
+    for (const x of [-1, 0, 1]) { P(g, .5, .5, .08, BRONZE, x, 1.1, .14); P(g, .2, .2, .06, T, x, 1.1, .19, false); } P(g, .08, 2.6, .08, WOOD, 2.3, 1.3, 1.2); P(g, .5, .5, .06, T, 2.56, 2.2, 1.2); },
+  house(g) { P(g, 1.8, 1.1, 1.5, WHITE, 0, .55, 0); P(g, 1.82, .12, 1.52, 0x4a6a9a, 0, 1.04, 0, false); for (let i = 0; i < 2; i++) P(g, 2 - i * .8, .25, 1.7, 0xb8422a, 0, 1.22 + i * .25, 0);
+    P(g, .16, .4, .16, 0x6a5a44, 1.4, .2, .5); P(g, .8, .45, .7, 0x8a9a6a, 1.4, .6, .5); },
+  sword(g, T) { legs(g, BRONZE); torso(g, 0xe8dcc0); P(g, .5, .3, .34, BRONZE, 0, .68, 0); P(g, .5, .12, .34, T, 0, .4, 0); head(g, SK.tan);
+    P(g, .36, .36, .36, BRONZE, 0, 1, 0); P(g, .24, .06, .06, 0x1a1a1a, 0, 1.02, .18, false); P(g, .08, .2, .5, T, 0, 1.28, -.02);
+    P(g, .1, .74, .74, BRONZE, -.34, .62, .04); P(g, .06, .3, .3, T, -.41, .62, .04); P(g, .05, 1.4, .05, WOOD, .31, .85, .16); P(g, .08, .18, .08, STEEL, .31, 1.62, .16); },
+  bow(g, T) { legs(g, 0x8a6a3a); torso(g, 0xd8c8a0); P(g, .5, .12, .34, T, 0, .76, 0); head(g, SK.tan); P(g, .34, .2, .34, T, 0, 1.15, 0); P(g, .2, .18, .2, T, 0, 1.31, .06);
+    P(g, .06, .82, .06, WOOD, -.3, .64, .12); P(g, .16, .42, .14, 0x7a4824, .1, .64, -.22); },
+  horse(g, T) { horse(g, 0x9a6a44, 0x8a5a34, 0x5a3a24, null); rider(g, 0xe8dcc0, SK.tan); P(g, .46, .42, .06, T, 0, 1.24, -.22); P(g, .44, .06, .44, BRONZE, 0, 1.76, -.05); P(g, .24, .14, .24, BRONZE, 0, 1.84, -.05);
+    for (const d of [0, .1]) P(g, .04, .04, 1.2, WOOD, .26 + d, 1.32, .35); },
+  hero(g, T) { horse(g, 0x2a2a2e, 0x1e1e22, 0x141418, T); rider(g, BRONZE, SK.tan); P(g, .5, .6, .08, T, 0, 1.15, -.24); P(g, .3, .3, .3, GOLD, 0, 1.64, -.05); P(g, .08, .34, .62, T, 0, 1.94, -.05);
+    P(g, .05, .05, 2, WOOD, .27, 1.45, .5); P(g, .08, .08, .22, STEEL, .27, 1.45, 1.6); P(g, .08, .62, .62, BRONZE, -.28, 1.25, 0); P(g, .06, .26, .26, T, -.33, 1.25, 0); },
+  god(g, T) { godBody(g, WHITE, 0xe8e2d4, SK.light, T); P(g, .38, .2, .38, GOLD, 0, 1.53, 0); P(g, .08, .26, .52, T, 0, 1.76, 0); P(g, .3, .22, .06, GOLD, 0, 1.0, .2);
+    P(g, .07, 1.8, .07, WOOD, .42, 1, .12); P(g, .1, .22, .1, GOLD, .42, 1.98, .12); P(g, .08, .62, .62, GOLD, -.42, .85, .05); P(g, .06, .24, .24, T, -.47, .85, .05); P(g, .14, .16, .12, 0x8a7a6a, -.3, 1.24, 0); } },
+
+{ id: 'vikingos', name: 'VIKINGOS', era: 'Era vikinga · s. IX', own: 0x4a6a7a,
+  tag: 'Casas largas de madera con tejado de hierba, escudos redondos pintados y hachas danesas. Saqueadores que toman pueblos muy deprisa.',
+  biome: 0x5f8a5a, plaza: 0x9a8a6a, sw: [0x6a4a2e, 0x5a7a3a, 0x9aa0a8, 0xc8b898],
+  names: ['HACHERO', 'ARQUERO', 'JINETE', 'JARL', 'ODÍN'],
+  notes: ['<b>Escudo:</b> redondo de madera pintado del color del bando, con umbo de hierro', '<b>Arma:</b> hacha danesa y casco de hierro con nasal (sin cuernos)', '<b>Héroe:</b> el jarl, a pie, con hacha de dos manos y capa de piel'],
+  castle(g, T) { const W = 0x6a4a2e, TU = 0x5a7a3a; P(g, 6.6, .4, 3.8, 0x8a8a86, 0, .2, 0); P(g, 6.2, 1.7, 3.2, W, 0, 1.25, 0);
+    for (let i = 0; i < 4; i++) P(g, 6.6, .36, 3.7 - i * .95, i % 2 ? 0x6a8a46 : TU, 0, 2.28 + i * .36, 0);
+    for (const s of [-1, 1]) { P(g, .2, .7, .2, W, s * 3.2, 3.6, 0); P(g, .44, .2, .2, W, s * 3.38, 3.95, 0); }
+    P(g, 1, 1.3, .1, 0x2a1a10, 0, .85, 1.62); for (const [x, c] of [[-2.3, T], [-1.4, 0xc8b898], [1.4, T], [2.3, 0xc8b898]]) { P(g, .55, .55, .08, c, x, 1.55, 1.64); P(g, .16, .16, .06, 0x9aa0a8, x, 1.55, 1.7, false); }
+    P(g, .5, 1.4, .3, 0x8a8a86, 3.6, .7, 2.1); P(g, .1, 3, .1, WOOD, -3.6, 1.5, 1.9); P(g, .8, .6, .06, T, -3.18, 2.6, 1.9); },
+  barracks(g, T) { P(g, 3.6, 1.2, 2, 0x6a4a2e, 0, .6, 0); for (let i = 0; i < 3; i++) P(g, 3.9, .32, 2.3 - i * .7, i % 2 ? 0x6a8a46 : 0x5a7a3a, 0, 1.36 + i * .32, 0); P(g, .8, .9, .1, 0x2a1a10, 0, .45, 1.02);
+    P(g, 1.2, .1, .1, WOOD, 2.6, .9, .4); for (const z of [.1, .4, .7]) P(g, .06, .9, .06, WOOD, 2.6, .5, z); P(g, .5, .5, .08, T, 2.6, .6, .9); },
+  house(g) { P(g, 1.9, .9, 1.2, 0x6a4a2e, 0, .45, 0); for (let i = 0; i < 3; i++) P(g, 2.1, .3, 1.4 - i * .45, 0x5a7a3a, 0, 1.05 + i * .3, 0); P(g, .4, .6, .06, 0x2a1a10, 0, .3, .62); P(g, .6, .4, .4, 0x8a6a4a, 1.4, .2, .4); },
+  sword(g, T) { legs(g, 0x6a5a44); torso(g, 0xc8b898); P(g, .52, .14, .36, 0x8a7a6a, 0, .86, 0); P(g, .5, .08, .34, 0x4a3a24, 0, .5, 0); head(g, SK.light); P(g, .26, .16, .08, 0xc8803a, 0, .88, .17);
+    P(g, .34, .16, .34, 0x9aa0a8, 0, 1.15, 0); P(g, .06, .18, .06, 0x9aa0a8, 0, 1.02, .18);
+    P(g, .1, .64, .64, T, -.33, .62, .04); P(g, .12, .18, .18, 0x9aa0a8, -.39, .62, .04); P(g, .06, .8, .06, WOOD, .31, .72, .16); P(g, .06, .28, .22, STEEL, .31, 1.02, .27); },
+  bow(g, T) { legs(g, 0x6a5a44); torso(g, 0x5a6a4a); P(g, .5, .12, .34, T, 0, .76, 0); head(g, SK.light); P(g, .26, .14, .08, 0xc8803a, 0, .9, .17); P(g, .38, .18, .38, 0x8a7a6a, 0, 1.15, 0);
+    P(g, .06, .9, .06, WOOD, -.3, .66, .12); P(g, .16, .42, .14, 0x7a4824, .1, .64, -.22); },
+  horse(g, T) { horse(g, 0xb8a888, 0xa89878, 0x6a5a44, T); rider(g, 0x9aa0a8, SK.light); P(g, .22, .12, .08, 0xc8803a, 0, 1.5, .1); P(g, .3, .16, .3, 0x9aa0a8, 0, 1.79, -.05); P(g, .06, .14, .06, 0x9aa0a8, 0, 1.68, .12);
+    P(g, .08, .52, .52, T, -.28, 1.25, -.05); P(g, .05, .05, 1.5, WOOD, .27, 1.3, .4); P(g, .07, .07, .2, STEEL, .27, 1.3, 1.2); },
+  hero(g, T) { legs(g, 0x4a3a2a); torso(g, 0x9aa0a8); P(g, .5, .08, .34, GOLD, 0, .5, 0); P(g, .58, .7, .08, 0x8a7a6a, 0, .64, -.2); P(g, .6, .16, .4, 0x8a7a6a, 0, .88, 0); P(g, .6, .08, .1, T, 0, .98, -.2);
+    head(g, SK.light); P(g, .28, .3, .08, 0xd8a050, 0, .82, .17); P(g, .36, .18, .36, 0x9aa0a8, 0, 1.15, 0); P(g, .38, .05, .38, GOLD, 0, 1.08, 0); P(g, .3, .08, .06, 0x9aa0a8, 0, 1.02, .17);
+    P(g, .07, 1.3, .07, WOOD, .32, .85, .18); P(g, .06, .38, .32, STEEL, .32, 1.4, .33); P(g, .1, .66, .66, T, -.34, .62, .04); P(g, .12, .2, .2, GOLD, -.4, .62, .04); },
+  god(g, T) { godBody(g, 0x4a4a5a, 0x5a5a6a, SK.light, T); P(g, .62, .06, .62, 0x3a3a44, 0, 1.52, 0); P(g, .3, .22, .3, 0x3a3a44, 0, 1.65, 0); P(g, .3, .4, .1, 0xe8e8e8, 0, 1.12, .18); P(g, .08, .08, .04, 0x1a1a1a, .08, 1.36, .18, false);
+    P(g, .07, 1.8, .07, 0x6a4a2e, .42, 1, .12); P(g, .1, .24, .1, GOLD, .42, 1.98, .12); for (const s of [-1, 1]) P(g, .16, .14, .26, 0x1a1a22, s * .32, 1.24, 0); } },
+
+{ id: 'persia', name: 'PERSIA', era: 'Imperio aqueménida · s. V a. C.', own: 0xd8782a,
+  tag: 'Palacios de columnas con capiteles de toro, ladrillo vidriado azul y jardines con canales. Inmortales y arqueros que aguantan más que nadie.',
+  biome: 0xb8b07a, plaza: 0xd8c8a8, sw: [0xd8c8a8, 0x2a8a8a, 0xe8c050, 0x7a2a5a],
+  names: ['INMORTAL', 'ARQUERO', 'CATAFRACTO', 'GRAN REY', 'AHURA MAZDA'],
+  notes: ['<b>Escudo:</b> de mimbre (spara) en forma de ocho', '<b>Silueta:</b> tiara de tela y túnica larga hasta los pies', '<b>Héroe:</b> el Gran Rey con corona almenada bajo la sombrilla real'],
+  castle(g, T) { const L = 0xd8c8a8, BL = 0x2a8a8a; P(g, 6.6, .8, 5, 0xc8b898, 0, .4, 0); for (let i = 0; i < 2; i++) P(g, 2.6, .4, .5, L, 0, .2 + i * .4, 2.75 - i * .4);
+    P(g, 5.4, 2.8, .4, L, 0, 2.2, -2); for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { const x = -2.1 + i * 1.4, z = -1.2 + j * 1.3; P(g, .3, 2.8, .3, 0xe0d4b8, x, 2.2, z); P(g, .7, .3, .3, 0x8a6a4a, x, 3.75, z); }
+    P(g, 5.6, .4, 4.4, L, 0, 4.1, -.1); P(g, 5.7, .3, 4.5, BL, 0, 4.45, -.1); for (let i = 0; i < 7; i++) { P(g, .36, .4, .2, L, -2.4 + i * .8, 4.8, 2.05); P(g, .18, .2, .2, L, -2.4 + i * .8, 5.1, 2.05); }
+    P(g, 1, .18, .1, GOLD, 0, 4.45, 2.16, false); P(g, .3, .3, .1, GOLD, 0, 4.62, 2.16, false);
+    for (const x of [-3.5, 3.5]) { P(g, .08, 3.4, .08, WOOD, x, 1.7, 2.2); P(g, .55, .6, .06, T, x + .3, 3, 2.2); } },
+  barracks(g, T) { P(g, 3.4, 1.6, 2.4, 0xd8c8a8, 0, .8, 0); P(g, 3.45, .3, 2.45, 0x2a8a8a, 0, 1.1, 0); for (let i = 0; i < 4; i++) P(g, .2, .2, .06, 0xe8c050, -1.2 + i * .8, 1.1, 1.24, false);
+    for (let i = 0; i < 5; i++) { P(g, .32, .3, .2, 0xd8c8a8, -1.4 + i * .7, 1.75, 1.1); P(g, .16, .16, .2, 0xd8c8a8, -1.4 + i * .7, 1.98, 1.1); }
+    P(g, 1, 1.1, .1, 0x3a2a14, 0, .55, 1.22); P(g, .08, 2.6, .08, WOOD, 2.1, 1.3, 1.3); P(g, .5, .5, .06, T, 2.36, 2.2, 1.3); },
+  house(g) { P(g, 1.6, 1.1, 1.4, 0xe0d0b0, 0, .55, 0); P(g, 1.7, .12, 1.5, 0xc8b898, 0, 1.15, 0); P(g, .4, .7, .4, 0xe0d0b0, .5, 1.5, -.4); P(g, .44, .1, .44, 0xc8b898, .5, 1.88, -.4);
+    P(g, .4, .6, .06, 0x2a8a8a, -.3, .3, .72); cypress(g, 1.4, .5); },
+  sword(g, T) { P(g, .42, .34, .3, 0xd8c09a, 0, .17, 0); torso(g, 0xd8c09a); P(g, .48, .08, .34, 0x2a8a8a, 0, .58, 0); head(g, SK.tan); P(g, .26, .14, .08, 0x1a1a1a, 0, .88, .17);
+    P(g, .34, .22, .34, 0xe8dcc0, 0, 1.18, 0); P(g, .28, .14, .28, 0xe8dcc0, 0, 1.36, 0);
+    P(g, .08, .3, .42, 0xb89a5a, -.33, .82, .04); P(g, .08, .3, .42, 0xb89a5a, -.33, .42, .04); P(g, .1, .14, .3, T, -.34, .62, .04);
+    P(g, .06, 1.2, .06, WOOD, .31, .8, .16); P(g, .1, .1, .1, GOLD, .31, .22, .16); P(g, .08, .14, .08, STEEL, .31, 1.45, .16); },
+  bow(g, T) { legs(g, 0x6a3a2a); torso(g, 0xc8b898); P(g, .5, .12, .34, T, 0, .7, 0); head(g, SK.tan); P(g, .26, .14, .08, 0x1a1a1a, 0, .88, .17); P(g, .36, .3, .36, 0xd8c09a, 0, 1.08, -.02); P(g, .14, .16, .14, 0xd8c09a, 0, 1.28, .08);
+    P(g, .06, .7, .06, 0x5a3a24, -.3, .64, .12); P(g, .18, .46, .16, 0x8a5a2a, .12, .62, -.22); },
+  horse(g, T) { horse(g, 0xb89a6a, 0xa88a5a, 0x6a4a2a, 0x2a8a8a); P(g, .56, .2, .5, 0x9aa0a8, 0, .92, .35); rider(g, 0x9aa0a8, SK.tan); P(g, .3, .24, .3, 0xe8dcc0, 0, 1.82, -.05); P(g, .12, .12, .12, 0xe8dcc0, 0, 1.98, .02);
+    P(g, .08, .44, .36, T, -.26, 1.25, 0); P(g, .05, .05, 1.6, WOOD, .27, 1.3, .45); },
+  hero(g, T) { horse(g, WHITE, 0xeae6f2, 0xd8d4e4, 0x2a8a8a); P(g, .62, .08, .6, GOLD, 0, 1.07, -.05); rider(g, 0x7a2a5a, SK.tan); P(g, .5, .6, .08, T, 0, 1.15, -.24); P(g, .22, .22, .08, 0x1a1a1a, 0, 1.46, .09);
+    P(g, .3, .2, .3, GOLD, 0, 1.82, -.05); for (const [a, b] of [[-.1, -.1], [.1, -.1], [-.1, .1], [.1, .1]]) P(g, .08, .1, .08, GOLD, a, 1.97, b - .05);
+    P(g, .05, 1.5, .05, GOLD, -.3, 2, -.3); P(g, 1.1, .1, 1.1, T, -.3, 2.75, -.3); P(g, .7, .12, .7, GOLD, -.3, 2.86, -.3); },
+  god(g, T) { godBody(g, WHITE, 0xe8dcc0, SK.tan, T); P(g, .32, .2, .32, GOLD, 0, 1.58, 0); P(g, .28, .22, .08, 0x3a3a3a, 0, 1.2, .18);
+    for (const s of [-1, 1]) { P(g, .5, .14, .1, GOLD, s * .55, 1.02, -.12); P(g, .42, .12, .1, GOLD, s * .5, .88, -.12); P(g, .34, .1, .1, GOLD, s * .46, .76, -.12); } P(g, .22, .22, .05, GOLD, .36, .62, .12); } },
+
+{ id: 'mongoles', name: 'MONGOLES', era: 'Imperio mongol · s. XIII', own: 0x8a4a2a,
+  tag: 'Campamento de yurtas de fieltro blanco tras un círculo de carros, en la estepa abierta. Estandartes de crin y la caballería más rápida.',
+  biome: 0x9ab06a, plaza: 0xb8a878, sw: [0xece6d6, 0x8a4a2a, 0x9aa0a8, 0xc8913c],
+  names: ['GUERRERO', 'ARQUERO', 'JINETE', 'KAN', 'TENGRI'],
+  notes: ['<b>Silueta:</b> casco cónico de hierro con orejeras de piel', '<b>Arma:</b> arco compuesto corto y sable curvo', '<b>Héroe:</b> el kan con el estandarte de colas de caballo (sulde)'],
+  castle(g, T) { const F = 0xece6d6, F2 = 0xe0d8c4; P(g, 6.6, .2, 4.8, 0x8a4a2a, 0, .1, 0);
+    P(g, 3.4, 1.6, 3.4, F, 0, 1, -.3); P(g, 3.4, 1.6, 3.4, F, 0, 1, -.3, true, Math.PI / 4); P(g, 3.5, .14, 3.5, T, 0, 1.6, -.3); P(g, 3.5, .14, 3.5, T, 0, 1.6, -.3, false, Math.PI / 4);
+    steps(g, 4, 3.8, .35, 3.8, .8, F2, 0, 1.8, -.3); P(g, .5, .3, .5, 0x8a4a2a, 0, 3.35, -.3); P(g, .8, 1.1, .1, 0xc8402a, 0, .75, 1.42);
+    for (const s of [-1, 1]) { P(g, 1.4, .8, 1.4, F, s * 2.7, .5, 1.3); P(g, 1.4, .8, 1.4, F, s * 2.7, .5, 1.3, true, Math.PI / 4); steps(g, 2, 1.6, .3, 1.6, .6, F2, s * 2.7, .9, 1.3); }
+    P(g, .1, 3.6, .1, WOOD, 2.8, 1.8, -1.8); P(g, .44, .9, .44, 0x2a2a2a, 2.8, 3.1, -1.8); P(g, .26, .26, .26, GOLD, 2.8, 3.7, -1.8);
+    P(g, .1, 3, .1, WOOD, -3, 1.5, -1.6); P(g, .7, .5, .06, T, -2.62, 2.6, -1.6); },
+  barracks(g, T) { P(g, 1.8, 1, 1.8, 0xece6d6, -.6, .5, -.2); P(g, 1.8, 1, 1.8, 0xece6d6, -.6, .5, -.2, true, Math.PI / 4); P(g, 1.9, .12, 1.9, T, -.6, .9, -.2); steps(g, 3, 2.1, .3, 2.1, .6, 0xe0d8c4, -.6, 1, -.2);
+    for (const z of [-.8, .2, 1.2]) P(g, .1, .7, .1, WOOD, 1.7, .35, z); for (const y of [.35, .6]) P(g, .06, .06, 2.1, WOOD, 1.7, y, .2); P(g, .8, .5, .06, 0xc8402a, -.6, .3, .72); },
+  house(g) { P(g, 1.4, .8, 1.4, 0xece6d6, 0, .4, 0); P(g, 1.4, .8, 1.4, 0xece6d6, 0, .4, 0, true, Math.PI / 4); steps(g, 2, 1.6, .3, 1.6, .6, 0xe0d8c4, 0, .8, 0); P(g, .2, .2, .2, 0x8a4a2a, 0, 1.5, 0);
+    P(g, .4, .6, .06, 0xc8402a, 0, .3, .72); P(g, 1, .4, .6, WOOD, 1.4, .4, .5); for (const s of [-1, 1]) P(g, .1, .5, .5, 0x5a3a24, 1.4 + s * .45, .25, .5); },
+  sword(g, T) { legs(g, 0x5a3a24); torso(g, 0x8a4a2a); P(g, .5, .1, .34, T, 0, .5, 0); head(g, SK.tan);
+    P(g, .34, .16, .34, 0x9aa0a8, 0, 1.15, 0); P(g, .18, .16, .18, 0x9aa0a8, 0, 1.3, 0); P(g, .06, .14, .06, 0x9aa0a8, 0, 1.44, 0); for (const s of [-1, 1]) P(g, .06, .2, .22, 0x6a5a44, s * .18, .98, 0);
+    P(g, .08, .44, .44, T, -.31, .62, .04); P(g, .06, .5, .08, STEEL, .31, .66, .18); P(g, .06, .16, .08, STEEL, .31, .96, .24); },
+  bow(g, T) { legs(g, 0x5a3a24); torso(g, 0x5a6a8a); P(g, .5, .1, .34, T, 0, .5, 0); head(g, SK.tan); P(g, .38, .16, .38, 0x8a7a5a, 0, 1.12, 0); P(g, .24, .14, .24, 0xc84a2a, 0, 1.26, 0);
+    P(g, .06, .66, .06, 0x5a3a24, -.3, .66, .12); P(g, .06, .1, .1, 0x5a3a24, -.3, 1.02, .18); P(g, .06, .1, .1, 0x5a3a24, -.3, .3, .18); P(g, .16, .42, .14, 0x8a4a2a, .1, .64, -.22); },
+  horse(g, T) { horse(g, 0x7a5a3a, 0x6a4a2a, 0x3a2a1a, T); rider(g, 0x8a4a2a, SK.tan); P(g, .3, .14, .3, 0x9aa0a8, 0, 1.78, -.05); P(g, .14, .18, .14, 0x9aa0a8, 0, 1.92, -.05); P(g, .06, .12, .06, 0xc84a2a, 0, 2.06, -.05);
+    P(g, .05, .05, 1.6, WOOD, .27, 1.3, .4); P(g, .06, .5, .06, 0x5a3a24, -.2, 1.3, -.25); },
+  hero(g, T) { horse(g, WHITE, 0xeae6f2, 0xd8d4e4, T); rider(g, 0x3a5a8a, SK.tan); P(g, .44, .08, .32, GOLD, 0, 1.2, -.05); P(g, .5, .6, .08, T, 0, 1.15, -.24);
+    P(g, .36, .14, .36, 0x8a6a44, 0, 1.78, -.05); P(g, .24, .18, .24, GOLD, 0, 1.9, -.05); P(g, .06, .14, .06, GOLD, 0, 2.06, -.05);
+    P(g, .06, 2.2, .06, WOOD, .32, 2, .1); P(g, .14, .26, .14, GOLD, .32, 3.2, .1); P(g, .38, .6, .38, WHITE, .32, 2.8, .1); P(g, .32, .26, .05, T, .32, 2.3, .14); },
+  god(g, T) { godBody(g, 0x8ab8e0, 0xa8c8e8, SK.tan, T); P(g, .5, .14, .5, WHITE, 0, 1.56, 0); P(g, .28, .32, .08, 0xe8e8e8, 0, 1.12, .18);
+    P(g, .24, .24, .06, GOLD, .44, 1.22, .1); P(g, .2, .2, .06, 0xe8e8f0, -.44, 1.22, .1); } },
+
+{ id: 'japon', name: 'JAPÓN', era: 'Período Sengoku · s. XVI', own: 0x2a2a2a,
+  tag: 'Castillo blanco de tejados superpuestos sobre muros de piedra, torii rojos y cerezos. Samuráis con armadura lacada y sashimono a la espalda.',
+  biome: 0x6a9a58, plaza: 0xc8c0a8, sw: [0xf2eee2, 0x3a4a5a, 0xb8302a, 0x8a8a8a],
+  names: ['ASHIGARU', 'YUMI', 'SAMURÁI', 'DAIMIO', 'AMATERASU'],
+  notes: ['<b>Silueta:</b> sashimono, la banderita del color del bando a la espalda', '<b>Arco:</b> yumi largo y asimétrico, más alto que el arquero', '<b>Héroe:</b> daimio con kabuto de cuernos dorados y horo inflado a la espalda'],
+  castle(g, T) { const RF = 0x3a4a5a; P(g, 5.6, 1.2, 4.6, 0x8a8a8a, 0, .6, 0); P(g, 5.2, .2, 4.2, 0x7a7a7a, 0, 1.3, 0);
+    P(g, 4.4, 1.3, 3.6, WHITE, 0, 2.05, 0); eaveRoof(g, 5.2, 4.4, 2.8, RF); P(g, 3.2, 1.1, 2.6, WHITE, 0, 3.85, 0); eaveRoof(g, 4, 3.4, 4.45, RF); P(g, 2.2, .9, 1.8, WHITE, 0, 5.4, 0); eaveRoof(g, 2.9, 2.5, 5.9, RF, GOLD);
+    for (const s of [-1, 1]) { P(g, .2, .3, .2, GOLD, s * .9, 6.55, 0); P(g, .3, .3, .06, 0x1a1a1a, s * 1.1, 2.1, 1.82, false); P(g, .26, .26, .06, 0x1a1a1a, s * .7, 3.9, 1.32, false); }
+    P(g, 1, .9, .1, 0x2a1a10, 0, 1.85, 1.82); for (const x of [-3.2, 3.2]) { P(g, .08, 3.4, .08, WOOD, x, 1.7, 2); P(g, .45, 1.6, .06, T, x + .24, 2.4, 2); } },
+  barracks(g, T) { P(g, 3.4, .4, 2.4, 0x8a8a8a, 0, .2, 0); P(g, 3.2, .7, 2.2, 0x5a3a24, 0, .75, 0); P(g, 3.2, .6, 2.2, WHITE, 0, 1.4, 0); eaveRoof(g, 3.9, 2.9, 1.8, 0x3a4a5a);
+    P(g, 1, .9, .1, 0x2a1a10, 0, .85, 1.12); P(g, .08, 2.8, .08, WOOD, 2.1, 1.4, .9); P(g, .4, 1.3, .06, T, 2.32, 2, .9); },
+  house(g) { P(g, 1.8, .6, 1.4, 0x5a3a24, 0, .3, 0); P(g, 1.8, .5, 1.4, 0xece6d8, 0, .85, 0); eaveRoof(g, 2.4, 2, 1.15, 0x4a5a6a);
+    P(g, .16, .6, .16, 0x5a3a2a, 1.4, .3, .5); P(g, .9, .5, .9, 0xf0b8c8, 1.4, .85, .5); P(g, .5, .26, .5, 0xf8d0dc, 1.5, 1.2, .4); },
+  sword(g, T) { legs(g, 0x3a3a44); torso(g, 0x5a3a2a); P(g, .5, .16, .34, 0x2a2a2a, 0, .42, 0); head(g, SK.tan); P(g, .58, .06, .58, 0x2a2a2a, 0, 1.14, 0); P(g, .3, .1, .3, 0x2a2a2a, 0, 1.2, 0);
+    P(g, .04, .8, .04, WOOD, 0, 1, -.2); P(g, .3, .5, .04, T, 0, 1.2, -.22); P(g, .05, 1.5, .05, WOOD, .31, .85, .16); P(g, .07, .2, .07, STEEL, .31, 1.68, .16); },
+  bow(g, T) { legs(g, 0x3a3a44); torso(g, 0x3a4a5a); head(g, SK.tan); P(g, .32, .06, .32, WHITE, 0, 1.06, 0); P(g, .1, .1, .16, 0x1a1a1a, 0, 1.16, -.04);
+    P(g, .04, .8, .04, WOOD, 0, 1, -.2); P(g, .3, .46, .04, T, 0, 1.2, -.22); P(g, .05, 1.4, .05, 0x3a2418, -.3, .78, .12); P(g, .16, .4, .14, 0x2a2a2a, .14, .62, -.18); },
+  horse(g, T) { horse(g, 0x5a3a24, 0x4a3018, 0x2a1a10, 0xb8302a); rider(g, 0xb8302a, SK.tan); P(g, .32, .14, .32, 0x2a2a2a, 0, 1.79, -.05); P(g, .4, .06, .36, 0x2a2a2a, 0, 1.72, -.08);
+    P(g, .04, .7, .04, WOOD, 0, 1.8, -.24); P(g, .3, .4, .04, T, 0, 2.02, -.26); P(g, .05, .05, 1.6, WOOD, .27, 1.3, .4); P(g, .06, .06, .26, STEEL, .27, 1.3, 1.3); },
+  hero(g, T) { horse(g, 0x1a1a1a, 0x141414, 0x0a0a0a, GOLD); rider(g, 0x2a2a2a, SK.tan); P(g, .34, .16, .34, 0x2a2a2a, 0, 1.8, -.05); P(g, .42, .06, .38, 0x2a2a2a, 0, 1.72, -.08);
+    for (const s of [-1, 1]) { P(g, .05, .3, .05, GOLD, s * .1, 1.98, .1); P(g, .05, .24, .05, GOLD, s * .18, 2.2, .12); } P(g, .14, .14, .04, GOLD, 0, 1.9, .12);
+    P(g, .62, .6, .4, T, 0, 1.42, -.42); P(g, .04, .5, .04, STEEL, .27, 1.3, .25); },
+  god(g, T) { godBody(g, 0xc8302a, WHITE, SK.light, T); P(g, .38, .5, .12, 0x1a1a1a, 0, 1.2, -.14); P(g, .38, .12, .38, 0x1a1a1a, 0, 1.52, 0); P(g, .3, .06, .06, GOLD, 0, 1.55, .12);
+    P(g, .24, .24, .04, 0xe8e8f0, .42, .9, .16); P(g, .3, .3, .04, GOLD, .42, .9, .14); } },
 ];
 // carro egipcio: dos caballos, caja del color del bando y conductor-arquero; el del faraón es dorado con corona azul
 function chariot(g, T, hc, king) {
@@ -176,7 +311,8 @@ function chariot(g, T, hc, king) {
 }
 
 
-  const WALLS = { roma: [0xe2dccc, 0xc8c0ae], cartago: [0xd9b27a, 0xc49a62], china: [0x8a8a92, 0x6a6a74], mexica: [0xd8d0b8, 0xbab29a], egipto: [0xe0c48a, 0xc8aa70], galos: [0x8a6a3e, 0x6a4e2a] };
+  const WALLS = { roma: [0xe2dccc, 0xc8c0ae], cartago: [0xd9b27a, 0xc49a62], china: [0x8a8a92, 0x6a6a74], mexica: [0xd8d0b8, 0xbab29a], egipto: [0xe0c48a, 0xc8aa70], galos: [0x8a6a3e, 0x6a4e2a],
+    grecia: [0xd8ceb0, 0xbab092], vikingos: [0x7a5a34, 0x6a5a3a], persia: [0xd8c8a8, 0x2a8a8a], mongoles: [0x8a6a44, 0x5a3a24], japon: [0xf2eee2, 0x8a8a8a] };
   for (const c of CIVS) c.wall = WALLS[c.id];
   // ---- mapa de cada civilización: bioma, paisaje, muralla, distribución del recinto, altar ----
   const hsh = (x, z, k = 0) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263) ^ Math.imul(k, 2246822519); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };
@@ -218,6 +354,41 @@ function chariot(g, T, hc, king) {
       shape: () => blob(7.2, 5.8, 22, .22, 11), rings: [1, .82], wall: { h: 2.2, palisade: true, gate(g, T) { for (const s of [-1, 1]) part(g, .6, 3.4, .6, 0x6a4e2a, s * 2.1, .65, 0); part(g, 4.8, .5, .7, 0x6a4e2a, 0, 2.4, 0); steps(g, 2, 5, .3, 1.2, 1.4, 0xc8a85a, 0, 2.65, 0); part(g, .6, .5, .06, T, 0, 1.8, .4, false); } },
       layout: { castle: [-2, -.6, .3, 1], barracks: [2.4, 5.2, -.3, .95], altar: [4.2, -1.6, 0, 1.4], temple: [-4.6, 4.6, 0, 1.5] },
       altar(g, T) { for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; P(g, .3, .9 + (i % 2) * .3, .3, 0x8a8a8a, Math.cos(a) * .9, .5, Math.sin(a) * .9); } P(g, 1, .2, .5, 0x9a9a98, 0, .7, 0); P(g, .2, .7, .2, 0x8a8a8a, -.3, .35, 0); P(g, .2, .7, .2, 0x8a8a8a, .3, .35, 0); P(g, .3, .3, .06, T, 0, 1.1, .3); } },
+    grecia: { ground: [0x9ab860, 0x8aac58, 0xa6be6c, 0xb4c27a], lush: 0x7a9a50, sand: 0xe2d4a4, road: 0xd8ccaa, trees: ['olive', 'cypress'], treeCol: 0x6a8a5a, dens: .7, feature: 'scrub',
+      plaza: 0xd8d0bc, wallbase: 0xb8ae96, path: 0xe0d8c4, inside: (x, z) => Math.abs(x) < 1.3 ? 0xe0d8c4 : -1,
+      shape: () => blob(7, 5.6, 9, .16, 17), wall: { h: 2.4, t: .9, cren: true, tower: true, every: 10, gate: gateTowers(0xd8ceb0, 0xbab092, 2.4) },
+      layout: { castle: [0, -1.2, 0, .95], barracks: [-4.6, 3.4, .4, .95], altar: [4.6, -3.4, 0, 1.3], temple: [2.2, 2.8, 0, 1.3] },
+      altar(g, T) { P(g, 2, .3, 1.6, 0xd8d0bc, 0, .15, 0); P(g, 1.2, .6, .8, 0xe8e2d4, 0, .6, 0); P(g, .5, .3, .4, 0xff8a3a, 0, 1.05, 0, false); P(g, .26, .2, .2, 0xffd04a, 0, 1.25, 0, false);
+        for (const s of [-1, 1]) { P(g, .22, 1.8, .22, WHITE, s * .8, 1.2, -.55); P(g, .42, .14, .3, WHITE, s * .8, 2.15, -.55); } P(g, 1.9, .2, .34, 0x4a6a9a, 0, 2.3, -.55); P(g, .5, .3, .06, T, 0, .6, .42); } },
+    vikingos: { ground: [0x5f8a5a, 0x557e52, 0x6a9462, 0x789e6a], lush: 0x4a7448, sand: 0xb8b49a, road: 0x9a8a6a, trees: ['pine', 'birch'], treeCol: 0x31683f, dens: 1.1, feature: 'heath',
+      plaza: 0x9a8a6a, wallbase: 0x6a7a4a, path: 0x8a7a5a, inside: (x, z) => Math.abs(x) < 1.2 || Math.abs(z) < 1.2 ? 0x8a7a5a : -1,
+      shape: () => blob(6.5, 6.5, 28, .04, 3), wall: { h: 2.2, t: 1, rampart: true, turf: 0x5a7a3a,
+        gate(g, T) { for (const s of [-1, 1]) { part(g, .7, 3.2, .7, 0x6a4a2e, s * 2.1, .55, 0); part(g, .6, .6, .08, T, s * 1.2, 1.7, .45, false); } part(g, 4.8, .5, .8, 0x6a4a2e, 0, 2.2, 0); part(g, 5.2, .3, 1.2, 0x5a7a3a, 0, 2.55, 0); } },
+      layout: { castle: [-1, -1.2, .2, 1], barracks: [2.6, 5.2, -.3, .95], altar: [4.6, -1.6, 0, 1.4], temple: [-4.8, 4.6, 0, 1.5] },
+      altar(g, T) { P(g, 2, .2, 1.8, 0x8a8a86, 0, .1, 0); P(g, 1.4, 1.1, 1.2, 0x6a4a2e, 0, .75, 0); for (let i = 0; i < 3; i++) P(g, 1.7 - i * .45, .35, 1.5 - i * .4, 0x3a2a1a, 0, 1.45 + i * .35, 0);
+        P(g, .14, .14, .4, GOLD, 0, 2.45, .5); P(g, .14, .14, .4, GOLD, 0, 2.45, -.5); P(g, .4, .6, .06, T, 0, .55, .62); for (let i = 0; i < 3; i++) P(g, .26, .7 + i * .15, .18, 0x8a8a86, -1.3 + i * .2, .4, .9 - i * .6); } },
+    persia: { ground: [0xb8b07a, 0xc4b888, 0xa8a46c, 0xccbe90], lush: 0x8aa060, sand: 0xe0d0a0, road: 0xd8c8a0, trees: ['cypress', 'plane'], treeCol: 0x4a7a3a, dens: .55, feature: 'garden',
+      plaza: 0xd8c8a8, wallbase: 0xb8a888, path: 0xe0d4b8, inside: (x, z) => Math.abs(x) < .5 && z > -1 ? 0x5a9ab8 : Math.abs(x) < 1.3 && z > -1 ? 0xe0d4b8 : -1,
+      shape: () => rect(13, 11), wall: { h: 3, t: 1, cren: true, merlon: 0x2a8a8a, tower: true, every: 6,
+        gate(g, T) { for (const s of [-1, 1]) { part(g, 1.6, 4.2, 1.8, 0x2a8a8a, s * 2.5, 1.05, 0); part(g, 1.9, .4, 2, 0xd8c8a8, s * 2.5, 3.35, 0); part(g, .5, .4, .1, GOLD, s * 2.5, 1.4, .92, false); } part(g, 6.6, .9, 1.6, 0x2a8a8a, 0, 2.7, 0); part(g, .5, .5, .06, T, 0, 2.7, .82, false); } },
+      layout: { castle: [0, -2.4, 0, 1], barracks: [-6, -4.2, .4, .95], altar: [5.8, 4.2, -.5, 1.4], temple: [-6, 4, 0, 1.5] },
+      altar(g, T) { P(g, 2, .3, 2, 0xd8c8a8, 0, .15, 0); steps(g, 3, 1.2, .25, 1.2, .25, 0xd8c8a8, 0, .3, 0); P(g, .5, .4, .5, 0xff8a3a, 0, 1.25, 0, false); P(g, .3, .3, .3, 0xffd04a, 0, 1.5, 0, false);
+        for (const s of [-1, 1]) { P(g, .26, 1.8, .26, 0xe0d4b8, s * .8, 1.2, -.6); P(g, .44, .2, .3, 0x8a6a4a, s * .8, 2.2, -.6); } P(g, .4, .2, .06, T, 0, .45, .63); } },
+    mongoles: { ground: [0x9ab06a, 0xa6b878, 0x8ea460, 0xb4c084], lush: 0x7a9a58, sand: 0xd4c89a, road: 0xb8a878, trees: ['shrub', 'pine'], treeCol: 0x6a8a4a, dens: .35, feature: 'steppe',
+      plaza: 0xb8a878, wallbase: 0x9a8a5a, path: 0xa89868,
+      shape: () => blob(7.2, 5.8, 18, .12, 23), wall: { h: 1.5, t: 1, carts: true, cover: 0xece6d6,
+        gate(g, T) { for (const s of [-1, 1]) { part(g, .2, 3.6, .2, WOOD, s * 2, .75, 0); part(g, .5, .8, .5, 0x2a2a2a, s * 2, 2.2, 0); part(g, .26, .26, .26, GOLD, s * 2, 2.65, 0); part(g, .6, .5, .06, T, s * 2 - s * .4, 1.5, 0, false); } } },
+      layout: { castle: [-1.6, -.8, .2, 1], barracks: [2.6, 5, -.3, .95], altar: [4.4, -1.8, 0, 1.4], temple: [-4.6, 4.4, 0, 1.5] },
+      altar(g, T) { steps(g, 3, 1.8, .4, 1.8, .5, 0x8a8a86, 0, 0, 0); P(g, .12, 2, .12, WOOD, 0, 2, 0); for (const [a, c] of [[0, T], [1.6, WHITE], [3.2, T], [4.7, WHITE]]) P(g, .5, .1, .06, c, Math.cos(a) * .3, 1.6 + a * .05, Math.sin(a) * .3, false, a);
+        P(g, .3, .4, .3, 0x2a2a2a, 0, 2.9, 0); P(g, .2, .2, .2, GOLD, 0, 3.2, 0); } },
+    japon: { ground: [0x6a9a58, 0x5e8e50, 0x78a664, 0x86b070], lush: 0x4f8044, sand: 0xd8ccaa, road: 0xb8ac90, trees: ['sakura', 'pine'], treeCol: 0x3a6a3a, dens: .9, feature: 'tea',
+      plaza: 0xc8c0a8, wallbase: 0x8a8a8a, path: 0xb8b0a0, moat: true,
+      shape: () => rect(12, 12), wall: { h: 2.8, t: 1.1, ishigaki: true, cap: 0x3a4a5a, tower: true, every: 10,
+        gate(g, T) { for (const s of [-1, 1]) part(g, 1.4, 3, 1.4, 0x8a8a8a, s * 2.5, .45, 0); part(g, 6.4, 1.2, 1.6, WHITE, 0, 2.5, 0); const q = new THREE.Group(); g.add(q); eaveRoof(q, 7, 2.2, 3.2, 0x3a4a5a); part(g, .5, .5, .06, T, 0, 2.5, .82, false); } },
+      layout: { castle: [0, -5, 0, 1], barracks: [6.2, 1.2, -Math.PI / 2, .95], altar: [0, 2.6, 0, 1.4], temple: [-6.2, 1.4, 0, 1.5] },
+      altar(g, T) { P(g, 1.6, .3, 1.4, 0x8a8a8a, 0, .15, -.3); P(g, 1, .8, .8, 0x8a5a34, 0, .7, -.3); for (let i = 0; i < 2; i++) P(g, 1.4 - i * .4, .2, 1.2, 0x3a3a2a, 0, 1.2 + i * .2, -.3);
+        for (const s of [-1, 1]) { P(g, .18, 1.8, .18, 0xc8302a, s * .8, .9, .8); P(g, .06, .4, .06, 0x8a5a34, s * .25, 1.7, -.3); }
+        P(g, 2.1, .16, .24, 0x1a1a1a, 0, 1.88, .8); P(g, 1.8, .12, .14, 0xc8302a, 0, 1.55, .8); P(g, .06, 1.6, .06, WOOD, -1.1, .8, -.2); P(g, .3, .8, .04, T, -.95, 1.1, -.2); } },
   };
   for (const c of CIVS) c.map = MAPS[c.id];
   return { list: CIVS, grp };
@@ -232,6 +403,11 @@ export const BONUS = {
   mexica: { name: 'GUERRA FLORIDA', text: 'conquistan pueblos un 40 % más rápido', capture: 1.4 },
   egipto: { name: 'CARROS', text: 'jinetes un 15 % más rápidos y con +15 % de daño', unit: { horse: { mul: { speed: 1.15, dmg: 1.15 } } } },
   galos: { name: 'FURIA', text: 'espadas con +15 % de daño y carga del héroe cada 14 s', unit: { sword: { mul: { dmg: 1.15 } } }, chargeCd: 14 },
+  grecia: { name: 'FALANGE', text: 'espadas con +25 % de vida, pero un 10 % más lentas', unit: { sword: { mul: { hp: 1.25, speed: .9 } } } },
+  vikingos: { name: 'SAQUEO', text: 'espadas con +10 % de daño y conquistan pueblos un 25 % más rápido', unit: { sword: { mul: { dmg: 1.1 } } }, capture: 1.25 },
+  persia: { name: 'INMORTALES', text: 'espadas y arqueros con +15 % de vida', unit: { sword: { mul: { hp: 1.15 } }, bow: { mul: { hp: 1.15 } } } },
+  mongoles: { name: 'ESTEPA', text: 'jinetes un 25 % más rápidos', unit: { horse: { mul: { speed: 1.25 } } } },
+  japon: { name: 'BUSHIDO', text: 'jinetes con +20 % de vida', unit: { horse: { mul: { hp: 1.2 } } } },
 };
 export const bonusOf = side => (side === 0 || side === 1) ? BONUS[civOf(side).id] || {} : {};
 // estadísticas de una tropa con la ventaja de su civilización (los neutrales usan las comunes)

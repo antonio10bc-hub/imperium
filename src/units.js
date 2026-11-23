@@ -183,7 +183,8 @@ export function place(u, dt = 0) {
 }
 export const charging = u => (u.type === 'hero' ? u : u.leader)?.chargeT > 0;
 export const roadK = u => roadCell && roadCell[u.node] ? 1.35 : 1;   // los caminos dan velocidad
-const MOUNTED = u => u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.side < 2 && civOf(u.side).id !== 'mexica');
+const FOOT_HERO = new Set(['mexica', 'vikingos']);   // civilizaciones cuyo héroe va a pie
+const MOUNTED = u => u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.side < 2 && !FOOT_HERO.has(civOf(u.side).id));
 export const slowK = u => (GEOT && GEOT[u.node] === 2 ? (MOUNTED(u) ? swampMounted() : .6) : 1) * geoSlow(u);   // pantano y bajío: más lentos, sobre todo a caballo
 export const spd = u => (u.leader ? Math.max(u.def.speed, u.leader.def.speed) : u.def.speed) * (charging(u) ? 1.6 : 1) * roadK(u) * slowK(u) * geoSpeed(u);
 export function stepToward(u, tx, tz, s, dt) {

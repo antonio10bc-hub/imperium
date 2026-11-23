@@ -181,6 +181,16 @@ export function buildWalls(f) {
       const a = A[k], b = A[(k + 1) % NS], pa = fortPt(f, a.r, a.th), pb = fortPt(f, b.r, b.th), dx = pb.x - pa.x, dz = pb.z - pa.z, L = Math.hypot(dx, dz);
       const g = new THREE.Group(); g.position.set((pa.x + pb.x) / 2, hr, (pa.z + pb.z) / 2); g.rotation.y = Math.atan2(-dz, dx);
       if (S.palisade) { const n = Math.max(2, Math.round(L / .42)); for (let j = 0; j < n; j++) { const hh = H + (j % 2) * .35; part(g, .34, hh, .34, stone, -L / 2 + (j + .5) * L / n, hh / 2 - 1.05, 0, false); } }
+      else if (S.rampart) {   // terraplén de tierra con césped y una empalizada encima (fortalezas circulares vikingas)
+        const eh = H * .5; part(g, L + .25, eh, t + 1.2, stone2, 0, eh / 2 - 1.05, 0); part(g, L + .25, .1, t + 1.22, S.turf, 0, eh - 1.05 + .05, 0, false);
+        const n = Math.max(2, Math.round(L / .42)); for (let j = 0; j < n; j++) { const hh = H * .55 + (j % 2) * .25; part(g, .3, hh, .3, stone, -L / 2 + (j + .5) * L / n, eh + hh / 2 - 1.05, 0, false); }
+      } else if (S.carts) {   // círculo de carros: caja, ruedas a los dos lados y, uno sí y otro no, una cubierta de fieltro
+        part(g, L * .9, .6, t, stone, 0, -.25, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) part(g, .14, .66, .66, stone2, sx * L * .28, -.72, sz * (t / 2 + .05));
+        if (k % 2) part(g, L * .8, .5, t * .9, S.cover, 0, .3, 0);
+      } else if (S.ishigaki) {   // muro japonés: base de piedra en talud, muro enlucido de blanco y caballete de tejas
+        const sh = H * .55, wh = H - sh; part(g, L + .25, sh * .5, t + .8, stone2, 0, sh * .25 - 1.05, 0); part(g, L + .25, sh * .5, t + .4, stone2, 0, sh * .75 - 1.05, 0);
+        part(g, L + .25, wh, t * .6, stone, 0, sh + wh / 2 - 1.05, 0); part(g, L + .3, .2, t * .6 + .4, S.cap, 0, H - 1.05 + .1, 0);
+      }
       else { part(g, L + .25, H, t, stone, 0, H / 2 - 1.05, 0); if (S.cren && k % 2) part(g, .55, .45, t + .1, S.merlon ?? stone2, 0, H - 1.05 + .22, 0); }
       if (S.butt && k % 2 === 0) part(g, .7, H * .85, t + .9, stone2, 0, H * .42 - 1.05, 0);   // contrafuertes de adobe
       if (!ri && S.tower && k % S.every === (S.every >> 1)) { part(g, 1.7, H + .8, 1.7, stone, 0, (H + .8) / 2 - 1.05, 0); part(g, 2, .45, 2, stone2, 0, H - .25 + .22, 0); part(g, .6, .6, .6, T.c, 0, H + .4, 0); }

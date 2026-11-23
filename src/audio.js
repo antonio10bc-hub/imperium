@@ -39,6 +39,7 @@ const HORNS = {
   conch: { type: 'triangle', open: 2.6, rest: 2, vib: .003, bend: .9, breath: .02 },
   carnyx: { type: 'sawtooth', open: 9, rest: 5, vib: .004, growl: .45 },
   trumpet: { type: 'square', open: 7, rest: 4, vib: .005, bend: .97, vol: .7 },
+  lur: { type: 'sawtooth', open: 3.5, rest: 2.2, vib: .003, bend: .94, breath: .015 },   // lur o cuerno de la estepa: grave y oscuro
 };
 // cuerno de guerra / metales: osciladores desafinados con un filtro que se abre al soplar
 function horn(t, f, dur, gain = .07, bus = sfxBus, tb = HORNS.cornu) {
@@ -64,6 +65,7 @@ const PERC = {
   bodhran: (t, g, strong, bus) => { drum(t, g, strong ? .7 : 1, bus); noise(t, .05, { f: 2200, q: 2, gain: g * .25, bus, wet: .1 }); },
   taiko: (t, g, strong, bus) => strong ? (tone(t, 62, .7, { gain: g * 1.4, f2: 38, bus, wet: .35 }), noise(t, .12, { type: 'lowpass', f: 400, gain: g * .6, bus })) : drum(t, g * .7, 1.4, bus),
   darbuka: (t, g, strong, bus) => strong ? tone(t, 95, .3, { gain: g, f2: 70, bus, wet: .2 }) : noise(t, .05, { type: 'highpass', f: 3500, gain: g * .5, a: .001, bus, wet: .15 }),
+  war: (t, g, strong, bus) => { drum(t, g * 1.2, strong ? .55 : .8, bus); if (strong) noise(t, .14, { type: 'lowpass', f: 300, gain: g * .5, bus, wet: .3 }); },   // tambor de guerra grave
   slit: (t, g, strong, bus) => { tone(t, strong ? 330 : 440, .14, { type: 'triangle', gain: g * .7, a: .001, bus, wet: .3 }); noise(t, .02, { f: 1800, q: 3, gain: g * .3, a: .001, bus, wet: .1 }); },
 };
 // choque de espadas: parciales metálicas inarmónicas + chasquido
@@ -147,6 +149,11 @@ const SOUND = {
   mexica: { mode: [57, 60, 62, 64, 67, 69, 72, 74], drone: [33, 40, 45], leads: ['whistle', 'whistle'], perc: 'slit', horn: 'conch', capture: [57, 64, 69, 72], charge: [45, 45, 52], bpm: [84, 120] },
   egipto: { mode: [64, 65, 68, 69, 71, 72, 75, 76], drone: [40, 47, 52], leads: ['harp', 'reed'], perc: 'frame', horn: 'trumpet', capture: [64, 68, 71, 76], charge: [64, 68, 71], bpm: [74, 108] },
   galos: { mode: [62, 64, 65, 67, 69, 70, 72, 74], drone: [38, 45, 50, 57], leads: ['whistle', 'harp'], perc: 'bodhran', horn: 'carnyx', capture: [50, 57, 62, 69], charge: [45, 52, 57], bpm: [82, 124] },
+  grecia: { mode: [64, 65, 67, 69, 71, 72, 74, 76], drone: [40, 47, 52], leads: ['reed', 'lyre'], perc: 'frame', horn: 'trumpet', capture: [64, 67, 71, 76], charge: [52, 59, 64], bpm: [78, 112] },
+  vikingos: { mode: [57, 59, 60, 62, 64, 65, 67, 69], drone: [33, 40, 45], leads: ['harp', 'whistle'], perc: 'war', horn: 'lur', capture: [45, 52, 57, 64], charge: [33, 40, 45], bpm: [76, 116] },
+  persia: { mode: [62, 63, 66, 67, 69, 70, 73, 74], drone: [38, 45, 50], leads: ['reed', 'pluck'], perc: 'darbuka', horn: 'trumpet', capture: [62, 66, 69, 74], charge: [62, 63, 66], bpm: [76, 110] },
+  mongoles: { mode: [57, 59, 62, 64, 66, 69, 71, 74], drone: [33, 40, 45], leads: ['whistle', 'pluck'], perc: 'frame', horn: 'lur', capture: [57, 62, 66, 69], charge: [45, 50, 57], bpm: [92, 132] },
+  japon: { mode: [62, 63, 67, 69, 70, 74, 75, 79], drone: [38, 45, 50], leads: ['flute', 'pluck'], perc: 'taiko', horn: 'conch', capture: [62, 67, 70, 74], charge: [50, 55, 62], bpm: [70, 104] },
 };
 const soundOf = side => SOUND[civOf(side === 1 ? 1 : 0)?.id] || SOUND.roma;
 function scheduleMusic() {
