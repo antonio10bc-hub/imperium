@@ -36,12 +36,40 @@ kbd{font:400 12px/1 var(--font);border:2px solid currentColor;padding:2px 3px;ma
 .card ul{margin:0;padding-left:16px}
 .card .ctl{font-size:12px;line-height:2;background:var(--paper2);border:2px solid var(--ink);padding:8px 10px}
 .card .ctl b{font-weight:400;color:var(--pink)}
-.card.menu{min-width:300px;align-items:center;gap:16px;padding:30px 34px}
-.card.menu h2{font-size:44px;margin-bottom:6px}
+.overlay#start{background:radial-gradient(ellipse at center,rgba(15,15,27,.55),rgba(15,15,27,.9))}
+/* menú principal: tres casillas dentro de un marco; las de los lados, partidas en diagonal (arriba tú, abajo el rival) */
+.menu3{position:relative;display:grid;grid-template-columns:1fr minmax(300px,1fr) 1fr;width:min(1120px,94vw);height:min(500px,78vh);background:var(--paper);border:4px solid var(--ink);box-shadow:0 8px 0 var(--ink),0 0 0 6px rgba(232,200,112,.25)}
+.mp{position:relative;min-width:0}
+.mp.side{overflow:visible}
+.mp.heroes{border-right:4px solid var(--ink)} .mp.cities{border-left:4px solid var(--ink)}
+.tri{position:absolute;inset:0;pointer-events:none}
+.tri.top{clip-path:polygon(0 0,100% 0,0 100%);background:repeating-linear-gradient(45deg,rgba(255,255,255,.06) 0 10px,transparent 10px 20px),linear-gradient(160deg,#4a7ae8,#1e3a7a)}
+.tri.bot{clip-path:polygon(100% 0,100% 100%,0 100%);background:repeating-linear-gradient(45deg,rgba(255,255,255,.06) 0 10px,transparent 10px 20px),linear-gradient(160deg,#e84a5a,#6a1420)}
+.diag{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to top right,transparent calc(50% - 4px),#0f0f1b calc(50% - 4px),#0f0f1b calc(50% + 4px),transparent calc(50% + 4px))}
+.slot{position:absolute;inset:0;pointer-events:none}
+.stage{position:absolute;width:76%;height:68%;animation:float 3.2s ease-in-out infinite}
+.s0 .stage{left:2%;top:-15%}
+.s1 .stage{right:2%;bottom:-13%;animation-delay:-1.6s}
+.cities .stage{width:92%;height:62%}
+.cities .s0 .stage{left:-4%;top:-12%} .cities .s1 .stage{right:-4%;bottom:-10%}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.stage>*{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 8px 0 rgba(15,15,27,.35));transition:transform .55s cubic-bezier(.2,.9,.25,1.2),opacity .45s ease}
+.stage>.enter{opacity:0;transform:translateX(calc(var(--dx) * 1px)) scale(.86)}
+.stage>.leave{opacity:0;transform:translateX(calc(var(--dx) * -1px)) scale(.9)}
+.stage .q{display:grid;place-items:center;font:400 clamp(90px,12vw,150px)/1 var(--font);color:#f4f4e8;text-shadow:0 6px 0 var(--ink),0 0 24px rgba(255,255,255,.25)}
+.nm{position:absolute;font:400 13px/1 var(--font);color:#fff;background:var(--ink);padding:6px 8px 5px;letter-spacing:.06em}
+.s0 .nm{left:12px;top:58%} .s1 .nm{right:12px;bottom:58%}
+.arr{position:absolute;pointer-events:auto;width:38px;height:38px;padding:0;font-size:16px;line-height:1;background:var(--yellow)}
+.s0 .arr{top:26%} .s0 .arr.l{left:8px} .s0 .arr.r{left:calc(66% - 38px)}
+.s1 .arr{bottom:26%} .s1 .arr.l{left:34%} .s1 .arr.r{right:8px}
+.mp.mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:22px 18px;background:var(--paper);color:var(--ink);font:400 12px/1.4 var(--font)}
+.mp.mid h2{font:400 44px/1.1 var(--font);color:var(--pink);margin:0 0 6px;text-shadow:0 3px 0 var(--ink)}
+.mp.mid #go,.mp.mid #howBtn{width:220px;font-size:16px;padding:12px 0}
+@media (max-width:860px){.menu3{grid-template-columns:1fr;height:auto;max-height:94vh;overflow:auto} .mp.side{height:200px} .mp.heroes{border-right:0;border-bottom:4px solid var(--ink)} .mp.cities{border-left:0;border-top:4px solid var(--ink)} .s0 .stage{top:-6%} .s1 .stage{bottom:-4%} .mp.mid h2{font-size:34px}}
+@media (prefers-reduced-motion:reduce){.stage{animation:none}.stage>*{transition:none}}
 .civsel{display:grid;grid-template-columns:70px 1fr;align-items:center;gap:10px;width:260px;font:400 12px/1 var(--font)}
 .civsel select{font:400 12px/1 var(--font);color:var(--ink);background:var(--paper2);border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink);padding:8px 6px;cursor:pointer;width:100%}
 .civsel select:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
-.card.menu #go,.card.menu #howBtn{width:220px;font-size:16px;padding:12px 0}
 #how .card{max-width:620px;max-height:90vh;overflow:auto}
 #how #howBack{align-self:center;font-size:14px;padding:10px 18px}
 button.alt{background:var(--paper)}
@@ -160,14 +188,24 @@ button.alt{background:var(--paper)}
 </div>
 <div id="toast" hidden></div>
 <div id="pause" hidden>PAUSA</div>
-<div id="start" class="overlay" hidden><div class="card menu">
-  <h2>IMPERIUM</h2>
-  <div class="civsel"><label for="civ0">TÚ</label><select id="civ0"></select></div>
-  <div class="civsel"><label for="civ1">RIVAL</label><select id="civ1"></select></div>
-  <div class="civsel"><label for="geo">MAPA</label><select id="geo"></select></div>
-  <div class="diff"><button type="button" data-d="easy">FÁCIL</button><button type="button" data-d="normal">NORMAL</button><button type="button" data-d="hard">DIFÍCIL</button></div>
-  <button id="go" type="button">JUGAR</button>
-  <button id="howBtn" type="button" class="alt">INSTRUCCIONES</button>
+<div id="start" class="overlay" hidden><div class="menu3">
+  <section class="mp side heroes" aria-label="Héroes: arriba el tuyo, abajo el del rival">
+    <div class="tri top"></div><div class="tri bot"></div><div class="diag"></div>
+    <div class="slot s0"><div class="stage" data-kind="hero" data-side="0"></div><span class="nm"></span><button type="button" class="arr l" data-side="0" data-d="-1" aria-label="Tu civilización anterior">◀</button><button type="button" class="arr r" data-side="0" data-d="1" aria-label="Tu civilización siguiente">▶</button></div><div class="slot s1"><div class="stage" data-kind="hero" data-side="1"></div><span class="nm"></span><button type="button" class="arr l" data-side="1" data-d="-1" aria-label="Rival: civilización anterior">◀</button><button type="button" class="arr r" data-side="1" data-d="1" aria-label="Rival: civilización siguiente">▶</button></div>
+  </section>
+  <section class="mp mid">
+    <h2>IMPERIUM</h2>
+    <div class="civsel"><label for="civ0">TÚ</label><select id="civ0"></select></div>
+    <div class="civsel"><label for="civ1">RIVAL</label><select id="civ1"></select></div>
+    <div class="civsel"><label for="geo">MAPA</label><select id="geo"></select></div>
+    <div class="diff"><button type="button" data-d="easy">FÁCIL</button><button type="button" data-d="normal">NORMAL</button><button type="button" data-d="hard">DIFÍCIL</button></div>
+    <button id="go" type="button">JUGAR</button>
+    <button id="howBtn" type="button" class="alt">INSTRUCCIONES</button>
+  </section>
+  <section class="mp side cities" aria-label="Fortalezas: arriba la tuya, abajo la del rival">
+    <div class="tri top"></div><div class="tri bot"></div><div class="diag"></div>
+    <div class="slot s0"><div class="stage" data-kind="city" data-side="0"></div><span class="nm"></span></div><div class="slot s1"><div class="stage" data-kind="city" data-side="1"></div><span class="nm"></span></div>
+  </section>
 </div></div>
 <div id="how" class="overlay" hidden><div class="card">
   <h2>INSTRUCCIONES</h2>
@@ -1812,7 +1850,8 @@ function newGame(s) {
     focusOn(spots[BASE0].x, spots[BASE0].z, true);
     $('mt').textContent = GAME.towns; $('cap').textContent = GAME.cap;
     updateCtx(); syncDiff();
-    $('loading').hidden = true; $('start').hidden = false; state = 'menu';
+    $('loading').hidden = true; state = 'menu'; menuDirty = false;
+    if (pendingStart) { pendingStart = false; startGame(); } else { $('start').hidden = false; showPortraits(); }
   }, 30));
 }
 function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; toast('MAPA: ' + GEO.LIST[scen]); resetFog(true); selBld = null; selSpot = null; updateCtx(); track('game_start', { seed, diff, map: scen }); }
@@ -2242,20 +2281,67 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => { keys.clear(); mouse.in = false; });
-$('go').addEventListener('click', () => { sfx('select'); startGame(); });
+$('go').addEventListener('click', () => { sfx('select'); if (menuDirty) { pendingStart = true; newGame(seed); } else startGame(); });
+// ---------- Menú principal: retratos de héroe y fortaleza ----------
+let menuDirty = false, pendingStart = false;
+const PORT = {};
+let portR = null;
+// retrato vóxel de un héroe o de una fortaleza (castillo, cuartel y altar) con el color del bando; se dibuja una vez y se guarda
+function portrait(kind, ci, side) {
+  const key = kind + ci + '_' + side; if (PORT[key]) return PORT[key];
+  try {
+    if (!portR) { portR = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: true }); portR.setPixelRatio(1); portR.outputColorSpace = THREE.LinearSRGBColorSpace; }
+    const hero = kind === 'hero', w = hero ? 120 : 176, h = hero ? 120 : 132; portR.setSize(w, h, false);
+    const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(26, w / h, .1, 200), l = new THREE.DirectionalLight(0xfff6e8, 2.2); l.position.set(3, 6, 5); sc.add(l, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25));
+    const g = new THREE.Group(), c = CIVS[ci], T = TEAM[side].c; sc.add(g); CIV.setFill(null);
+    if (hero) c.hero(g, T);
+    else { part(g, 11, .5, 8, c.map.plaza, 0, -.25, 0, false); c.castle(CIV.grp(g, .4, 0, -.6, .9), T); c.barracks(CIV.grp(g, -3.8, 0, 2.2, .7, .4), T); c.map.altar(CIV.grp(g, 3.9, 0, 2.3, 1.05, -.3), T); }
+    g.rotation.y = side ? -.55 : .55;   // el tuyo mira hacia la derecha, el del rival hacia la izquierda
+    const box = new THREE.Box3().setFromObject(g), ctr = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+    const dist = Math.max(size.y * (hero ? 1.15 : 1.25), size.x / (w / h) * .95) / (2 * Math.tan(13 * Math.PI / 180));
+    cam.position.copy(ctr).add(new THREE.Vector3(0, hero ? .35 : .9, 1).normalize().multiplyScalar(dist)); cam.lookAt(ctr);
+    portR.render(sc, cam); return (PORT[key] = palettize(portR.domElement));
+  } catch (e) { return ''; }
+}
+const civOpts = () => ['random', ...CIVS.map(c => c.id)];
+function setCiv(sd, val, dir) {
+  civPick[sd] = val; $('civ' + sd).value = val; try { localStorage.setItem('imperium-civs', JSON.stringify(civPick)); } catch (e) {}
+  menuDirty = true; sfx('select'); showPortraits(sd, dir);
+}
+// cambia el contenido de una casilla con un deslizamiento suave: lo viejo sale hacia un lado y lo nuevo entra desde el otro
+function swapStage(stage, node, dir) {
+  node.style.setProperty('--dx', String(dir * 70));
+  for (const old of [...stage.children]) { old.style.setProperty('--dx', String(dir * 70)); old.classList.add('leave'); setTimeout(() => old.remove(), 600); }
+  if (dir) { node.classList.add('enter'); stage.appendChild(node); requestAnimationFrame(() => requestAnimationFrame(() => node.classList.remove('enter'))); }
+  else { for (const old of [...stage.children]) old.remove(); stage.appendChild(node); }
+}
+function showPortraits(onlySide = -1, dir = 0) {
+  for (const sd of [0, 1]) {
+    if (onlySide >= 0 && sd !== onlySide) continue;
+    const val = civPick[sd], ci = CIVS.findIndex(c => c.id === val);
+    for (const stage of document.querySelectorAll(`#start .stage[data-side="${sd}"]`)) {
+      let node;
+      if (ci < 0) { node = document.createElement('div'); node.className = 'q'; node.textContent = '?'; }
+      else { node = new Image(); node.alt = ''; node.src = portrait(stage.dataset.kind, ci, sd); }
+      swapStage(stage, node, dir);
+    }
+    for (const nm of document.querySelectorAll(`#start .s${sd} .nm`)) nm.textContent = ci < 0 ? 'ALEATORIA' : CIVS[ci].name;
+  }
+}
+document.querySelectorAll('#start .arr').forEach(b => b.addEventListener('click', () => {
+  const sd = +b.dataset.side, d = +b.dataset.d, o = civOpts(), i = o.indexOf(civPick[sd]);
+  setCiv(sd, o[(i + d + o.length) % o.length], d);
+}));
 for (const sd of [0, 1]) {
   const el = $('civ' + sd);
   el.innerHTML = '<option value="random">ALEATORIA</option>' + CIVS.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   el.value = civPick[sd] || 'random';
-  el.addEventListener('change', () => {
-    civPick[sd] = el.value; try { localStorage.setItem('imperium-civs', JSON.stringify(civPick)); } catch (e) {}
-    sfx('select'); newGame(seed);
-  });
+  el.addEventListener('change', () => setCiv(sd, el.value, 1));
 }
 { const el = $('geo');
   el.innerHTML = '<option value="random">ALEATORIO</option>' + GEO.keys.map(k => `<option value="${k}">${GEO.LIST[k]}</option>`).join('');
   el.value = GEO.LIST[wantScen] ? wantScen : 'random';
-  el.addEventListener('change', () => { wantScen = el.value; try { localStorage.setItem('imperium-geo', wantScen); } catch (e) {} sfx('select'); newGame(seed); });
+  el.addEventListener('change', () => { wantScen = el.value; try { localStorage.setItem('imperium-geo', wantScen); } catch (e) {} sfx('select'); menuDirty = true; });
 }
 $('howBtn').addEventListener('click', () => { sfx('select'); $('start').hidden = true; $('how').hidden = false; });
 $('howBack').addEventListener('click', () => { sfx('select'); $('how').hidden = true; $('start').hidden = false; });
