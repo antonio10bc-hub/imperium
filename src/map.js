@@ -111,13 +111,13 @@ class Chunk {
     this.nv += 4; return v;
   }
   box(cx, cy, cz, sx, sy, sz, col) { for (let f = 0; f < 6; f++) if (f !== 3) this.quad(f, cx - sx / 2, cx + sx / 2, cy - sy / 2, cy + sy / 2, cz - sz / 2, cz + sz / 2, col); }
-  build(mat) {
+  build(mat, parent = world) {
     const g = new THREE.BufferGeometry(), ix = new Uint32Array(this.nv / 4 * 6);
     for (let q = 0, v = 0; v < this.nv; v += 4) { ix[q++] = v; ix[q++] = v + 1; ix[q++] = v + 2; ix[q++] = v; ix[q++] = v + 2; ix[q++] = v + 3; }
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
     this.col = new THREE.BufferAttribute(Uint8Array.from(this.c), 3, true); g.setAttribute('color', this.col); g.setIndex(new THREE.BufferAttribute(ix, 1));
     g.computeBoundingSphere(); this.p = this.n = this.c = null;
-    const m = new THREE.Mesh(g, mat); world.add(m); return m;
+    const m = new THREE.Mesh(g, mat); parent.add(m); return m;
   }
 }
 // ---------- Generación del mapa ----------
@@ -338,4 +338,35 @@ function buildVoxels() {
   const lmat = terrainMat(false), wmat = terrainMat(true);
   landC.forEach(L => { if (L.nv) { meshes.push(L.build(lmat)); chunks.push(L); } else chunks.push(L); });
   waterC.forEach(W => { if (W.nv) meshes.push(W.build(wmat)); });
+}
+
+// ---------- Vista de una geografía para el menú ----------
+// Terreno vóxel como el de la partida (alturas, laderas, agua, bosque y arboledas) de la geografía de ejemplo,
+// sin edificios ni pueblos, con colores de hierba neutros. Construye solo la ventana [x0,x1)×[z0,z1).
+const PREV_GROUND = [0x6ea653, 0x7db45b, 0x8bbd61, 0x9fc56c];
+export function geoTerrain(key, x0, z0, x1, z1) {
+  const p = previewMap(key), grp = new THREE.Group(), L = new Chunk(), W = new Chunk();
+  const H = (x, z) => { if (x < 0 || z < 0 || x >= MW || z >= MD) return 0; const g = p.HM[idx(x, z)]; return g >= .5 ? Math.max(1, Math.round(g)) : 0; };
+  const H4 = [[1, 0, 0], [-1, 0, 1], [0, 1, 4], [0, -1, 5]];
+  for (let z = Math.max(0, z0); z < Math.min(MD, z1); z++) for (let x = Math.max(0, x0); x < Math.min(MW, x1); x++) {
+    const i = idx(x, z), h = H(x, z), cx = x + .5, cz = z + .5, t = p.TT[i];
+    if (h <= 0) { const nearLand = H4.some(([a, b]) => H(x + a, z + b) > 0); W.quad(2, x, x + 1, 0, 0, z, z + 1, nearLand ? TP.edge : -p.HM[i] < 2.2 ? TP.shallow : TP.deep); continue; }
+    const tree = t === 1 ? ((x + z) % 2 === 0 ? 2 : 0) : (t === 0 && h >= 2 && h <= 7 && n2(cx, cz, .055, 3, 22) > .6 && hash(x * 3, 1, z * 11) < .45) ? 1 : 0;
+    let col;
+    if (t === 1 || tree) col = TP.lush;
+    else if (t === 2) { const w = n2(cx, cz, .12, 2, 71) > .55; col = h <= 1 ? (w ? 0xb8ccc0 : 0xd6cca0) : (w ? 0x6c9a92 : 0x6a8a5a); }
+    else if (t === 3 || h <= 1) col = TP.sand;
+    else if (t === 4) col = mixHex(PREV_GROUND[0], 0x4f9a3a, .45);
+    else { const m = n2(cx, cz, .045, 3, 21) + (h - 2) * .05, tone = THREE.MathUtils.clamp(Math.floor((m - .34) / .09), 0, 3); col = h >= 6 ? (h >= 9 ? 0xe4e2da : mixHex(PREV_GROUND[tone], 0x9a9488, Math.min(1, (h - 5) / 3))) : PREV_GROUND[tone]; }
+    if (H(x - 1, z + 1) > h) col = mixHex(col, 0x10203a, .12);
+    L.quad(2, x, x + 1, h, h, z, z + 1, col);
+    const lip = mixHex(col, 0x10203a, .14);
+    for (const [a, b, f] of H4) { const hn = H(x + a, z + b); if (hn >= h) continue; L.quad(f, x, x + 1, h - 1, h, z, z + 1, h <= 1 ? TP.cliffS : lip); if (hn < h - 1) L.quad(f, x, x + 1, hn, h - 1, z, z + 1, TP.cliff); }
+    const r2 = hash(x * 5, 7, z * 3);
+    if (tree === 2) { L.box(cx, h + .5 + r2 * .15, cz, 1.6, .9 + r2 * .3, 1.6, TP.canopy); L.box(cx + .2, h + 1.1 + r2 * .3, cz - .2, .8, .4, .8, TP.canopy2); }
+    else if (tree) treeBoxes(L, r2 > .55 ? 'oak' : 'pine', cx, h, cz, r2);
+  }
+  const lm = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: grad }), wm = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: grad });
+  if (L.nv) L.build(lm, grp); if (W.nv) W.build(wm, grp);
+  return grp;
 }

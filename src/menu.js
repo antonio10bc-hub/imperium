@@ -1,40 +1,99 @@
-// Menú principal: mapa a la izquierda; en el centro, civilizaciones (con su ventaja), mapa y dificultad; a la derecha, fortaleza y héroe de cada bando.
+// Menú principal en tres columnas iguales: civilizaciones (la tuya arriba, la del rival abajo), geografía y, a la derecha, título, dificultad y jugar.
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { BONUS, CIV, CIVS, civPick } from './civs.js';
-import { MW, TEAM, idx } from './config.js';
+import { MD, MW, TEAM, TP, idx, mixHex } from './config.js';
 import { newGame } from './game.js';
 import { GEO } from './geo.js';
 import { syncDiff } from './hud.js';
-import { previewMap } from './map.js';
+import { geoTerrain, previewMap } from './map.js';
 import { resize } from './overlay.js';
-import { part } from './render.js';
+import { bake, grad, part } from './render.js';
 import { $, S } from './state.js';
-import { offscreen, palettize } from './units.js';
+import { offscreen } from './units.js';
 
-// ---------- Menú principal: retrato de fortaleza y héroe ----------
+// ---------- Menú principal: retrato de cada civilización ----------
 const PORT = {};
-// fortaleza (castillo, cuartel y salón de héroes sobre su plaza) con el héroe delante, del color del bando; se dibuja una vez y se guarda.
-// La cámara se ajusta a todo el conjunto con margen, para que la imagen salga entera
+// diorama de la fortaleza (castillo, cuartel y templo sobre su plaza) con el héroe grande delante, del color del bando,
+// con contornos como en la partida; se dibuja una vez a buena resolución y se guarda. La cámara encuadra todo el conjunto.
 function portrait(ci, side) {
   const key = ci + '_' + side; if (PORT[key]) return PORT[key];
   try {
-    const portR = offscreen(), w = 260, h = 210; portR.setSize(w, h, false);
-    const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(26, w / h, .1, 300), l = new THREE.DirectionalLight(0xfff6e8, 2.2); l.position.set(3, 6, 5); sc.add(l, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25));
-    const g = new THREE.Group(), c = CIVS[ci], T = TEAM[side].c, f = side ? -1 : 1; sc.add(g);
-    part(g, 11, .5, 8, c.map.plaza, 0, -.25, 0, false);
-    c.castle(CIV.grp(g, -.6 * f, 0, -1.2, .85), T); c.barracks(CIV.grp(g, -4 * f, 0, 1.6, .65, .4 * f), T); c.map.altar(CIV.grp(g, 3.8 * f, 0, -1.4, .8, -.3 * f), T);
-    c.hero(CIV.grp(g, 2.6 * f, 0, 3, 2.3, -.35 * f), T);   // el héroe, grande y delante
-    g.rotation.y = .45 * f;   // el tuyo mira hacia la derecha, el del rival hacia la izquierda
-    const box = new THREE.Box3().setFromObject(g), ctr = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
-    const dist = Math.max(size.y * 1.3, size.x / (w / h) * 1.12, size.z * .9) / (2 * Math.tan(13 * Math.PI / 180));
-    cam.position.copy(ctr).add(new THREE.Vector3(0, .75, 1).normalize().multiplyScalar(dist)); cam.lookAt(ctr);
-    portR.render(sc, cam); return (PORT[key] = palettize(portR.domElement));
+    const r = offscreen(), w = 960, h = 600; r.setSize(w, h, false);
+    const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(24, w / h, .1, 300), f = side ? -1 : 1;
+    const key1 = new THREE.DirectionalLight(0xfff6e8, 1.9), rim = new THREE.DirectionalLight(0xffd890, .7);
+    key1.position.set(-3 * f, 7, 6); rim.position.set(4 * f, 3, -7); sc.add(key1, rim, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1));
+    const g = new THREE.Group(), c = CIVS[ci], M = c.map, T = TEAM[side].c; sc.add(g);
+    part(g, 15, 1, 10.5, M.ground[0], 0, -.5, 0); part(g, 15.2, .9, 10.7, TP.cliff, 0, -1.4, 0);   // bloque de terreno
+    part(g, 11, .14, 6.6, M.plaza, -.2 * f, .07, -.9, false);
+    for (const [x, z, s] of [[-6.4, -4, 1], [6.3, -3.7, .9], [-6.6, 3.8, .8], [6.6, 4.2, 1.1]]) {   // matas en las esquinas
+      part(g, .9 * s, .9 * s, .9 * s, M.treeCol ?? TP.canopy, x, .45 * s, z); part(g, .5 * s, .4 * s, .5 * s, mixHex(M.treeCol ?? TP.canopy, 0x9ad86a, .25), x + .1, 1 * s, z - .1);
+    }
+    c.castle(CIV.grp(g, -.4 * f, 0, -1.8, .9), T); c.barracks(CIV.grp(g, -4.6 * f, 0, 1.4, .62, .35 * f), T); M.altar(CIV.grp(g, 4.5 * f, 0, -1.6, .78, -.3 * f), T);
+    c.hero(CIV.grp(g, 2.6 * f, .02, 2.8, 3.1, -.35 * f), T);   // el héroe, grande y delante
+    g.rotation.y = .38 * f;   // el tuyo mira hacia la derecha, el del rival hacia la izquierda
+    const baked = bake(g);
+    fitCam(cam, g, new THREE.Vector3(0, .62, 1), .97);
+    r.render(sc, cam); const url = r.domElement.toDataURL();
+    for (const m of baked) m.geometry.dispose();
+    return (PORT[key] = url);
+  } catch (e) { return ''; }
+}
+// coloca la cámara en la dirección dada y a la distancia justa para que el modelo entero (todos sus vértices) llene el encuadre
+function fitCam(cam, obj, dir, fill) {
+  obj.updateMatrixWorld(true);
+  const pts = [], v = new THREE.Vector3();
+  obj.traverse(o => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i += 2) pts.push(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).clone()); });
+  const ctr = new THREE.Box3().setFromPoints(pts).getCenter(new THREE.Vector3()); dir.normalize();
+  let dist = 40;
+  for (let it = 0; it < 5; it++) {
+    cam.position.copy(ctr).addScaledVector(dir, dist); cam.lookAt(ctr); cam.updateMatrixWorld();
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const p of pts) { v.copy(p).project(cam); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); }
+    const t = dist * Math.tan(cam.fov * Math.PI / 360);
+    ctr.add(new THREE.Vector3((x0 + x1) / 2 * cam.aspect * t, (y0 + y1) / 2 * t, 0).applyQuaternion(cam.quaternion));   // recentra
+    dist *= Math.max(x1 - x0, y1 - y0) / 2 / fill;
+  }
+  cam.position.copy(ctr).addScaledVector(dir, dist); cam.lookAt(ctr);
+}
+// ---------- Menú principal: vista de la geografía ----------
+// Terreno real de la geografía de ejemplo (sin edificios), visto desde el sur como en la partida y acercado al centro del mapa
+const GEOIMG = {};
+// la zona más vistosa del ejemplo: muchos desniveles y orillas, poca cumbre nevada y plana
+function geoFocus(key) {
+  const p = previewMap(key), H = i => { const g = p.HM[i]; return g >= .5 ? Math.max(1, Math.round(g)) : 0; };
+  let best = [MW / 2, MD / 2], bv = -1e9;
+  for (let cz = 70; cz <= MD - 70; cz += 16) for (let cx = 110; cx <= MW - 110; cx += 16) {
+    let v = 0;
+    for (let z = cz - 50; z < cz + 50; z += 2) for (let x = cx - 40; x < cx + 40; x += 2) {
+      const i = idx(x, z), h = H(i), hr = H(i + 2), hd = H(i + 2 * MW);
+      if (h !== hr) v += (h === 0) !== (hr === 0) ? 3 : 1;
+      if (h !== hd) v += (h === 0) !== (hd === 0) ? 3 : 1;
+      if (h >= 9) v -= 1.5; if (p.TT[i] === 1) v += .15;
+    }
+    v -= Math.hypot(cx - MW / 2, cz - MD / 2) * .4;   // a igualdad, mejor cerca del centro
+    if (v > bv) { bv = v; best = [cx, cz]; }
+  }
+  return best;
+}
+function geoRender(key) {
+  if (GEOIMG[key]) return GEOIMG[key];
+  try {
+    const r = offscreen(), w = 640, h = 1000; r.setSize(w, h, false);
+    const sc = new THREE.Scene(), SKY = new THREE.Color(0x8ad8f0); sc.background = SKY; sc.fog = new THREE.Fog(SKY, 200, 430);
+    const sun = new THREE.DirectionalLight(0xfff6e8, 2.2); sun.position.set(-60, 120, 80); sc.add(sun, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25));
+    const [cx, cz] = geoFocus(key), grp = geoTerrain(key, cx - 120, 0, cx + 120, MD); sc.add(grp);
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshToonMaterial({ color: 0x1e4a8a, gradientMap: grad })); sea.rotation.x = -Math.PI / 2; sea.position.set(cx, -1.5, cz); sc.add(sea);
+    const cam = new THREE.PerspectiveCamera(30, w / h, 1, 1200), D = 185, pitch = 44 * Math.PI / 180;
+    cam.position.set(cx, 2 + D * Math.sin(pitch), cz + D * Math.cos(pitch)); cam.lookAt(cx, 2, cz);
+    r.render(sc, cam); const url = r.domElement.toDataURL('image/jpeg', .9);
+    grp.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); sea.geometry.dispose(); sea.material.dispose();
+    return (GEOIMG[key] = url);
   } catch (e) { return ''; }
 }
 const civOpts = () => ['random', ...CIVS.map(c => c.id)];
 function setCiv(sd, val, dir) {
-  civPick[sd] = val; $('civ' + sd).value = val; try { localStorage.setItem('imperium-civs', JSON.stringify(civPick)); } catch (e) {}
+  civPick[sd] = val; try { localStorage.setItem('imperium-civs', JSON.stringify(civPick)); } catch (e) {}
   S.menuDirty = true; sfx('select'); showPortraits(sd, dir);
 }
 // cambia el contenido de una casilla con un deslizamiento suave: lo viejo sale hacia un lado y lo nuevo entra desde el otro
@@ -60,26 +119,16 @@ export function showPortraits(onlySide = -1, dir = 0) {
   }
 }
 
-// miniatura de la geografía elegida: agua, alturas, bosque denso, pantano y arena, con tu fortaleza (azul) y la del rival (roja)
-const PREV_COL = { deep: 0x4594c6, shallow: 0x5fb0d4, forest: 0x2f5a35, swamp: 0x6c9a92, sand: 0xdccb95, oasis: 0x4f9a3a, rock: 0x9a9488, snow: 0xe4e2da, grass: [0x7db45b, 0x8bbd61, 0x9fc56c] };
-function drawGeoPreview() {
-  const c = $('geoPrev'), x = c.getContext('2d'), W = c.width, H = c.height, key = S.wantScen;
-  $('geoName').textContent = GEO.LIST[key] || 'ALEATORIO';
-  if (!GEO.LIST[key]) { x.fillStyle = '#262a3b'; x.fillRect(0, 0, W, H); x.fillStyle = '#e8c870'; x.font = '150px Silkscreen, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('?', W / 2, H / 2 + 8); return; }
-  const p = previewMap(key), img = x.createImageData(W, H), k = MW / W;
-  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
-    const c0 = idx(i * k | 0, j * k | 0), h = p.HM[c0], t = p.TT[c0], C = PREV_COL;
-    const col = h <= 0 ? (h < -1.5 ? C.deep : C.shallow) : t === 1 ? C.forest : t === 2 ? C.swamp : t === 4 ? C.oasis : t === 3 || h <= 1 ? C.sand : h >= 9 ? C.snow : h >= 6 ? C.rock : C.grass[Math.min(2, Math.max(0, Math.round(h) - 2))];
-    const o = (j * W + i) * 4; img.data[o] = col >> 16 & 255; img.data[o + 1] = col >> 8 & 255; img.data[o + 2] = col & 255; img.data[o + 3] = 255;
-  }
-  x.putImageData(img, 0, 0);
-  p.F.forEach(([fx, fz], sd) => { const px = fx / k, pz = fz / k; x.fillStyle = '#0f0f1b'; x.fillRect(px - 10, pz - 10, 20, 20); x.fillStyle = TEAM[sd].css; x.fillRect(px - 7, pz - 7, 14, 14); });
+function showGeo(dir = 0) {
+  const key = S.wantScen, node = GEO.LIST[key] ? Object.assign(new Image(), { alt: '', src: geoRender(key) }) : Object.assign(document.createElement('div'), { className: 'q', textContent: '?' });
+  $('geoName').textContent = GEO.LIST[key] || 'ALEATORIA';
+  swapStage($('geoStage'), node, dir);
 }
 
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
-function setGeo(v) {
-  S.wantScen = v; $('geo').value = GEO.LIST[v] ? v : 'random'; try { localStorage.setItem('imperium-geo', v); } catch (e) {}
-  sfx('select'); S.menuDirty = true; drawGeoPreview();
+function setGeo(v, dir) {
+  S.wantScen = v; try { localStorage.setItem('imperium-geo', v); } catch (e) {}
+  sfx('select'); S.menuDirty = true; showGeo(dir);
 }
 
 export function init() {
@@ -87,19 +136,8 @@ export function init() {
     const sd = +b.dataset.side, d = +b.dataset.d, o = civOpts(), i = o.indexOf(civPick[sd]);
     setCiv(sd, o[(i + d + o.length) % o.length], d);
   }));
-  for (const sd of [0, 1]) {
-    const el = $('civ' + sd);
-    el.innerHTML = '<option value="random">ALEATORIA</option>' + CIVS.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-    el.value = civPick[sd] || 'random';
-    el.addEventListener('change', () => setCiv(sd, el.value, 1));
-  }
-  { const el = $('geo');
-    el.innerHTML = '<option value="random">ALEATORIO</option>' + GEO.keys.map(k => `<option value="${k}">${GEO.LIST[k]}</option>`).join('');
-    el.value = GEO.LIST[S.wantScen] ? S.wantScen : 'random';
-    el.addEventListener('change', () => setGeo(el.value));
-    document.querySelectorAll('#start [data-geo]').forEach(b => b.addEventListener('click', () => { const o = ['random', ...GEO.keys], i = o.indexOf(S.wantScen); setGeo(o[(i + +b.dataset.geo + o.length) % o.length]); }));
-    setTimeout(drawGeoPreview, 0);
-  }
+  document.querySelectorAll('#start [data-geo]').forEach(b => b.addEventListener('click', () => { const d = +b.dataset.geo, o = ['random', ...GEO.keys], i = o.indexOf(S.wantScen); setGeo(o[(i + d + o.length) % o.length], d); }));
+  setTimeout(() => showGeo(), 0);
   $('howBtn').addEventListener('click', () => { sfx('select'); $('start').hidden = true; $('how').hidden = false; });
   $('howBack').addEventListener('click', () => { sfx('select'); $('how').hidden = true; $('start').hidden = false; });
   $('again').addEventListener('click', () => newGame(1 + Math.floor(Math.random() * 99999)));
