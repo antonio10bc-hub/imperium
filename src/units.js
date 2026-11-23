@@ -1,8 +1,8 @@
 // Unidades: plantillas de modelos, miniaturas, aparición, movimiento y rejilla espacial.
 import * as THREE from 'three';
 import { orderMove } from './behavior.js';
-import { CIV_SLOT, civOf } from './civs.js';
-import { BARR0, GAME, MD, MW, RANKS, TEAM, TYPES, UNITS, mixHex } from './config.js';
+import { CIV_SLOT, civOf, defOf } from './civs.js';
+import { BARR0, GAME, MD, MW, RANKS, TEAM, TYPES, mixHex } from './config.js';
 import { GEOT, HM, cellOf, roadCell, spots } from './map.js';
 import { NBO, cellX, cellZ, inMain, nearestNode, stepMask, walk } from './nav.js';
 import { BOX, FLASH, HULLMAT, VCMAT, basic, collectParts, discGeo, mergeBoxes, part, ring, world } from './render.js';
@@ -132,7 +132,7 @@ export function spawnUnit(side, type, at = BARR0) {
   return u;
 }
 export function spawnAt(side, type, x, z, ang = Math.random() * 6.28) {
-  const def = UNITS[type], n = nearestNode(x, z);
+  const def = defOf(side, type), n = nearestNode(x, z);
   const parts = buildUnit(type, side);
   const u = { id: ++uid, side, type, def, hp: def.hp, maxHp: def.hp, node: n, pos: new THREE.Vector3(cellX(n), HM[n], cellZ(n)), fwd: new THREE.Vector3(Math.cos(ang), 0, Math.sin(ang)),
     cd: 0, think: 0, enemy: null, bob: Math.random() * 6, lunge: 0, flash: 0, block: 0, order: null, leader: null, escort: [], combatT: 0, lastHit: -9, healT: 0,

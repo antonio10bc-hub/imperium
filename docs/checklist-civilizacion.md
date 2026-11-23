@@ -1,6 +1,6 @@
 # Lista de comprobación: civilización nueva
 
-Todas las civilizaciones comparten la misma lógica (estadísticas, costes, counters e IA). Lo que cambia es el aspecto, los edificios, el mapa y los nombres. Esta lista recoge todo lo que tiene que tener una civilización para estar completa.
+Todas las civilizaciones comparten la misma lógica (estadísticas, costes, counters e IA) salvo una ventaja propia. Lo que cambia es esa ventaja, el aspecto, los edificios, el mapa y los nombres. Esta lista recoge todo lo que tiene que tener una civilización para estar completa.
 
 ## Dónde va cada cosa
 
@@ -8,6 +8,7 @@ Todas las civilizaciones comparten la misma lógica (estadísticas, costes, coun
 |---|---|
 | Tropas, fortaleza, cuartel, casa, nombres, paleta, color propio | array `CIVS` en `src/civs.js` |
 | Colores de muralla | objeto `WALLS` en `src/civs.js` |
+| Ventaja propia | objeto `BONUS` en `src/civs.js` |
 | Bioma, árboles, rasgo de paisaje, forma y estilo de muralla, distribución del recinto, altar | objeto `MAPS` en `src/civs.js` |
 | Árboles nuevos | función `treeBoxes` en `src/map.js` |
 | Rasgo de paisaje nuevo | función `featureAt` (y piezas pequeñas en `buildVoxels`), en `src/map.js` |
@@ -16,6 +17,7 @@ Todas las civilizaciones comparten la misma lógica (estadísticas, costes, coun
 - [ ] **Nombre y época**: nombre corto en mayúsculas para el selector y una época para las fichas.
 - [ ] **Color propio** (`own`): no puede parecerse al azul (`#3a6ad8`) ni al rojo (`#d83a4a`) de bando.
 - [ ] **Paleta de 4 colores**: materiales dominantes (piedra, tejado, metal, tela).
+- [ ] **Ventaja propia** (`BONUS`): una sola y moderada (unos 15–30 % en una cosa), con nombre y texto para el menú; probarla en partidas contra cada civilización.
 - [ ] **Silueta única**: un rasgo (escudo, casco, montura o arma) que ninguna otra civilización tenga.
 
 ## Tropas

@@ -1,7 +1,7 @@
 // Menú principal: retratos y selección de civilizaciones, mapa y dificultad.
 import * as THREE from 'three';
 import { sfx } from './audio.js';
-import { CIV, CIVS, civPick } from './civs.js';
+import { BONUS, CIV, CIVS, civPick } from './civs.js';
 import { TEAM } from './config.js';
 import { newGame } from './game.js';
 import { GEO } from './geo.js';
@@ -52,6 +52,8 @@ export function showPortraits(onlySide = -1, dir = 0) {
       swapStage(stage, node, dir);
     }
     for (const nm of document.querySelectorAll(`#start .s${sd} .nm`)) nm.textContent = ci < 0 ? 'ALEATORIA' : CIVS[ci].name;
+    const b = ci < 0 ? null : BONUS[CIVS[ci].id], info = $('civInfo' + sd);   // ventaja de la civilización elegida
+    if (info) info.innerHTML = b ? `<b>${b.name}</b> ${b.text}` : 'ventaja al azar';
   }
 }
 

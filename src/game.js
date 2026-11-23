@@ -4,7 +4,7 @@ import { makeAI, updateAIs } from './ai.js';
 import { sfx, startMusic } from './audio.js';
 import { updateUnit } from './behavior.js';
 import { buildAltar, buildBarracks, buildCastle, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
-import { resolveCivs, uname } from './civs.js';
+import { BONUS, bonusOf, civOf, resolveCivs, uname } from './civs.js';
 import { alarm, applyRank, corpses, damage, raiseAlarm, shoot } from './combat.js';
 import { ALT0, BARR0, BASE0, BASE1, DIFF, GAME, TEAM, TOWN0, UNITS } from './config.js';
 import { burst, dropBox, floatText, ping, seenAt } from './effects.js';
@@ -102,7 +102,7 @@ export function newGame(s, keepCivs = false) {
     if (S.pendingStart) { S.pendingStart = false; startGame(); } else { $('start').hidden = false; showPortraits(); }
   }, 30));
 }
-export function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; toast('MAPA: ' + GEO.LIST[scen]); resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
+export function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; toast('MAPA: ' + GEO.LIST[scen]); { const b = BONUS[civOf(0).id]; if (b) toast(`${civOf(0).name} · ${b.name}: ${b.text.toUpperCase()}`, 'good'); } resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
 export function endGame(win, surrender = false) {
   state = 'end'; $('menu').hidden = true; S.menuOpen = false; $('ui').classList.add('hidden-ui'); $('toast').hidden = true; $('pause').hidden = true;
   const s = spots[win ? BASE1 : BASE0];
@@ -122,7 +122,7 @@ export function toast(msg, kind = '', pos = null) {   // avisos en columna, arri
   while (f.children.length > 4) f.lastChild.remove(); setTimeout(() => d.remove(), 4500);
 }
 export const TOWN_LV = { cost: [0, 120, 220], inc: [1, 1.8, 2.6] };
-export const townInc = s => s.camp ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special ? 2 : 1) * (s.fortified ? 2 : 1);
+export const townInc = s => s.camp ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special ? 2 : 1) * (s.fortified ? 2 : 1) * (bonusOf(s.owner).income || 1);
 export const incomeOf = sd => GAME.income + spots.reduce((a, s) => a + (s.kind === 'town' && s.owner === sd ? townInc(s) : 0), 0);
 export const towerRange = s => GAME.towerRange + (s.lvl - 1) * 1.5, towerDmg = s => GAME.towerDmg * (1 + (s.lvl - 1) * .5);
 export function upgradeTown(side, s) {
@@ -173,13 +173,13 @@ function updateTowns(dt) {
     if (s.camp && s.owner >= 0 && (s.genT -= dt) <= 0) { s.genT = GAME.campGen; campSpawn(s); }
     if (s.owner === -1) {
       for (const sd of [0, 1]) {
-        if (here[sd] && !here[1 - sd]) { s.prog[sd] += dt / GAME.capture; cheer(sd); } else s.prog[sd] = Math.max(0, s.prog[sd] - dt / GAME.capture / 2);
+        if (here[sd] && !here[1 - sd]) { s.prog[sd] += dt / GAME.capture * (bonusOf(sd).capture || 1); cheer(sd); } else s.prog[sd] = Math.max(0, s.prog[sd] - dt / GAME.capture / 2);
         if (s.prog[sd] >= 1 && s.owner === -1) { s.prog = [0, 0]; setOwner(s, sd); }
       }
     } else {
       const own = s.owner, en = 1 - own;
       if (here[en] && !here[own]) {
-        s.lose += dt / (GAME.capture * 2); cheer(en);
+        s.lose += dt / (GAME.capture * 2) * (bonusOf(en).capture || 1); cheer(en);
         if (own === 0) raiseAlarm(p, `¡TE ESTÁN QUITANDO ${s.name}!`);
         if (s.lose >= 1) { s.lose = 0; setOwner(s, -1); }
       } else s.lose = Math.max(0, s.lose - dt / GAME.capture);

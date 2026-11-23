@@ -209,6 +209,25 @@ function chariot(g, T, hc, king) {
   return { list: CIVS, grp };
 })();
 export const CIVS = CIV.list;
+// Ventaja propia de cada civilización (el resto de reglas es común). unit: por tipo de tropa, mul multiplica y add suma estadísticas;
+// income multiplica el oro de sus pueblos, capture la velocidad de conquista y chargeCd son los segundos entre cargas del héroe
+export const BONUS = {
+  roma: { name: 'LEGIONES', text: 'espadas con +20 % de vida', unit: { sword: { mul: { hp: 1.2 } } } },
+  cartago: { name: 'COMERCIO', text: 'sus pueblos dan +30 % de oro', income: 1.3 },
+  china: { name: 'BALLESTAS', text: 'arqueros con +1,5 de alcance', unit: { bow: { add: { range: 1.5 } } } },
+  mexica: { name: 'GUERRA FLORIDA', text: 'conquistan pueblos un 40 % más rápido', capture: 1.4 },
+  egipto: { name: 'CARROS', text: 'jinetes un 15 % más rápidos y con +15 % de daño', unit: { horse: { mul: { speed: 1.15, dmg: 1.15 } } } },
+  galos: { name: 'FURIA', text: 'espadas con +15 % de daño y carga del héroe cada 14 s', unit: { sword: { mul: { dmg: 1.15 } } }, chargeCd: 14 },
+};
+export const bonusOf = side => (side === 0 || side === 1) ? BONUS[civOf(side).id] || {} : {};
+// estadísticas de una tropa con la ventaja de su civilización (los neutrales usan las comunes)
+const defCache = new Map();
+export function defOf(side, type) {
+  const m = bonusOf(side).unit?.[type]; if (!m) return UNITS[type];
+  const k = civOf(side).id + ':' + type; let d = defCache.get(k);
+  if (!d) { d = { ...UNITS[type] }; for (const [s, v] of Object.entries(m.mul || {})) d[s] *= v; for (const [s, v] of Object.entries(m.add || {})) d[s] += v; defCache.set(k, d); }
+  return d;
+}
 export let civPick = ['random', 'random'], civIdx = [0, 1];
 try { civPick = JSON.parse(localStorage.getItem('imperium-civs')) || civPick; } catch (e) {}
 export const civOf = side => CIVS[civIdx[side] ?? 0];

@@ -6,6 +6,7 @@ import { nearestEnemy, siege, strike } from './combat.js';
 import { BASE1, GAME, MD, MW, idx } from './config.js';
 import { burst, floatText, ping } from './effects.js';
 import { aiUnit } from './ai.js';
+import { bonusOf } from './civs.js';
 import { capR, elapsed, fields } from './game.js';
 import { HM, cellOf, regionCell, regionOwner, spots } from './map.js';
 import { bfs, cellX, cellZ, inMain, nearestNode, walk } from './nav.js';
@@ -153,7 +154,7 @@ export function updateUnit(u, dt) {
     u.chargeCd -= dt; u.chargeT -= dt;
     if (u.escort.length && ((u.fieldT = (u.fieldT || 0) - dt) <= 0)) { u.fieldT = .6; u.field = bfs([u.node]); }
     if (u.chargeCd <= 0 && nearestEnemy(u, 8)) {
-      u.chargeCd = GAME.chargeCd; u.chargeT = GAME.chargeTime;
+      u.chargeCd = bonusOf(u.side).chargeCd ?? GAME.chargeCd; u.chargeT = GAME.chargeTime;
       burst(u.pos, [0xe6d6b0, 0xffffff, 0xffd23f], 16, 3, 2, .6, .25);
       for (const e of u.escort) burst(e.pos, [0xe6d6b0], 4, 2, 1.5, .4, .18);
       if (u.vis) { floatText(u.pos.clone().setY(u.pos.y + 4.4), '¡CARGA!', '#e8c870', 11); sfx('charge'); }
