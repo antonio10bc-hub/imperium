@@ -219,7 +219,7 @@ button.alt{background:var(--paper)}
     <li>Invoca un <b>HÉROE</b> en el altar. Asígnale hasta 50 tropas: formarán delante de él en bloque, línea o cuña.</li>
     <li>La niebla de guerra oculta lo que no has explorado. Las tropas suben de rango al matar y se curan en tus regiones.</li>
   </ul>
-  <div class="ctl"><b>IZQ</b> seleccionar · arrastrar caja · doble clic: mismo tipo<br><b>DER</b> mover, atacar o conquistar · sobre tu héroe: asignar tropas<br><b>E</b> ataque-mover · <b>WASD</b>, borde o <b>DER+ARRASTRAR</b>: cámara · <b>RUEDA</b> zoom<br><b>1 2 3</b> reclutar · <b>B</b> cuartel · <b>G</b> héroe · <b>H</b> base · <b>F1–F5</b> grupos · <b>ESPACIO</b> alerta · <b>P</b> pausa · <b>V</b> velocidad</div>
+  <div class="ctl"><b>IZQ</b> seleccionar · arrastrar caja · doble clic: mismo tipo<br><b>DER</b> mover, atacar o conquistar · sobre tu héroe: asignar tropas<br><b>E</b> ataque-mover · <b>WASD</b>, borde o <b>DER+ARRASTRAR</b>: cámara · <b>RUEDA</b> zoom<br><b>1 2 3</b> reclutar · <b>B</b> cuartel · <b>G</b> héroe · <b>H</b> base · <b>F1–F5</b> grupos · <b>ESPACIO</b> alerta · <b>P</b> pausa · <b>V</b> velocidad · <b>N</b> quitar o poner la niebla de guerra</div>
   <button id="howBack" type="button">VOLVER</button>
 </div></div>
 <div id="end" class="overlay" hidden><div class="card">
@@ -605,10 +605,11 @@ const cellX = i => i % MW + .5, cellZ = i => ((i / MW) | 0) + .5;
 let regions = [];
 function regionAt(x, z) { let b = 0, bd = 1e9; for (let r = 0; r < regions.length; r++) { const s = regions[r], d = (s.x - x) ** 2 + (s.z - z) ** 2; if (d < bd) { bd = d; b = r; } } return b; }
 const regionOwner = r => { const s = regions[r]; return s.kind === 'base' ? s.side : s.owner; };
+const regionShown = r => { const s = regions[r]; return s.kind === 'base' ? s.side : (s.known ?? s.owner); };   // lo que sabes de quién es
 let landBase = [], landEdge = [], regionLand = [], treeCell = null, roadCell = null, chunks = [], tileCh = null, tileV = null;
 const tintLand = (h, edge, own) => edge ? (own < 0 ? mixHex(h, 0xf4f4e8, .3) : mixHex(h, TEAM[own].c, .55)) : own >= 0 ? mixHex(h, TEAM[own].c, .07) : h;
 function paintRegion(r) {
-  const own = regionOwner(r);
+  const own = regionShown(r);
   for (const i of regionLand[r]) {
     const c = tintLand(landBase[i], landEdge[i], own), ch = chunks[tileCh[i]], a = ch.col.array, v0 = tileV[i] * 3;
     for (let k = 0; k < 12; k += 3) { a[v0 + k] = c >> 16 & 255; a[v0 + k + 1] = c >> 8 & 255; a[v0 + k + 2] = c & 255; }
@@ -926,10 +927,17 @@ function updateFog(snapTo) {
   // lo que nunca has visto queda oculto: edificios, pueblos y murallas
   for (const sp of spots) if (sp.group) sp.group.visible = exploredAt(sp.x, sp.z);
   for (const d of decos) d.visible = exploredAt(d.position.x, d.position.z);
+  refreshKnownTowns(false);
 }
 const fogIdx = (x, z) => THREE.MathUtils.clamp(Math.floor(z), 0, FH - 1) * FW + THREE.MathUtils.clamp(Math.floor(x), 0, FW - 1);
 const exploredAt = (x, z) => !fogOn || explored[fogIdx(x, z)] === 1;
 const visibleAt = (x, z) => !fogOn || seen[fogIdx(x, z)] === 1;
+function toggleFog() {
+  fogOn = !fogOn;
+  if (fogOn) updateFog(true);
+  else { fogData.fill(255); fogTex.needsUpdate = true; miniDirty = true; for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; for (const u of units) u.g.visible = true; refreshKnownTowns(true); }
+  toast(fogOn ? 'NIEBLA DE GUERRA: SÍ · N' : 'NIEBLA DE GUERRA: NO · N'); sfx('select');
+}
 function resetFog(on) { fogOn = on; explored.fill(0); expF.fill(0); fogData.fill(255); if (on) updateFog(true); else { fogTex.needsUpdate = true; for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; } }
 
 function paintMinimap() {
@@ -937,7 +945,7 @@ function paintMinimap() {
   for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) {
     const i = idx(x, z), o = i * 4; let c = miniRaw[i];
     if (HM[i] > 0) {
-      const r = regionCell[i], own = regionOwner(r);
+      const r = regionCell[i], own = regionShown(r);
       const edge = (x + 1 < MW && HM[i + 1] > 0 && regionCell[i + 1] !== r) || (z + 1 < MD && HM[i + MW] > 0 && regionCell[i + MW] !== r);
       c = edge ? (own < 0 ? 0xe8e8d8 : TEAM[own].c) : own >= 0 ? mixHex(c, TEAM[own].c, .28) : c;
     }
@@ -955,7 +963,7 @@ function drawMinimap() {
   mctx.lineWidth = 2; mctx.strokeStyle = '#0f0f1b';
   for (const s of spots) {
     if (!exploredAt(s.x, s.z)) continue;
-    if (s.kind === 'town') { const r = 7; mctx.fillStyle = s.owner < 0 ? '#f4f4e8' : TEAM[s.owner].css; mctx.beginPath(); mctx.moveTo(s.x, s.z - r); mctx.lineTo(s.x + r, s.z); mctx.lineTo(s.x, s.z + r); mctx.lineTo(s.x - r, s.z); mctx.closePath(); mctx.fill(); mctx.stroke(); }
+    if (s.kind === 'town') { const r = 7, ko = s.known ?? s.owner; mctx.fillStyle = ko < 0 ? '#f4f4e8' : TEAM[ko].css; mctx.beginPath(); mctx.moveTo(s.x, s.z - r); mctx.lineTo(s.x + r, s.z); mctx.lineTo(s.x, s.z + r); mctx.lineTo(s.x - r, s.z); mctx.closePath(); mctx.fill(); mctx.stroke(); }
     else if (s.kind === 'base') { mctx.fillStyle = TEAM[s.side].css; mctx.fillRect(s.x - 8, s.z - 8, 16, 16); mctx.strokeRect(s.x - 8, s.z - 8, 16, 16); }
   }
   for (const u of units) { if (u.side !== 0 && !visibleAt(u.pos.x, u.pos.z)) continue; const k = u.type === 'hero' ? 4 : 2; mctx.fillStyle = sel.has(u) ? '#e8c870' : u.type === 'hero' ? '#fff' : TEAM[u.side].css; mctx.fillRect(u.pos.x - k, u.pos.z - k, k * 2, k * 2); }
@@ -1236,7 +1244,7 @@ function buildCamp(s) {
   for (let k = 0; k < 26; k++) { const a = k / 26 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .2 && Math.cos(a) > 0) continue; part(g, .16, 1 + (k % 2) * .25, .16, 0x7a5a34, Math.cos(a) * 3, .4, Math.sin(a) * 3); }   // empalizada
   s.zone = ring(g, 3.5, 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.visible = false; g.add(s.beacon);
-  s.roofs = roofs; placeSpot(s, g, camFace(s, .5)); s.owner = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.campGen; addFlag(s, s.flag);
+  s.roofs = roofs; placeSpot(s, g, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.campGen; addFlag(s, s.flag);
   s.tower = local(s, -1.6, 2.6, -1.4);
 }
 function buildTown(s) {
@@ -1248,7 +1256,7 @@ function buildTown(s) {
   for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .25 && Math.cos(a) > 0) continue; part(g, .12, .9, .12, cv.id === 'galos' ? 0x7a5a34 : wc2, Math.cos(a) * 2.9, .05, Math.sin(a) * 2.9, false); }
   s.zone = ring(g, 3.5, 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.scale.set(.5, 14, .5); s.beacon.position.y = 9; s.beacon.visible = false; g.add(s.beacon);
-  s.roofs = roofs; placeSpot(s, g, camFace(s, .5)); s.owner = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
+  s.roofs = roofs; placeSpot(s, g, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
   s.tower = local(s, -1.5, 3.6, -1.5);
 }
 const decos = [];
@@ -1275,20 +1283,27 @@ function buildWalls(f) {
     });
   });
 }
-function setOwner(s, sd) {
-  const prev = s.owner; s.owner = sd; if (sd < 0) s.lvl = 1; s.anim = 1.4;
-  const col = sd < 0 ? null : TEAM[sd];
+// aspecto del pueblo según su dueño conocido
+function townLook(s) {
+  const sd = s.known, col = sd < 0 ? null : TEAM[sd];
   for (const m of s.roofs) m.material = mat(col ? (s.camp ? mixHex(0xd8c89a, col.c, .55) : col.c) : s.camp ? 0xd8c89a : civOf(sideAt(s.x, s.z)).wall[1]);
   s.flag.material = mat(col ? col.c : s.camp ? TEAM[2].c : 0xffffff);
   s.zone.material = basic(col ? col.c : 0xfff4d6, .85);
   s.beacon.visible = false;
   paintRegion(s.region);
-  const p = spotPos(s);
+}
+// al verlo de nuevo, el pueblo muestra su dueño real
+function refreshKnownTowns(all) { for (const s of spots) if (s.kind === 'town' && s.known !== s.owner && (all || visibleAt(s.x, s.z))) { s.known = s.owner; townLook(s); } }
+function setOwner(s, sd) {
+  const prev = s.owner; s.owner = sd; if (sd < 0) s.lvl = 1;
+  const p = spotPos(s), col = sd < 0 ? null : TEAM[sd];
+  if (sd >= 0 && s.camp) { s.genT = GAME.campGen; for (let k = 0; k < 3; k++) campSpawn(s); }   // el campamento da tropas aunque no se vea
+  if (!seenAt(p) && prev !== 0) return;   // en la niebla no te enteras (salvo que pierdas un pueblo tuyo)
+  s.known = sd; s.anim = 1.4; townLook(s);
   if (sd >= 0) {
     burst(spotPos(s, 1), [0xffd23f, 0xffe98a, col.c], 22, 3, 7, 1.1, .26); burst(spotPos(s, 4), [col.c, col.l, 0xffffff], 34, 4, 6, 1.6, .18); ping(p, '#e8c870'); ping(p, col.css);
     floatText(spotPos(s, 5.5), sd === 0 ? (s.camp ? 'JINETES ARQUEROS' : '+1,5 ORO/S') : 'PUEBLO PERDIDO', sd === 0 ? '#e8c870' : '#d83a4a', 10);
     toast(sd === 0 ? (s.camp ? `¡${s.name} ES TUYO! JINETES ARQUEROS` : `¡${s.name} ES TUYO! +1,5 ORO/S`) : `EL RIVAL HA TOMADO ${s.name}`, sd === 0 ? 'good' : 'bad', s);
-    if (s.camp) { s.genT = GAME.campGen; for (let k = 0; k < 3; k++) campSpawn(s); }
     sfx(sd === 0 ? 'capture' : 'deny'); if (sd === 0) track('town_captured');
   } else {
     burst(spotPos(s, 1), [0xffffff, TEAM[prev].c], 14, 3, 4, .8, .22); ping(p, '#ffffff');
@@ -1416,20 +1431,26 @@ function followField(u, f, dt, s = spd(u)) {
   const x = u.node % MW, z = (u.node / MW) | 0; let best = u.node, bv = f[u.node];
   for (const [dx, dz] of NB8) { if (!canStep(x, z, x + dx, z + dz)) continue; const j = idx(x + dx, z + dz); if (f[j] < bv) { bv = f[j]; best = j; } }
   if (best === u.node) return false;
-  return stepToward(u, cellX(best), cellZ(best), s, dt);
+  return stepToward(u, cellX(best), cellZ(best), s, dt) || stepToward(u, cellX(u.node), cellZ(u.node), s, dt);
 }
+let bfsBudget = 0;   // campos de búsqueda individuales que se pueden calcular por paso de simulación (evita picos)
+// un puesto de formación vale si es transitable y se llega a él por un camino que no rodee demasiado (no está al otro lado de un acantilado)
+const slotOk = (f, c, maxF) => walk[c] && inMain[c] && f[c] < 1e9 && f[c] <= maxF;
 const alive = u => u && !u.dead;
 
 // ---------- Efectos ----------
 const UP = new THREE.Vector3(0, 1, 0);
 function burst(loc, colors, n, speed, up, life = .6, size = .22) {
+  if (!seenAt(loc)) return;
   for (let k = 0; k < n; k++) {
     const m = new THREE.Mesh(BOX, mat(colors[k % colors.length])); m.scale.setScalar(size); m.position.copy(loc).y += .6;
     world.add(m); puffs.push({ m, v: new THREE.Vector3().randomDirection().multiplyScalar(speed).addScaledVector(UP, up), t: life, life, s: size });
   }
 }
-const floatText = (loc, text, color, size = 10) => floats.push({ local: loc.clone(), text, color, t: 0, size });
-const ping = (loc, color) => pings.push({ local: loc.clone(), color, t: 0 });
+// lo que pasa en la niebla no se ve: textos, señales, partículas y flechas
+const seenAt = p => !fogOn || visibleAt(p.x, p.z);
+const floatText = (loc, text, color, size = 10) => { if (seenAt(loc)) floats.push({ local: loc.clone(), text, color, t: 0, size }); };
+const ping = (loc, color) => { if (seenAt(loc)) pings.push({ local: loc.clone(), color, t: 0 }); };
 
 // ---------- Sonido y música ----------
 // Todo sintetizado con WebAudio, pero buscando timbres reales: metal, madera, cuerno, tambor y una pequeña sala con reverberación
@@ -1606,7 +1627,7 @@ function hitBase(att, s) {
   if (s.side === 0) raiseAlarm(spotPos(s), '¡TU CASTILLO ESTÁ BAJO ATAQUE!');
 }
 function shoot(from, toPos, lift = 1.1) {
-  const m = new THREE.Mesh(BOX, mat(0xfff1c4)); m.scale.set(.07, .07, .6); world.add(m);
+  const m = new THREE.Mesh(BOX, mat(0xfff1c4)); m.scale.set(.07, .07, .6); m.visible = seenAt(from) || seenAt(toPos); world.add(m);
   arrows.push({ m, a: from.clone().setY(from.y + lift), b: toPos.clone().setY(toPos.y + .7), t: 0 });
 }
 function strike(u, tgt, dt) {
@@ -1680,9 +1701,14 @@ function orderMove(list, x, z, show = true, attack = false) {
   let mz = 0; for (const [, p] of sl) mz += p[1]; mz /= Math.max(1, sl.size);
   for (const u of list) {
     const [ox, oz0] = sl.get(u) || [0, 0], oz = oz0 - mz;
-    let px = tx + fz * ox + fx * oz, pz = tz - fx * ox + fz * oz;
-    const c = cellOf(px, pz); if (!walk[c] || !inMain[c]) { const n = nearestNode(px, pz); px = cellX(n); pz = cellZ(n); }
-    u.order = { type: 'move', f, tx: px, tz: pz, fx, fz, pace: list.length > 1 ? pace : 99, attack, stuck: 0 };
+    let px = tx + fz * ox + fx * oz, pz = tz - fx * ox + fz * oz, c = cellOf(px, pz);
+    const lim = Math.hypot(ox, oz) * 1.6 + 3;
+    if (!slotOk(f, c, lim)) {
+      let best = -1, bd = 1e9; const x0 = Math.floor(px), z0 = Math.floor(pz);
+      for (let dz = -7; dz <= 7; dz++) for (let dx = -7; dx <= 7; dx++) { const xx = x0 + dx, zz = z0 + dz; if (xx < 0 || zz < 0 || xx >= MW || zz >= MD) continue; const j = idx(xx, zz), dd = dx * dx + dz * dz; if (dd < bd && slotOk(f, j, lim + Math.sqrt(dd))) { bd = dd; best = j; } }
+      c = best >= 0 ? best : node; px = cellX(c); pz = cellZ(c);
+    }
+    u.order = { type: 'move', f, tx: px, tz: pz, slot: c, slotF: f[c], fx, fz, pace: list.length > 1 ? pace : 99, attack, stuck: 0, bestD: 1e9, noProg: 0 };
   }
   if (show) ping(new THREE.Vector3(tx, HM[node] + .1, tz), attack ? '#d83a4a' : '#9ad86a');
 }
@@ -1700,9 +1726,15 @@ function escortUnit(u, dt) {
   if (h.combatT > 0 && h.pos.distanceTo(spotPos(foe)) < 10) { siege(u, foe, dt); return; }
   const [ox, oz] = formation(h).get(u) || [0, -2], fx = h.fwd.x, fz = h.fwd.z;
   const tx = h.pos.x + fz * ox + fx * oz, tz = h.pos.z - fx * ox + fz * oz, dist = Math.hypot(tx - u.pos.x, tz - u.pos.z);
+  if (h.field && !slotOk(h.field, cellOf(tx, tz), Math.hypot(ox, oz) * 1.6 + 3)) {   // puesto inalcanzable: junto al héroe
+    if (h.field[u.node] > 3) followField(u, h.field, dt, spd(u) * 1.2);
+    return;
+  }
   if (dist > .5) {
-    const s = spd(u) * (dist > 5 ? 1.4 : dist < 1.5 ? .7 : 1);
-    if (!stepToward(u, tx, tz, s, dt) && h.field) followField(u, h.field, dt, s);
+    const s = spd(u) * (dist > 5 ? 1.4 : dist < 1.5 ? .7 : 1), sc = h.field ? h.field[cellOf(tx, tz)] : 0;
+    // lejos (por el camino) del héroe: sigue el camino hasta él; cerca: va directa a su puesto, y si algo la bloquea, vuelve al camino
+    if (h.field && h.field[u.node] > sc + 3) followField(u, h.field, dt, s);
+    else if (!stepToward(u, tx, tz, s, dt) && h.field) followField(u, h.field, dt, s);
   } else { u.fwd.lerp(h.fwd, .15).normalize(); }
 }
 function playerUnit(u, dt) {
@@ -1713,10 +1745,22 @@ function playerUnit(u, dt) {
       if ((u.think -= dt) <= 0) { u.think = .3; u.enemy = nearestEnemy(u, u.def.aggro); }
       if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
     }
-    const d = Math.hypot(o.tx - u.pos.x, o.tz - u.pos.z), sp = Math.min(spd(u), o.pace * roadK(u));
+    const d = Math.hypot(o.tx - u.pos.x, o.tz - u.pos.z), sp = Math.min(spd(u), o.pace * roadK(u) * slowK(u)), near = d < 2 ? Math.max(1.5, sp * d / 2) : sp;
     if (d < .3) { u.order = null; u.fwd.set(o.fx, 0, o.fz); return; }
-    const ok = d < 7 || o.f[u.node] <= 2 ? stepToward(u, o.tx, o.tz, d < 2 ? Math.max(1.5, sp * d / 2) : sp, dt) || followField(u, o.f, dt, sp) : followField(u, o.f, dt, sp);
-    if (!ok) { o.stuck += dt; if (o.stuck > 1.2) u.order = null; } else o.stuck = 0;
+    let ok;
+    if (o.own) ok = (o.own[u.node] > 0 && followField(u, o.own, dt, sp)) || stepToward(u, o.tx, o.tz, near, dt);
+    else if (d > 3 && o.f[u.node] > o.slotF + 2) ok = followField(u, o.f, dt, sp);
+    else {
+      ok = stepToward(u, o.tx, o.tz, near, dt);
+      if (!ok && bfsBudget > 0) { bfsBudget--; o.own = bfs([o.slot]); ok = true; }
+      else if (!ok) ok = followField(u, o.f, dt, sp);
+    }
+    // sin avanzar por el camino durante unos segundos (empujones, bloqueos): se da por llegada. El avance se mide por el campo, no en línea recta
+    const prog = o.own ? o.own[u.node] + d * .01 : o.f[u.node] > o.slotF + 2 ? o.f[u.node] : d, ph = o.own ? 2 : o.f[u.node] > o.slotF + 2 ? 0 : 1;
+    if (ph !== o.ph) { o.ph = ph; o.bestD = 1e9; }
+    if (prog < o.bestD - .25) { o.bestD = prog; o.noProg = 0; } else o.noProg += dt;
+    if (!ok) { o.stuck += dt; if (o.stuck > 1.5) u.order = null; } else o.stuck = 0;
+    if (o.noProg > (ph === 0 ? 25 : 6)) u.order = null;   // en el camino común hay más paciencia: en rampas y vados estrechos se forman colas
     return;
   }
   if (o?.type === 'attack') { if (strike(u, o.target, dt)) return; u.order = null; }
@@ -1753,7 +1797,7 @@ function updateUnit(u, dt) {
   u.cd -= dt; u.block -= dt; u.moving = false; u.lunge = Math.max(0, u.lunge - dt * 4); u.flash -= dt; u.combatT -= dt;
   if (u.type === 'hero') {
     u.chargeCd -= dt; u.chargeT -= dt;
-    if (u.escort.length && ((u.fieldT = (u.fieldT || 0) - dt) <= 0)) { u.fieldT = 1; u.field = bfs([u.node]); }
+    if (u.escort.length && ((u.fieldT = (u.fieldT || 0) - dt) <= 0)) { u.fieldT = .6; u.field = bfs([u.node]); }
     if (u.chargeCd <= 0 && nearestEnemy(u, 8)) {
       u.chargeCd = GAME.chargeCd; u.chargeT = GAME.chargeTime;
       burst(u.pos, [0xe6d6b0, 0xffffff, 0xffd23f], 16, 3, 2, .6, .25);
@@ -1944,7 +1988,7 @@ function updateAI() {
   else if (mine.length <= 1) aiStance = 'defend';
 }
 function updateGame(dt) {
-  elapsed += dt;
+  elapsed += dt; bfsBudget = 4;
   for (const sd of [0, 1]) sideState[sd].gold += incomeOf(sd) * dt * (sd === 1 ? DIFF[diff].inc : 1);
   updateAI(); updateProduction(dt);
   for (const u of [...units]) if (!u.dead) updateUnit(u, dt);
@@ -1978,7 +2022,7 @@ function updateHud() {
   $('gold').textContent = Math.floor(st.gold);
   $('rate').textContent = '+' + String(Math.round(incomeOf(0) * 10) / 10).replace('.', ',') + '/S';
   $('pop').textContent = popOf(0);
-  const n0 = 1 + owned(0), n1 = 1 + owned(1), NR = regions.length, key = n0 + ',' + n1 + ',' + NR;
+  const n0 = 1 + owned(0), n1 = 1 + spots.filter(s => s.kind === 'town' && s.known === 1).length, NR = regions.length, key = n0 + ',' + n1 + ',' + NR;
   if (key !== terrKey) { terrKey = key; $('terr').innerHTML = '<i class="b"></i>'.repeat(n0) + '<i></i>'.repeat(Math.max(0, NR - n0 - n1)) + '<i class="r"></i>'.repeat(n1); }
   $('hp0').textContent = Math.max(0, Math.round(spots[BASE0].hp / GAME.baseHp * 100)) + ' %';
   $('hp1').textContent = Math.max(0, Math.round(spots[BASE1].hp / GAME.baseHp * 100)) + ' %';
@@ -2275,6 +2319,7 @@ addEventListener('keydown', e => {
   else if (k === 'p') { paused = !paused; syncTools(); }
   else if (k === 'v') { speed = speed === 1 ? 2 : 1; syncTools(); }
   else if (k === ' ') { e.preventDefault(); if (alarm.pos) focusOn(alarm.pos.x, alarm.pos.z); }
+  else if (k === 'n') toggleFog();
   else if (k === 'e') { if (sel.size) { amode = !amode; sfx('select'); } }
   else if (k === 'escape') { if (amode) amode = false; else { follow = null; setSelection([], false); } }
   else if (k === 'a' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setSelection(units.filter(u => u.side === 0), false); }
@@ -2419,8 +2464,9 @@ function drawOverlay(dt) {
     } else if (s.kind === 'town') {
       const own = s.owner;
       for (let k = 1; k < s.lvl; k++) pip(top.x + (k - s.lvl / 2) * 10, top.y - 6, '#e8c870');
-      if (own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; bar(top.x, top.y + 6, 50, 5, s.prog[sd], TEAM[sd].css); }
-      if (own >= 0 && s.lose > 0) bar(top.x, top.y + 6, 50, 5, 1 - s.lose, TEAM[own].css);
+      const seenT = visibleAt(s.x, s.z);
+      if (seenT && own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; bar(top.x, top.y + 6, 50, 5, s.prog[sd], TEAM[sd].css); }
+      if (seenT && own >= 0 && s.lose > 0) bar(top.x, top.y + 6, 50, 5, 1 - s.lose, TEAM[own].css);
     } else {
       const q = s.kind === 'barracks' ? sideState[s.side].queue[0] : null, h = s.kind === 'altar' ? sideState[s.side].hero : null;
       if (s.side === 0 && selBld === s.kind) continue;
