@@ -2,15 +2,15 @@
 
 Todas las civilizaciones comparten la misma lógica (estadísticas, costes, counters e IA). Lo que cambia es el aspecto, los edificios, el mapa y los nombres. Esta lista recoge todo lo que tiene que tener una civilización para estar completa.
 
-## Dónde va cada cosa en `index.html`
+## Dónde va cada cosa
 
 | Qué | Dónde |
 |---|---|
-| Tropas, fortaleza, cuartel, casa, nombres, paleta, color propio | array `CIVS` dentro del módulo `CIV` (sección *Civilizaciones*) |
-| Colores de muralla | objeto `WALLS` del mismo módulo |
-| Bioma, árboles, rasgo de paisaje, forma y estilo de muralla, distribución del recinto, altar | objeto `MAPS` del mismo módulo |
-| Árboles nuevos | función `treeBoxes` |
-| Rasgo de paisaje nuevo | función `featureAt` (y piezas pequeñas en `buildVoxels`) |
+| Tropas, fortaleza, cuartel, casa, nombres, paleta, color propio | array `CIVS` en `src/civs.js` |
+| Colores de muralla | objeto `WALLS` en `src/civs.js` |
+| Bioma, árboles, rasgo de paisaje, forma y estilo de muralla, distribución del recinto, altar | objeto `MAPS` en `src/civs.js` |
+| Árboles nuevos | función `treeBoxes` en `src/map.js` |
+| Rasgo de paisaje nuevo | función `featureAt` (y piezas pequeñas en `buildVoxels`), en `src/map.js` |
 
 ## Identidad
 - [ ] **Nombre y época**: nombre corto en mayúsculas para el selector y una época para las fichas.
