@@ -25,6 +25,8 @@ export const TYPES = ['sword', 'bow', 'horse'], ALLT = ['hero', 'sword', 'bow', 
 export const RANGED = t => t === 'bow' || t === 'harcher';
 export const GAME = { startGold: 220, income: 1, townIncome: 1.8, baseHp: 1500, capBase: 30, capTown: 6, capMax: 100, towns: 16, capture: 4, queueMax: 30, bounty: 6, maxHeroes: 3, wallShooters: 12, wallRange: 10, wallDmg: 7, wallCd: 1.6,
   campGen: 14, campMax: 20, campGuards: 6, fortGuards: 20, heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4 };
-export const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, label: 'FÁCIL' }, normal: { inc: 1, attackAt: 5, hero: true, label: 'NORMAL' }, hard: { inc: 1.3, attackAt: 4, hero: true, label: 'DIFÍCIL' } };
+// dificultad: fácil usa la IA simple con menos oro; normal y difícil, la IA smart con el mismo oro que el jugador (difícil decide más a menudo y concentra el fuego)
+// plan: segundos entre decisiones de la IA smart · focus: cada tropa elige objetivo en vez de atacar al más cercano
+export const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, brain: 'simple', label: 'FÁCIL' }, normal: { inc: 1, attackAt: 6, hero: true, brain: 'smart', plan: 1, focus: false, label: 'NORMAL' }, hard: { inc: 1, attackAt: 5, hero: true, brain: 'smart', plan: .5, focus: true, label: 'DIFÍCIL' } };
 export const BASE0 = 0, BASE1 = 1, BARR0 = 2, BARR1 = 3, ALT0 = 4, ALT1 = 5, TOWN0 = 6;
 export const TOWN_NAMES = ['VILLAROCA', 'PINARES', 'ALBAMAR', 'ROBLEDO', 'FUENTEVIEJA', 'MONTEALTO', 'LAGUNILLA', 'PEÑASCO', 'VALDEORO', 'SALINAS', 'TORRENUEVA', 'ARENALES', 'CASTROVERDE', 'OLMEDA', 'MIRAFLORES', 'ROCAFRÍA', 'VADOHONDO', 'LOS LLANOS'];

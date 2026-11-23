@@ -128,7 +128,7 @@ export function setMax(u) { const old = u.maxHp; u.maxHp = maxHpOf(u); if (u.max
 export function spawnUnit(side, type, at = BARR0) {
   const b = spots[at + side], k = spots[side], ang = Math.atan2(k.z - b.z, k.x - b.x) + (Math.random() - .5) * 1.6;
   const u = spawnAt(side, type, b.x + Math.cos(ang) * 2.8, b.z + Math.sin(ang) * 2.8, ang);
-  if (side === 0 && S.rally && type !== 'hero') orderMove([u], S.rally.x, S.rally.z, false);
+  if (side === 0 && !sideState[0].ai && S.rally && type !== 'hero') orderMove([u], S.rally.x, S.rally.z, false);
   return u;
 }
 export function spawnAt(side, type, x, z, ang = Math.random() * 6.28) {

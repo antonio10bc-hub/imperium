@@ -15,6 +15,7 @@ import { walk } from './nav.js';
 import { _h, applyRes, drawOverlay } from './overlay.js';
 import { camera, fogU, gl, postCam, postScene, scene, target, world } from './render.js';
 import { S } from './state.js';
+import { makeAI } from './ai.js';
 import { makeThumbs, puffs, sel, sideState, spawnAt, units } from './units.js';
 import { init as init_minimap } from './minimap.js';
 import { init as init_fog } from './fog.js';
@@ -75,7 +76,9 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 init_minimap(); init_fog(); init_hud(); init_input(); init_menu(); init_overlay();
-window.__game = { gl, units, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
+window.__game = { S, gl, units,
+  // pruebas: pone un cerebro de IA en un bando (diff: dificultad base; over: ajustes que la sobrescriben) o se lo quita con diff = null
+  setAI(sd, diff, brain, over) { sideState[sd].ai = diff ? makeAI(sd, diff, brain) : null; if (over && sideState[sd].ai) { const A = sideState[sd].ai; A.Df = { ...A.Df, ...over }; if (over.inc != null) A.inc = over.inc; } }, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
   step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) S.camGoal = S.camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, spawnAt, dbg: () => ({ fields, walk, HM, MW, wallHit, promote }) };
 makeThumbs();
 newGame(1 + Math.floor(Math.random() * 99999));

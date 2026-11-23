@@ -20,6 +20,7 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 - El límite de tropas crece con el territorio: 30 de base y 6 por cada pueblo o campamento (hasta 100).
 - Las tropas seleccionadas muestran una línea hasta su destino (verde: mover, roja: atacar o asediar, amarilla: conquistar).
 - Las fortalezas dañadas echan humo y fuego, y los pueblos mejorados ganan construcciones.
+- IA rival: en fácil, la IA simple con menos oro; en normal y difícil, una IA sin trampas (mismo oro que tú, solo sabe lo que ven sus tropas) que contrarresta tu ejército, defiende sus pueblos, cura a sus heridos y concentra fuerzas. En difícil decide más a menudo y concentra el fuego.
 - **ESC** (o el botón ☰) abre el menú de pausa: continuar, reiniciar el mismo mapa, rendirse o volver al menú principal.
 - El héroe aparece a la izquierda con sus tropas asignadas (hasta 50), que forman delante de él en bloque, línea o cuña.
 
@@ -45,6 +46,7 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 | `civs.js` | Civilizaciones: modelos, murallas, biomas y elección |
 | `buildings.js` | Castillo, cuartel, altar, pueblos, campamentos, murallas y cambio de dueño |
 | `units.js` | Plantillas de tropas, miniaturas, aparición, movimiento y rejilla espacial |
+| `ai.js` | IA de los bandos: cerebro simple (la original) y smart |
 | `combat.js`, `behavior.js` | Daño, rangos y muertes; formaciones, órdenes, escolta e IA de cada tropa |
 | `game.js` | Partida: producción, héroes, pueblos, defensas, IA del rival y paso de simulación |
 | `hud.js`, `input.js`, `menu.js`, `overlay.js` | Interfaz, ratón/teclado/cámara, menú principal y capa 2D |

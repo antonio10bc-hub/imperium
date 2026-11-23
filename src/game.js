@@ -1,11 +1,12 @@
 // Partida: producción, héroes, pueblos, campamentos, defensas, IA del rival y paso de simulación.
 import * as THREE from 'three';
+import { makeAI, updateAIs } from './ai.js';
 import { sfx, startMusic } from './audio.js';
 import { updateUnit } from './behavior.js';
 import { buildAltar, buildBarracks, buildCastle, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
 import { resolveCivs, uname } from './civs.js';
-import { alarm, applyRank, assign, corpses, damage, raiseAlarm, shoot } from './combat.js';
-import { ALT0, BARR0, BASE0, BASE1, DIFF, GAME, TEAM, TOWN0, TYPES, UNITS } from './config.js';
+import { alarm, applyRank, corpses, damage, raiseAlarm, shoot } from './combat.js';
+import { ALT0, BARR0, BASE0, BASE1, DIFF, GAME, TEAM, TOWN0, UNITS } from './config.js';
 import { burst, dropBox, floatText, ping, seenAt } from './effects.js';
 import { resetFog } from './fog.js';
 import { GEO } from './geo.js';
@@ -68,7 +69,7 @@ function updateProduction(dt) {
   }
 }
 // ---------- Partida ----------
-export let state = 'menu', fields = null, aiStance = 'defend', aiNext = 'sword', elapsed = 0;
+export let state = 'menu', fields = null, elapsed = 0;
 function clearWorld() {
   for (const u of [...units]) world.remove(u.g); units.length = 0; sel.clear(); S.follow = null;
   for (const l of [arrows, puffs]) { for (const a of l) dropBox(a.m); l.length = 0; }
@@ -92,7 +93,8 @@ export function newGame(s, keepCivs = false) {
     regions.forEach((_, r) => paintRegion(r));
     fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2));
     for (const st of sideState) Object.assign(st, { gold: GAME.startGold, queue: [], heroQ: [] });
-    aiStance = 'defend'; elapsed = 0; S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
+    sideState[0].ai = S.aiPlayer ? makeAI(0, S.aiPlayer.diff, S.aiPlayer.brain) : null; sideState[1].ai = makeAI(1, S.diff, S.aiRival);   // el bando 0 lo juega la IA solo en pruebas
+    elapsed = 0; S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
     focusOn(spots[BASE0].x, spots[BASE0].z, true);
     $('mt').textContent = GAME.towns; $('cap').textContent = capOf(0);
     updateCtx(); syncDiff();
@@ -189,31 +191,10 @@ function updateTowns(dt) {
     }
   }
 }
-function updateAI() {
-  const Df = DIFF[S.diff], mine = units.filter(u => u.side === 1 && u.type !== 'hero'), theirs = units.filter(u => u.side === 0);
-  const count = t => theirs.filter(u => u.type === t).length, st = sideState[1];
-  const wantH = Df.hero ? Math.min(GAME.maxHeroes, 1 + Math.floor(mine.length / 10)) : 0, hc = heroCount(1);
-  const saving = hc < wantH && mine.length >= 4;   // ahorra para el siguiente héroe
-  if (hc < wantH && mine.length >= 3 && st.gold >= UNITS.hero.cost) summonHero(1);
-  else if (!saving && st.queue.length < 2 && st.gold >= UNITS[aiNext].cost && enqueue(1, aiNext)) {
-    const r = Math.random();
-    aiNext = count('bow') > count('sword') && r < .6 ? 'horse' : count('horse') > count('bow') && r < .6 ? 'sword' : count('sword') > count('horse') && r < .6 ? 'bow' : TYPES[r * 3 | 0];
-  }
-  for (const h of heroesOf(1)) {   // escolta en formación para cada héroe: hasta 20 tropas, en cuña para atacar y en bloque para defender
-    h.formShape = aiStance === 'attack' ? 'wedge' : 'block';
-    if (h.escort.length < 20) { const free = mine.filter(u => !u.leader && !u.retreat).sort((a, b) => a.pos.distanceTo(h.pos) - b.pos.distanceTo(h.pos)); if (free.length > 1) assign(free[0], h); }
-  }
-  // mejora sus pueblos cuando le sobra oro
-  if (!saving && st.gold > 320) { const t = spots.filter(s => s.kind === 'town' && !s.camp && s.owner === 1 && s.lvl < 3).sort((a, b) => a.lvl - b.lvl)[0]; if (t) upgradeTown(1, t); }
-  const bp = spotPos(spots[BASE1]), threat = theirs.filter(u => u.pos.distanceTo(bp) < 16).length;
-  if (threat > mine.length * .7 && threat > 0) aiStance = 'defend';
-  else if (mine.length >= Df.attackAt || (mine.length >= 2 && spots.some(s => s.kind === 'town' && s.owner === -1))) aiStance = 'attack';
-  else if (mine.length <= 1) aiStance = 'defend';
-}
 export function updateGame(dt) {
   elapsed += dt; S.bfsBudget = 4;
-  for (const sd of [0, 1]) sideState[sd].gold += incomeOf(sd) * dt * (sd === 1 ? DIFF[S.diff].inc : 1);
-  updateAI(); updateProduction(dt);
+  for (const sd of [0, 1]) sideState[sd].gold += incomeOf(sd) * dt * (sideState[sd].ai?.inc ?? 1);
+  updateAIs(dt); updateProduction(dt);
   UGRID.rebuild();
   for (const u of [...units]) if (!u.dead) updateUnit(u, dt);
   updateTowns(dt); castleDefense(dt);

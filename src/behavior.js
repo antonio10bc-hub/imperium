@@ -3,14 +3,15 @@ import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { spotPos } from './buildings.js';
 import { nearestEnemy, siege, strike } from './combat.js';
-import { BASE0, BASE1, GAME, MD, MW, TOWN0, idx } from './config.js';
+import { BASE1, GAME, MD, MW, idx } from './config.js';
 import { burst, floatText, ping } from './effects.js';
-import { aiStance, capR, elapsed, fields } from './game.js';
+import { aiUnit } from './ai.js';
+import { capR, elapsed, fields } from './game.js';
 import { HM, cellOf, regionCell, regionOwner, spots } from './map.js';
 import { bfs, cellX, cellZ, inMain, nearestNode, walk } from './nav.js';
 import { _h } from './overlay.js';
 import { S } from './state.js';
-import { UGRID, _nearSep, alive, followField, place, roadK, slotOk, slowK, spd, stepToward, units } from './units.js';
+import { UGRID, _nearSep, alive, sideState, followField, place, roadK, slotOk, slowK, spd, stepToward } from './units.js';
 
 // ---------- Órdenes ----------
 // Disposición de una tropa en formación. Coordenadas locales: x a la derecha, z hacia delante.
@@ -69,7 +70,7 @@ function formation(h) {
   if (h.formKey === key) return h.form;
   h.formKey = key; h.form = layout(h.escort, key, 2); return h.form;
 }
-function escortUnit(u, dt) {
+export function escortUnit(u, dt) {
   const h = u.leader;
   if ((u.think -= dt) <= 0) { u.think = .3; u.enemy = nearestEnemy(u, h.combatT > 0 ? u.def.aggro + 2 : 3.5); }
   if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
@@ -132,7 +133,7 @@ function guardUnit(u, dt) {
   else if (d <= .4) u.fwd.lerp(_h.set(u.pos.x - s.x, 0, u.pos.z - s.z).normalize(), .05).normalize();   // mirando hacia fuera
 }
 // cada tropa ociosa ocupa su propio sitio en un girasol alrededor del punto (ángulo áureo y radio según la raíz de su índice): repartidas, sin montones
-function spreadTo(u, cx, cz, field, r0, k, dt, disc = 0) {
+export function spreadTo(u, cx, cz, field, r0, k, dt, disc = 0) {
   const key = cx + ',' + cz + ',' + disc;
   if (u.spreadKey !== key) {   // el sitio se calcula una vez por destino; si cae en una casilla bloqueada o tras un muro, el más cercano que sí valga
     const i = u.id % 36, a = i * 2.39996, r = disc ? disc * Math.sqrt(.06 + ((u.id * .618034) % 1) * .94) : r0 + k * Math.sqrt(i); let tx = cx + Math.cos(a) * r, tz = cz + Math.sin(a) * r, c = cellOf(tx, tz);
@@ -146,27 +147,6 @@ function spreadTo(u, cx, cz, field, r0, k, dt, disc = 0) {
   const d = Math.hypot(tx - u.pos.x, tz - u.pos.z); if (d < .4) return false;
   return stepToward(u, tx, tz, spd(u) * (d < 2 ? .6 : 1), dt) || (field[u.node] > 1 && followField(u, field, dt));
 }
-function aiUnit(u, dt) {
-  if (u.leader) return escortUnit(u, dt);
-  // retirada: con poca vida vuelve a casa a curarse (salvo que tenga un enemigo encima)
-  const k = u.hp / u.maxHp; if (k < .3 && u.type !== 'hero') u.retreat = true; else if (k > .85) u.retreat = false;
-  if ((u.think -= dt) <= 0) { u.think = .35; u.enemy = nearestEnemy(u, u.retreat ? 1.8 : u.def.aggro); }
-  if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
-  const home = spots[BASE1];
-  if (u.retreat || aiStance === 'defend') { spreadTo(u, home.x, home.z, fields[BASE1], 3.5, 1.15, dt); return; }   // en casa, repartidos por el recinto
-  // varios frentes: la mitad del ejército va al pueblo más cercano y la otra mitad al segundo.
-  // Cada tropa se compromete con su objetivo y solo lo replantea cada pocos segundos o al conquistarlo (antes lo cambiaba a cada paso y se quedaba clavada a medio camino)
-  const valid = t => t >= TOWN0 && spots[t] && spots[t].owner !== 1 && (u.bigArmy || !(spots[t].fortified && spots[t].guards > 0));
-  if ((u.aiReT = (u.aiReT ?? 0) - dt) <= 0 || !valid(u.aiT)) {
-    u.aiReT = 5 + (u.id % 5); u.bigArmy = units.filter(o => o.side === 1 && o.type !== 'hero').length >= 24;
-    let bt = -1, bv = 1e9, st = -1, sv = 1e9;
-    for (let t = TOWN0; t < spots.length; t++) if (valid(t)) { const v = fields[t][u.node]; if (v < bv) { st = bt; sv = bv; bt = t; bv = v; } else if (v < sv) { st = t; sv = v; } }
-    u.aiT = u.id % 2 && st >= 0 && sv < bv * 2.5 + 20 ? st : bt; u.aiV = u.aiT === st ? sv : bv;
-  }
-  const bs = spots[u.aiT];
-  if (bs && (u.aiV < 90 || u.type !== 'hero')) spreadTo(u, bs.x, bs.z, fields[u.aiT], 0, 0, dt, capR(bs) - .8);   // dentro del círculo de conquista, sin amontonarse
-  else siege(u, spots[BASE0], dt);
-}
 export function updateUnit(u, dt) {
   u.cd -= dt; u.block -= dt; u.moving = false; u.lunge = Math.max(0, u.lunge - dt * 4); u.flash -= dt; u.combatT -= dt;
   if (u.type === 'hero') {
@@ -179,7 +159,7 @@ export function updateUnit(u, dt) {
       if (u.vis) { floatText(u.pos.clone().setY(u.pos.y + 4.4), '¡CARGA!', '#e8c870', 11); sfx('charge'); }
     }
   }
-  if (u.side === 0) playerUnit(u, dt); else if (u.side === 1) aiUnit(u, dt); else guardUnit(u, dt);
+  if (u.side < 2 && sideState[u.side].ai) aiUnit(u, dt); else if (u.side === 0) playerUnit(u, dt); else guardUnit(u, dt);
   for (const o of UGRID.near(u.pos.x, u.pos.z, 1.7, _nearSep)) if (o !== u) {   // separación: solo vecinos cercanos
     const dx = u.pos.x - o.pos.x, dz = u.pos.z - o.pos.z, d = Math.hypot(dx, dz), min = (u.type === 'hero' || o.type === 'hero') ? 1.7 : 1.05;
     if (d < min && d > 1e-4) { const k = (u.moving ? .8 : 1.4) * dt / d, nx = u.pos.x + dx * k, nz = u.pos.z + dz * k, b = cellOf(nx, nz); if (b === u.node || (walk[b] && inMain[b] && Math.abs(HM[b] - HM[u.node]) <= 1)) { u.pos.x = nx; u.pos.z = nz; u.node = b; } }
