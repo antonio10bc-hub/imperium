@@ -10,6 +10,7 @@ import { fogU } from './render.js';
 import { units } from './units.js';
 import { visionBonus } from './rules.js';
 import { weatherVis } from './ambient.js';
+import { R } from './rules.js';
 
 // ---------- Niebla de guerra ----------
 // resolución completa (una celda por casilla), borde de visión en degradado y desenfoque: 255 = a la vista, 120 = explorado, 0 = sin explorar
@@ -52,6 +53,8 @@ export function updateFog(snapTo) {
   // lo que nunca has visto queda oculto: edificios, pueblos y murallas
   for (const sp of spots) if (sp.group) sp.group.visible = exploredAt(sp.x, sp.z);
   for (const d of decos) d.visible = exploredAt(d.position.x, d.position.z);
+  for (const b of R.bridges) b.group.visible = b.built && exploredAt(b.x, b.z);   // los puentes no se ven hasta explorarlos
+  for (const t of R.treasures || []) t.g.visible = !t.taken && exploredAt(t.x, t.z);
   refreshKnownTowns(false);
 }
 const fogIdx = (x, z) => THREE.MathUtils.clamp(Math.floor(z), 0, FH - 1) * FW + THREE.MathUtils.clamp(Math.floor(x), 0, FW - 1);

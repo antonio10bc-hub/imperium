@@ -12,7 +12,7 @@ import { sfx } from './audio.js';
 import { damage } from './combat.js';
 import { MD, MW, N, RANGED, idx } from './config.js';
 import { orderMove } from './behavior.js';
-import { burst, ping, plume, streak } from './effects.js';
+import { burst, dropBox, ping, plume, takeBox } from './effects.js';
 import { refreshFields, toast } from './game.js';
 import { GEOT, HM, bridgeSites, geoR, removeTrees, roadCell, scen, spots, treeCell } from './map.js';
 import { blocked, cellX, cellZ, nearestOpen, refreshCells } from './nav.js';
@@ -25,7 +25,8 @@ const _near = [];
 // ---------- preparación al empezar cada partida ----------
 export function setupRules() {
   for (const m of R.meshes) { world.remove(m); m.traverse(o => { if (o.isMesh && o.userData.own) { o.geometry.dispose(); o.material.dispose(); } }); }
-  Object.assign(R, { on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false, bombs: [], breaks: [], treasures: null });
+  for (const b of R.bombs || []) if (b.m) dropBox(b.m);
+  Object.assign(R, { lava: null, on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false, bombs: [], breaks: [], treasures: null });
   const on = R.on;
   on.bridges = bridgeSites.length > 0;
   // en una mezcla, cada regla vale solo en la mitad de su geografía
@@ -56,7 +57,7 @@ export function setupRules() {
   if (on.treasures) R.treasures = (geoR.treasures || []).map(([x, z]) => makeChest(x, z));
   if (on.volcano) {   // lava en el cráter (brilla siempre) y humo constante
     const [x, z] = geoR.volcano, y = HM[idx(Math.floor(x), Math.floor(z))]; R.volcano = { x, z, y: y + 1, t: 150, phase: 'calm' };
-    const lava = new THREE.Mesh(new THREE.BoxGeometry(2.6, .2, 2.6), new THREE.MeshBasicMaterial({ color: 0xff7a1a })); lava.position.set(Math.floor(x) + .5, y + .12, Math.floor(z) + .5); lava.userData.own = true; world.add(lava); R.meshes.push(lava);
+    const lava = R.lava = new THREE.Mesh(new THREE.BoxGeometry(2.6, .2, 2.6), new THREE.MeshBasicMaterial({ color: 0xff7a1a })); lava.position.set(Math.floor(x) + .5, y + .12, Math.floor(z) + .5); lava.userData.own = true; world.add(lava); R.meshes.push(lava);
   }
 }
 // distancia (en casillas, sin obstáculos) al agua, a los oasis y a las fortalezas, hasta r
@@ -253,14 +254,22 @@ function updateThirst() {
 // ---------- volcán ----------
 function updateVolcano(dt) {
   const v = R.volcano, top = new THREE.Vector3(v.x, v.y, v.z);
-  if ((v.fx = (v.fx ?? 0) - dt) <= 0) { v.fx = v.phase === 'calm' ? .35 : .08; plume(top.clone().setY(v.y + .5), Math.random() < .5 ? 0x4a4448 : 0x6a6266, v.phase === 'calm' ? 1.2 : 2, 3, 2.5, -.4); if (v.phase !== 'calm') plume(top, Math.random() < .5 ? 0xff7a1a : 0xffc83a, .8, .8, 4, 2); }
+  // humo siempre; al rugir, más humo y chispas; en erupción, columna de lava y nube negra (se ven aunque el volcán esté en la niebla)
+  if ((v.fx = (v.fx ?? 0) - dt) <= 0) { const e = v.phase === 'erupt', w = v.phase === 'warn'; v.fx = e ? .05 : w ? .1 : .35;
+    plume(top.clone().setY(v.y + .5), Math.random() < .5 ? 0x3a3438 : 0x6a6266, e ? 3.2 : w ? 2 : 1.2, e ? 4 : 3, e ? 6 : 2.5, -.4, true);
+    if (w) burst(top, [0xff7a1a, 0xffc83a], 2, 1.5, 4, .6, .25, true);
+    if (e) { burst(top, [0xff7a1a, 0xffc83a, 0xff4a1a], 7, 3, 12, 1.4, .45, true); plume(top.clone().setY(v.y + 3), 0xff7a1a, 1.4, .7, 7, 2, true); } }
+  if (R.lava) { const k = v.phase === 'erupt' ? 1.6 + Math.sin(performance.now() / 60) * .3 : v.phase === 'warn' ? 1.2 + Math.sin(performance.now() / 90) * .2 : 1; R.lava.scale.set(k, 1 + (k - 1) * 4, k); }
   v.t -= dt;
   if (v.phase === 'erupt' && (v.bt = (v.bt ?? 0) - dt) <= 0) {   // bombas de lava alrededor del volcán
     v.bt = .18; const a = Math.random() * 6.28, r = 6 + Math.random() * 26, x = v.x + Math.cos(a) * r, z = v.z + Math.sin(a) * r, i = idx(Math.max(0, Math.min(MW - 1, x | 0)), Math.max(0, Math.min(MD - 1, z | 0)));
-    const to = new THREE.Vector3(x, Math.max(0, HM[i]) + .3, z); streak(top, to, 0xff7a1a, .5, .45); R.bombs.push({ to, t: .5 });
+    const to = new THREE.Vector3(x, Math.max(0, HM[i]) + .3, z), T = 1.4, m = takeBox(Math.random() < .5 ? 0xff7a1a : 0xffc83a);   // bomba de lava en arco
+    m.scale.setScalar(.7); m.position.copy(top); R.bombs.push({ to, t: T, m, v: new THREE.Vector3((to.x - top.x) / T, (to.y - top.y + 4.5 * T * T) / T, (to.z - top.z) / T) });
   }
-  for (let k = R.bombs.length - 1; k >= 0; k--) { const b = R.bombs[k]; if ((b.t -= dt) > 0) continue; R.bombs.splice(k, 1);
-    burst(b.to, [0xff7a1a, 0xffc83a, 0x3a3034], 8, 3, 4, .6, .24); plume(b.to, 0x56565c, 1, 1.6, 1.4);
+  for (let k = R.bombs.length - 1; k >= 0; k--) { const b = R.bombs[k];
+    if (b.m) { b.v.y -= 9 * dt; b.m.position.addScaledVector(b.v, dt); b.m.rotation.x += dt * 6; if ((b.tr = (b.tr ?? 0) - dt) <= 0) { b.tr = .06; plume(b.m.position.clone(), 0x4a4448, .45, .8, .6, -.2, true); } }
+    if ((b.t -= dt) > 0) continue; R.bombs.splice(k, 1); if (b.m) dropBox(b.m);
+    burst(b.to, [0xff7a1a, 0xffc83a, 0x3a3034], 12, 4, 5, .8, .3, true); plume(b.to, 0x56565c, 1.4, 1.8, 1.4, -.6, true);
     for (const u of UGRID.near(b.to.x, b.to.z, 2.8, _near)) if (Math.hypot(u.pos.x - b.to.x, u.pos.z - b.to.z) < 2.8) damage({ side: 2, vis: u.vis, def: {} }, u, 40);
   }
   if (v.t > 0) return;

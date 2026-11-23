@@ -168,20 +168,36 @@ export const GEO = (() => {
         return [2 + Math.max(0, fbm(x * .04, z * .04, s + 81) - .62) * 4, 0]; });
       return [];
     },
-    // ciudad en ruinas: en el centro, manzanas con muros de piedra rotos (7 = ruina) entre calles; hay tesoros por las calles
+    // ruinas: grupos de restos repartidos por el mapa (7 = piedra en ruinas): tramos de muralla rotos, esquinas, torres redondas
+    // a medio caer, recintos sin techo e hileras de columnas, cada uno con su orientación. Hay un tesoro escondido en cada grupo
     ruinas(M, r, s, F) {
-      const cx = 96 + (r() - .5) * 16, cz = 64 + (r() - .5) * 12, city = blobR(cx, cz, 46, 34, .5, s + 100), G = 11;
-      const inCity = (x, z) => city(x, z) < 1, cell = v => Math.floor(((v % G) + G) % G);
+      const clusters = scatter(r, 8, 30, [18, 10, W - 18, H - 10], p => F.every(f => Math.hypot(f[0] - p[0], f[1] - p[1]) > 26));
+      const segs = [], rings = [], posts = [], treasures = [];
+      const seg = (x, z, a, L, t) => segs.push([x, z, x + Math.cos(a) * L, z + Math.sin(a) * L, t]);
+      for (const [cx, cz] of clusters) {
+        const n = 3 + (r() * 4 | 0), base = r() * Math.PI;
+        for (let k = 0; k < n; k++) {
+          const ox = cx + (r() - .5) * 18, oz = cz + (r() - .5) * 14, a = base + (r() < .6 ? (r() * 4 | 0) * Math.PI / 2 : r() * Math.PI) + (r() - .5) * .25, kind = r();
+          if (kind < .35) seg(ox, oz, a, 3 + r() * 7, .55 + r() * .3);   // tramo suelto
+          else if (kind < .55) { const L1 = 3 + r() * 5, L2 = 2 + r() * 5; seg(ox, oz, a, L1, .6); seg(ox, oz, a + Math.PI / 2 * (r() < .5 ? 1 : -1), L2, .6); }   // esquina
+          else if (kind < .72) rings.push([ox, oz, 1.6 + r() * 2.2, r() * 6.28, 3.2 + r() * 2.2]);   // torre redonda rota (arco)
+          else if (kind < .88) { const w = 3 + r() * 4, d = 3 + r() * 3, c = Math.cos(a), sn = Math.sin(a), pts = [[-w, -d], [w, -d], [w, d], [-w, d]].map(([u, v]) => [ox + u * c - v * sn, oz + u * sn + v * c]);   // recinto con huecos
+            for (let e = 0; e < 4; e++) if (r() < .78) { const [ax, az] = pts[e], [bx, bz] = pts[(e + 1) % 4], f0 = r() * .3, f1 = .7 + r() * .3; segs.push([ax + (bx - ax) * f0, az + (bz - az) * f0, ax + (bx - ax) * f1, az + (bz - az) * f1, .55]); } }
+          else for (let q = 0; q < 4 + (r() * 4 | 0); q++) posts.push([ox + Math.cos(a) * q * 2.2, oz + Math.sin(a) * q * 2.2, .55 + r() * .25]);   // hilera de columnas
+        }
+        treasures.push([cx + (r() - .5) * 6, cz + (r() - .5) * 6]);
+      }
+      const near = (x, z) => clusters.some(([cx, cz]) => Math.abs(x - cx) < 22 && Math.abs(z - cz) < 18);
       M.each((x, z) => {
-        if (inCity(x, z)) { const u = cell(x - cx + 2), v = cell(z - cz + 2), bx = Math.floor((x - cx + 2) / G), bzz = Math.floor((z - cz + 2) / G);
-          if (u < 3 || v < 3) return [2, 0];   // calle
-          const edge = u === 3 || u === G - 1 || v === 3 || v === G - 1, gap = hsh(bx, bzz, s) < .5 ? Math.abs(u - 7) < 1.5 && (v === 3 || v === G - 1) : Math.abs(v - 7) < 1.5 && (u === 3 || u === G - 1);
-          if (edge && !gap && hsh(Math.floor(x), Math.floor(z), s + 3) > .12) return [4, 7];   // muro (con huecos)
-          return [2, hsh(Math.floor(x * 3), Math.floor(z * 3), s + 4) < .06 ? 7 : 0]; }   // patio con cascotes
-        return [2 + Math.max(0, fbm(x * .05, z * .05, s + 101) - .5) * 5, 0]; });
-      const streets = []; M.each((x, z, h, t) => { if (inCity(x, z) && h === 2 && (cell(x - cx + 2) < 3 || cell(z - cz + 2) < 3) && city(x, z) < .8) streets.push([x, z]); return null; });
-      const pick = []; for (let k = 0; k < 400 && pick.length < 7; k++) { const q = streets[(r() * streets.length) | 0]; if (q && pick.every(o => Math.hypot(o[0] - q[0], o[1] - q[1]) > 12)) pick.push(q); }
-      M.treasures = pick; return [[cx, cz]];
+        const base = [2 + Math.max(0, fbm(x * .05, z * .05, s + 101) - .5) * 5, 0];
+        if (!near(x, z)) return base;
+        const broken = hsh(Math.floor(x * 2), Math.floor(z * 2), s + 3) < .14;   // mordiscos en los muros
+        for (const [ax, az, bx, bz, t] of segs) if (segD(x, z, ax, az, bx, bz) < t && !broken) return [base[0] + 2, 7];
+        for (const [rx, rz, rr, a0, arc] of rings) { const d = Math.hypot(x - rx, z - rz), a = ((Math.atan2(z - rz, x - rx) - a0) % 6.283 + 6.283) % 6.283; if (Math.abs(d - rr) < .55 && a < arc && !broken) return [base[0] + 2, 7]; }
+        for (const [px, pz, t] of posts) if (Math.hypot(x - px, z - pz) < t) return [base[0] + 2.5, 7];
+        if (hsh(Math.floor(x * 3), Math.floor(z * 3), s + 4) < .05 && clusters.some(([cx, cz]) => Math.hypot(x - cx, z - cz) < 12)) return [base[0], 7];   // cascotes
+        return base; });
+      M.treasures = treasures; return [];
     },
   };
 
