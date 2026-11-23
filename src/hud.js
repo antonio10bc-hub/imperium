@@ -8,7 +8,7 @@ import { ping } from './effects.js';
 import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, townIncNow, popOf, state, summonHero, toast, towerDmg, towerRange, upgradeTown } from './game.js';
 import { focusOn, heroButton } from './input.js';
 import { MERC, ev, hireMercs, mercRoom } from './events.js';
-import { regions, spots } from './map.js';
+import { mapCode, regions, spots } from './map.js';
 import { seed } from './noise.js';
 import { $, S, track } from './state.js';
 import { THUMB, alive, sel, sideState, units } from './units.js';
@@ -176,7 +176,7 @@ export function syncTools() { $('spd').firstChild.textContent = '×' + S.speed; 
 // menú de pausa: congela la partida mientras está abierto y al cerrarlo la deja como estaba
 export function openMenu() {
   if (state !== 'play' || S.menuOpen) return;
-  S.menuOpen = true; S.pausedBefore = S.paused; S.paused = true; S.amode = false; $('menu').hidden = false; syncTools(); sfx('select'); $('mResume').focus();
+  S.menuOpen = true; S.pausedBefore = S.paused; S.paused = true; S.amode = false; $('mCode').textContent = mapCode(); $('menu').hidden = false; syncTools(); sfx('select'); $('mResume').focus();
 }
 export function closeMenu() {
   if (!S.menuOpen) return;
@@ -220,6 +220,8 @@ export function init() {
   $('menuBtn').addEventListener('click', openMenu);
   $('mercBtn').addEventListener('click', () => { if (hireMercs(0)) { sfx('capture'); updateHud(); } else sfx('deny'); });
   $('mResume').addEventListener('click', closeMenu);
+  for (const [b, t] of [['mCopy', 'mCode'], ['eCopy', 'eCode']]) $(b).addEventListener('click', () => {   // copia el código del mapa
+    const c = $(t).textContent; navigator.clipboard?.writeText(c).then(() => { $(b).textContent = 'COPIADO'; setTimeout(() => { $(b).textContent = 'COPIAR'; }, 1500); }, () => {}); sfx('select'); });
   $('mRestart').addEventListener('click', () => { track('menu_restart'); S.pendingStart = true; newGame(seed, true); });   // misma semilla y mismas civilizaciones
   $('mSurrender').addEventListener('click', () => { track('menu_surrender'); endGame(false, true); });
   $('mQuit').addEventListener('click', () => { track('menu_quit'); newGame(1 + Math.floor(Math.random() * 99999)); });

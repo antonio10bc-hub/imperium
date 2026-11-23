@@ -6,7 +6,7 @@ import { MD, MW, TEAM, TP, idx, mixHex } from './config.js';
 import { newGame } from './game.js';
 import { GEO } from './geo.js';
 import { syncDiff } from './hud.js';
-import { geoTerrain, previewMap } from './map.js';
+import { geoTerrain, parseCode, previewMap } from './map.js';
 import { resize } from './overlay.js';
 import { bake, grad, part } from './render.js';
 import { $, S } from './state.js';
@@ -144,7 +144,8 @@ function showGeo(dir = 0) {
 }
 
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
-function setGeo(v, dir) {
+function setGeo(v, dir, keepCode = false) {
+  if (!keepCode) { S.codeSeed = null; $('mapCode').value = ''; $('mapCode').className = ''; }
   S.wantScen = v; try { localStorage.setItem('imperium-geo', v); } catch (e) {}
   sfx('select'); S.menuDirty = true; showGeo(dir);
 }
@@ -156,6 +157,12 @@ export function init() {
   }));
   document.querySelectorAll('#start [data-geo]').forEach(b => b.addEventListener('click', () => { const d = +b.dataset.geo, o = ['random', ...GEO.keys], i = o.indexOf(S.wantScen); setGeo(o[(i + d + o.length) % o.length], d); }));
   setTimeout(() => showGeo(), 0);
+  $('mapCode').addEventListener('input', e => {   // código de mapa: elige su geografía y su semilla
+    const el = e.target, c = parseCode(el.value);
+    if (c) { setGeo(c.geo, 1, true); S.codeSeed = c.seed; S.menuDirty = true; }
+    else S.codeSeed = null;
+    el.className = !el.value.trim() ? '' : c ? 'ok' : 'bad';
+  });
   $('howBtn').addEventListener('click', () => { sfx('select'); $('start').hidden = true; $('how').hidden = false; });
   $('howBack').addEventListener('click', () => { sfx('select'); $('how').hidden = true; $('start').hidden = false; });
   $('again').addEventListener('click', () => newGame(1 + Math.floor(Math.random() * 99999)));

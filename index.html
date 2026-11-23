@@ -49,6 +49,7 @@
     <div class="mcard"><h3>DIFICULTAD</h3><div class="diff"><button type="button" data-d="easy">FÁCIL</button><button type="button" data-d="normal">NORMAL</button><button type="button" data-d="hard">DIFÍCIL</button></div></div>
     <button id="go" type="button">JUGAR</button>
     <button id="howBtn" type="button" class="alt">INSTRUCCIONES</button>
+    <label class="codein">CÓDIGO DE MAPA <input id="mapCode" type="text" maxlength="24" placeholder="P. EJ. RIO-48213" autocomplete="off" spellcheck="false"></label>
   </section>
 </div></div>
 <div id="how" class="overlay" hidden><div class="card">
@@ -77,12 +78,14 @@
 <div id="menu" class="overlay" hidden><div class="card">
   <h2>PAUSA</h2>
   <button id="mResume" type="button">CONTINUAR</button>
+  <p class="mcode">MAPA <b id="mCode"></b> <button id="mCopy" type="button" class="alt" title="Copiar el código para jugar este mapa otra vez o compartirlo">COPIAR</button></p>
   <button id="mRestart" type="button" class="alt">REINICIAR ESTE MAPA</button>
   <button id="mSurrender" type="button" class="alt">RENDIRSE</button>
   <button id="mQuit" type="button" class="alt">MENÚ PRINCIPAL</button>
 </div></div>
 <div id="end" class="overlay" hidden><div class="card">
   <h2 id="endT">VICTORIA</h2><p id="endP" style="text-align:center"></p>
+  <p class="mcode">MAPA <b id="eCode"></b> <button id="eCopy" type="button" class="alt">COPIAR</button></p>
   <button id="again" type="button">OTRA PARTIDA</button>
 </div></div>
 <div id="loading">GENERANDO MAPA...</div>

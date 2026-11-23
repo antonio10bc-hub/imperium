@@ -9,7 +9,7 @@ export const S = {
   VW: innerWidth, VH: innerHeight,
   paused: false, speed: 1, diff: 'easy', wantScen: 'random', soundOn: false,
   bfsBudget: 0,   // campos de búsqueda individuales que se pueden calcular por paso de simulación (evita picos)
-  menuDirty: false, pendingStart: false,
+  menuDirty: false, pendingStart: false, codeSeed: null,   // codeSeed: semilla de un código de mapa escrito en el menú
   menuOpen: false, pausedBefore: false,
   aiPlayer: null, aiRival: null,   // solo pruebas: { diff, brain } para que la IA juegue tu bando; cerebro forzado para el rival   // menú de pausa abierto y si la partida ya estaba en pausa al abrirlo
 };

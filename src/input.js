@@ -196,5 +196,5 @@ export function init() {
   });
   addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
   addEventListener('blur', () => { keys.clear(); mouse.in = false; });
-  $('go').addEventListener('click', () => { sfx('select'); if (S.menuDirty) { S.pendingStart = true; newGame(seed); } else startGame(); });
+  $('go').addEventListener('click', () => { sfx('select'); if (S.menuDirty) { S.pendingStart = true; newGame(S.codeSeed ?? seed); } else startGame(); });
 }

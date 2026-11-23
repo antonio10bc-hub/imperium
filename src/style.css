@@ -162,6 +162,12 @@ button.alt{background:var(--paper)}
 #panel .act kbd{margin-left:4px;border:0;padding:0;opacity:.6}
 #tools{flex:none;display:grid;grid-template-columns:repeat(4,auto);gap:4px;align-content:center}
 #menu .card{min-width:280px;align-items:stretch}
+.mcode{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;font:400 12px/1 var(--font)}
+.mcode b{font-weight:400;color:var(--blue);letter-spacing:.06em}
+#menu .card .mcode button,.mcode button{font-size:10px;padding:6px 8px}
+.codein{display:flex;flex-direction:column;gap:6px;align-items:center;font:400 10px/1 var(--font);color:var(--mute);letter-spacing:.08em}
+.codein input{width:190px;text-align:center;font:400 12px/1 var(--font);color:var(--ink);background:var(--paper2);border:3px solid var(--ink);padding:7px 6px;text-transform:uppercase}
+.codein input.bad{border-color:var(--red)} .codein input.ok{border-color:#3a8a3a}
 #menu .card button{font-size:14px;padding:12px 16px}
 #tools .tl{display:flex;align-items:center;justify-content:center;gap:4px;height:30px;padding:0 7px;background:var(--bar3);color:var(--txt);border:2px solid var(--ink);box-shadow:0 2px 0 var(--ink);font-size:12px}
 #tools .tl kbd{margin:0;border:0;padding:0;font-size:12px;color:var(--dim);opacity:1}

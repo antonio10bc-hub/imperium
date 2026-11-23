@@ -9,7 +9,7 @@ import { updateFog } from './fog.js';
 import { enqueue, fields, heroOf, newGame, state, summonHero, updateGame, upgradeTown } from './game.js';
 import { selectSpot, setSelection, updateHud } from './hud.js';
 import { PITCH, camT, command, drag, focusOn, keys, mouse, pan, rayPlane } from './input.js';
-import { HM, spots, surfY, wallHit } from './map.js';
+import { HM, parseCode, spots, surfY, wallHit } from './map.js';
 import { drawMinimap } from './minimap.js';
 import { walk } from './nav.js';
 import { _h, applyRes, drawOverlay } from './overlay.js';
@@ -82,5 +82,8 @@ window.__game = { S, gl, units, triggerEvent, ev,
   setAI(sd, diff, brain, over) { sideState[sd].ai = diff ? makeAI(sd, diff, brain) : null; if (over && sideState[sd].ai) { const A = sideState[sd].ai; A.Df = { ...A.Df, ...over }; if (over.inc != null) A.inc = over.inc; } }, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
   step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) S.camGoal = S.camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, spawnAt, dbg: () => ({ fields, walk, HM, MW, wallHit, promote }) };
 makeThumbs();
-newGame(1 + Math.floor(Math.random() * 99999));
+// ?mapa=RIO-48213 en la dirección abre ese mapa
+{ let c = null; try { c = parseCode(new URLSearchParams(location.search).get('mapa')); } catch (e) {}
+  if (c) { S.wantScen = c.geo; S.codeSeed = c.seed; document.getElementById('mapCode').value = c.geo.toUpperCase() + '-' + c.seed; document.getElementById('mapCode').className = 'ok'; }
+  newGame(c ? c.seed : 1 + Math.floor(Math.random() * 99999)); }
 requestAnimationFrame(frame);

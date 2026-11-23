@@ -13,7 +13,7 @@ import { resetFog } from './fog.js';
 import { GEO } from './geo.js';
 import { refreshPanel, syncDiff, syncTools, updateCtx } from './hud.js';
 import { focusOn } from './input.js';
-import { fortPt, forts, generate, paintRegion, regions, scen, spots, wallR } from './map.js';
+import { fortPt, forts, generate, mapCode, paintRegion, regions, scen, spots, wallR } from './map.js';
 import { showPortraits } from './menu.js';
 import { cellX, cellZ, fieldAround, nearestNode } from './nav.js';
 import { seed } from './noise.js';
@@ -143,7 +143,7 @@ export function endGame(win, surrender = false) {
   const s = spots[win ? BASE1 : BASE0];
   for (let k = 0; k < 4; k++) burst(spotPos(s, 2 + k), [0xd4cde2, TEAM[s.side].c, 0xffa03a, 0x3a2a4a], 14, 6, 6, 1.4, .45);
   focusOn(s.x, s.z);
-  $('endT').textContent = win ? 'VICTORIA' : 'DERROTA';
+  $('endT').textContent = win ? 'VICTORIA' : 'DERROTA'; $('eCode').textContent = mapCode();
   $('endT').style.color = win ? 'var(--blue)' : 'var(--red)';
   const m = Math.floor(elapsed / 60), sec = Math.floor(elapsed % 60);
   $('endP').textContent = (win ? 'La fortaleza roja ha caído' : surrender ? 'Te has rendido' : 'Tu fortaleza ha caído') + ` en ${m}:${String(sec).padStart(2, '0')} (${DIFF[S.diff].label}).`;

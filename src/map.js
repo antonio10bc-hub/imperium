@@ -162,13 +162,20 @@ export function terrainColor(x, z) {
   return B.ground[tone];
 }
 export let meshes = [], spots = [];
+// código de mapa para compartir: GEOGRAFÍA-SEMILLA (p. ej. RIO-48213). La misma geografía y semilla dan el mismo terreno y los mismos pueblos
+export const mapCode = () => `${scen.toUpperCase()}-${seed}`;
+export function parseCode(t) {
+  const m = /^\s*([A-Za-z]+)\s*-\s*(\d{1,9})\s*$/.exec(t || ''), key = m && m[1].toLowerCase();
+  return m && GEO.LIST[key] ? { geo: key, seed: +m[2] } : null;
+}
 export function generate(newSeed, tries = 0) {
   setSeed(newSeed);
   meshes.forEach(m => { m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); }); meshes = [];
   EL = new Float32Array(N); G = new Float32Array(N); HM = new Int8Array(N);
   const rng = rngOf(seed);
   // tras muchas semillas fallidas se cae al río clásico, que siempre sale jugable (evita reintentar sin fin)
-  scen = tries >= 20 ? 'rio' : S.wantScen === 'random' ? GEO.keys[rng() * GEO.keys.length | 0] : (GEO.LIST[S.wantScen] ? S.wantScen : 'rio');
+  const pickR = rng();   // se tira siempre, para que un código de mapa (geografía + semilla) dé el mismo mapa tanto si se eligió al azar como a mano
+  scen = tries >= 20 ? 'rio' : S.wantScen === 'random' ? GEO.keys[pickR * GEO.keys.length | 0] : (GEO.LIST[S.wantScen] ? S.wantScen : 'rio');
   baseGround(rng);
   flats = []; forts = [];
   computeHM();
@@ -201,7 +208,8 @@ export function generate(newSeed, tries = 0) {
     return { kind: kind === 'castle' ? 'base' : kind, side: sd, x: f.x + lx * Math.cos(a) - lz * Math.sin(a), z: f.z + lx * Math.sin(a) + lz * Math.cos(a), ry, sc }; };
   spots = [lay(0, 'castle'), lay(1, 'castle'), lay(0, 'barracks'), lay(1, 'barracks'), lay(0, 'altar'), lay(1, 'altar'), lay(0, 'temple'), lay(1, 'temple')];   // mismo orden que BASE0…TEMP1 en config
   const names = [...TOWN_NAMES].sort(() => rng() - .5);
-  let pool = mainList.filter(i => HM[i] <= 7 && cellX(i) > 10 && cellX(i) < MW - 10 && cellZ(i) > 10 && cellZ(i) < MD - 10);
+  // pueblos lejos de los bordes del mapa (en las esquinas quedaban apartados del juego)
+  let pool = mainList.filter(i => HM[i] <= 7 && cellX(i) > 26 && cellX(i) < MW - 26 && cellZ(i) > 22 && cellZ(i) < MD - 22);
   if (geoR?.oasis) pool = pool.filter(i => GEOT[i] === 4);   // en el desierto, los pueblos están en los oasis
   const addTown = (x, z, extra = {}) => { spots.push({ kind: 'town', x, z, name: names[spots.length % names.length], owner: -1, ...extra }); flats.push({ kind: 'town', x, z, r0: 4.8, r1: 8.5, h: plateau(x, z, 4) }); };
   for (const [x, z] of geoR?.special || []) { const n = nearestNode(x, z); if (Math.hypot(cellX(n) - x, cellZ(n) - z) < 8) addTown(cellX(n), cellZ(n), geoR.goldTop ? { special: true } : {}); }
