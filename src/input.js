@@ -6,7 +6,7 @@ import { spotPos } from './buildings.js';
 import { alarm, assign, unassign } from './combat.js';
 import { ALT0, BARR0, BASE0, BASE1, GAME, MD, MW, TYPES } from './config.js';
 import { ping } from './effects.js';
-import { toggleFog } from './fog.js';
+import { exploredAt, toggleFog } from './fog.js';
 import { enqueue, heroesOf, newGame, startGame, state, toast } from './game.js';
 import { closeMenu, openMenu, pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
 import { HM, spots, surfY } from './map.js';
@@ -41,16 +41,23 @@ export function groundAt(x, y, loose) {
   if (!loose && (px < 0 || pz < 0 || px >= MW || pz >= MD)) return null;
   return { x: px, z: pz };
 }
+function setRally(g) {
+  S.rally = g; if (!S.rallyFlag) { S.rallyFlag = new THREE.Group(); part(S.rallyFlag, .1, 2, .1, 0x8a5a34, 0, 1, 0); part(S.rallyFlag, .8, .5, .08, 0x2f7bff, .45, 1.7, 0); world.add(S.rallyFlag); }
+  S.rallyFlag.position.set(g.x, surfY(g.x, g.z), g.z);
+  ping(S.rallyFlag.position, '#3a6ad8'); sfx('cmd'); toast('PUNTO DE REUNIÓN FIJADO');
+}
+// orden sobre la fortaleza rival (asalto), un pueblo ajeno (conquista) o un punto del suelo (mover); la usan el mapa y el minimapa
+function orderTo(list, sp, g, attack) {
+  if (sp && sp.side === 1) { for (const u of list) u.order = { type: 'siege' }; ping(spotPos(spots[BASE1]), '#d83a4a'); sfx('cmd'); toast('¡AL ASALTO DE LA FORTALEZA!'); track('order', { type: 'siege' }); return; }
+  if (sp && sp.kind === 'town' && sp.owner !== 0) { const k = spots.indexOf(sp); for (const u of list) u.order = { type: 'capture', k }; ping(spotPos(sp), '#e8c870'); sfx('cmd'); track('order', { type: 'capture' }); return; }
+  orderMove(list, g.x, g.z, true, attack); sfx('cmd'); track('order', { type: attack ? 'amove' : 'move' });
+}
+const commandList = () => [...sel].filter(u => !(u.leader && sel.has(u.leader)));   // la escolta de un héroe seleccionado sigue en formación
 export function command(x, y, attack = false) {
   if (state !== 'play') return;
-  if (S.selBld === 'barracks') {
-    const g = groundAt(x, y); if (!g) return;
-    S.rally = g; if (!S.rallyFlag) { S.rallyFlag = new THREE.Group(); part(S.rallyFlag, .1, 2, .1, 0x8a5a34, 0, 1, 0); part(S.rallyFlag, .8, .5, .08, 0x2f7bff, .45, 1.7, 0); world.add(S.rallyFlag); }
-    S.rallyFlag.position.set(g.x, surfY(g.x, g.z), g.z);
-    ping(S.rallyFlag.position, '#3a6ad8'); sfx('cmd'); toast('PUNTO DE REUNIÓN FIJADO'); return;
-  }
+  if (S.selBld === 'barracks') { const g = groundAt(x, y); if (g) setRally(g); return; }
   if (!sel.size) return;
-  const list = [...sel].filter(u => !(u.leader && sel.has(u.leader)));   // la escolta de un héroe seleccionado sigue en formación
+  const list = commandList();
   const own = pickUnit(x, y, 0);
   if (own && own.type === 'hero' && list.some(u => u !== own)) {
     let n = 0; for (const u of list) if (assign(u, own)) n++;
@@ -62,11 +69,17 @@ export function command(x, y, attack = false) {
   for (const u of list) unassign(u);
   const eu = pickEnemy(x, y);
   if (eu) { for (const u of list) u.order = { type: 'attack', target: eu }; ping(eu.pos, '#d83a4a'); sfx('cmd'); track('order', { type: 'attack' }); return; }
-  const sp = pickSpot(x, y);
-  if (sp && sp.side === 1) { for (const u of list) u.order = { type: 'siege' }; ping(spotPos(spots[BASE1]), '#d83a4a'); sfx('cmd'); toast('¡AL ASALTO DE LA FORTALEZA!'); track('order', { type: 'siege' }); return; }
-  if (sp && sp.kind === 'town' && sp.owner !== 0) { const k = spots.indexOf(sp); for (const u of list) u.order = { type: 'capture', k }; ping(spotPos(sp), '#e8c870'); sfx('cmd'); track('order', { type: 'capture' }); return; }
-  const g = sp ? { x: sp.x, z: sp.z } : groundAt(x, y); if (!g) return;
-  orderMove(list, g.x, g.z, true, attack); sfx('cmd'); track('order', { type: attack ? 'amove' : 'move' });
+  const sp = pickSpot(x, y), g = sp ? { x: sp.x, z: sp.z } : groundAt(x, y); if (!g) return;
+  orderTo(list, sp, g, attack);
+}
+// orden desde el minimapa (clic derecho): punto de reunión con el cuartel seleccionado; si no, mover, conquistar o asaltar
+export function commandAt(x, z, attack = false) {
+  if (state !== 'play') return false;
+  if (S.selBld === 'barracks') { setRally({ x, z }); return true; }
+  if (!sel.size) return false;
+  const list = commandList(); for (const u of list) unassign(u);
+  const sp = spots.find(s => (s.kind === 'town' || (s.kind === 'base' && s.side === 1)) && exploredAt(s.x, s.z) && Math.hypot(s.x - x, s.z - z) < (s.kind === 'base' ? 10 : 7));
+  orderTo(list, sp, sp ? { x: sp.x, z: sp.z } : { x, z }, attack); return true;
 }
 // ---------- Cámara ----------
 export const PITCH = .98, camT = new THREE.Vector3(MW / 2, 2, MD / 2);

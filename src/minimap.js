@@ -3,7 +3,7 @@ import { alarm } from './combat.js';
 import { MD, MW, N, TEAM, TP, idx, mixHex } from './config.js';
 import { exploredAt, fogData, visibleAt } from './fog.js';
 import { miniPings } from './game.js';
-import { focusOn, groundAt } from './input.js';
+import { commandAt, focusOn, groundAt } from './input.js';
 import { G, HM, biomeAt, regionCell, regionShown, spots, terrainColor, treeCell } from './map.js';
 import { S } from './state.js';
 import { sel, units } from './units.js';
@@ -64,7 +64,15 @@ const miniGo = e => { const r = mini.getBoundingClientRect(); focusOn((e.clientX
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
 export function init() {
   mini.width = MW * MS; mini.height = MD * MS; mbuf.width = MW; mbuf.height = MD;
-  mini.addEventListener('pointerdown', e => { miniDrag = true; mini.setPointerCapture(e.pointerId); miniGo(e); });
+  mini.addEventListener('contextmenu', e => e.preventDefault());
+  mini.addEventListener('pointerdown', e => {
+    if (e.button === 2) {   // clic derecho: orden a lo seleccionado (o punto de reunión), como en el mapa
+      const r = mini.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * MW, z = (e.clientY - r.top) / r.height * MD;
+      if (commandAt(x, z, S.amode)) { S.amode = false; miniPings.push({ x, z, t: 0, c: '#9ad86a' }); }
+      return;
+    }
+    miniDrag = true; mini.setPointerCapture(e.pointerId); miniGo(e);
+  });
   mini.addEventListener('pointermove', e => { if (miniDrag) miniGo(e); });
   mini.addEventListener('pointerup', () => { miniDrag = false; });
 }
