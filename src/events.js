@@ -2,14 +2,14 @@
 // · Bandidos: una banda neutral asalta los pueblos del bando con más territorio; un pueblo sin defensores cae y queda neutral.
 // · Mercenarios: durante 45 s, cualquiera de los dos bandos puede contratar tropas veteranas.
 // · Caravana: cruza el mapa de norte a sur por el centro; quien la destruya se lleva su oro.
-import { spreadTo } from './behavior.js';
+import { orderMove, spreadTo } from './behavior.js';
 import { applyRank, nearestEnemy, strike } from './combat.js';
 import { MD, MW, TOWN0 } from './config.js';
 import { ping } from './effects.js';
 import { capOf, capR, elapsed, fields, popOf, toast } from './game.js';
 import { spots } from './map.js';
 import { bfs, cellX, cellZ, inMain, nearestNode } from './nav.js';
-import { alive, followField, sel, setMax, sideState, spawnAt, spawnUnit, units } from './units.js';
+import { alive, followField, sel, setMax, sideState, spawnAt, units } from './units.js';
 
 export const MERC = { cost: 220, time: 45, types: ['horse', 'horse', 'bow', 'sword'], rank: 2 };
 const CARAVAN_GOLD = 150, CARAVAN_CARTS = 3, CARAVAN_GAP = 2.4;   // oro total, carros y segundos entre uno y el siguiente
@@ -74,11 +74,29 @@ export function hireMercs(sd) {
   const st = sideState[sd];
   if (!ev.merc || ev.merc.hired[sd] || st.gold < MERC.cost || !mercRoom(sd)) return false;
   st.gold -= MERC.cost; ev.merc.hired[sd] = true;
-  for (const t of MERC.types) { const u = spawnUnit(sd, t); u.rank = MERC.rank; setMax(u); u.hp = u.maxHp; applyRank(u); }
-  if (sd === 0) toast('MERCENARIOS CONTRATADOS', 'good', spots[sd]);
+  // llegan por el borde del mapa más cercano a tu castillo y van a esperar junto a él
+  const c = spots[sd], e = mercEntry(c), list = [];
+  MERC.types.forEach((t, k) => { const u = spawnAt(sd, t, cellX(e) + (k % 2) * 1.2, cellZ(e) + (k >> 1) * 1.2, Math.atan2(c.z - cellZ(e), c.x - cellX(e))); u.rank = MERC.rank; setMax(u); u.hp = u.maxHp; applyRank(u); list.push(u); });
+  orderMove(list, c.x, c.z, false);
+  if (sd === 0) toast('MERCENARIOS CONTRATADOS: LLEGAN POR EL BORDE DEL MAPA', 'good', { x: cellX(e), z: cellZ(e) });
   return true;
 }
 
+// casilla de entrada: desde cada punto del borde del mapa, avanza hacia el castillo hasta tocar tierra a la que se llega por camino
+// (en mapas con mar, es la costa: llegan en barco); se queda con la que está más cerca del castillo por camino
+function mercEntry(c) {
+  const f = bfs([c.node]); let best = c.node, bd = 1e9;
+  for (let k = 0; k <= 1; k += 1 / 64) for (const [x0, z0] of [[k * MW, 2], [k * MW, MD - 2], [2, k * MD], [MW - 2, k * MD]]) {
+    const L = Math.hypot(c.x - x0, c.z - z0);
+    for (let t = 0; t < L; t += 1.5) {
+      const x = x0 + (c.x - x0) * t / L, z = z0 + (c.z - z0) * t / L, n = nearestNode(x, z);
+      if (Math.hypot(cellX(n) - x, cellZ(n) - z) > 1.5 || !inMain[n]) continue;
+      if (f[n] < bd) { bd = f[n]; best = n; }
+      break;
+    }
+  }
+  return best;
+}
 // ---------- caravana ----------
 function caravan() {
   const x0 = MW / 2 + (Math.random() - .5) * 60, from = nearestNode(x0, 6), to = nearestNode(MW / 2 + (Math.random() - .5) * 60, MD - 6);
