@@ -14,6 +14,7 @@ import { blocked, refreshCells, walk } from './nav.js';
 import { rngOf, seed } from './noise.js';
 import { bake, basic, part, world } from './render.js';
 import { visibleAt } from './fog.js';
+import { setAmbience } from './audio.js';
 
 // ---------- clima ----------
 const KIND = { delta: 'fog', ruinas: 'fog', oasis: 'sand', cordillera: 'snow', helado: 'snow', lago: 'ash' };
@@ -73,7 +74,11 @@ function makeFlock() {
   const a = fxRand() * 6.28; g.position.set(camT.x - Math.cos(a) * 70, 15 + fxRand() * 5, camT.z - Math.sin(a) * 50); g.rotation.y = -a; world.add(g);
   return { g, birds, v: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)).multiplyScalar(7 + fxRand() * 3), t: 0 };
 }
+const BED = { cordillera: ['wind', .6], helado: ['wind', .8], costa: ['waves', .8], archipielago: ['waves', 1], istmo: ['waves', .7], oasis: ['sand', .45], lago: ['wind', .35] };
+const WX_BED = { rain: 'rain', sand: 'sand', snow: 'wind', ash: 'wind' };
+let bedT = 0;
 export function updateLife(dt) {
+  if ((bedT -= dt) <= 0) { bedT = 1; if (state !== 'play') setAmbience(null); else if (WEA.k > .4 && WX_BED[WEA.kind]) setAmbience(WX_BED[WEA.kind], .6 + WEA.k * .6); else { const b = BED[scen]; setAmbience(b?.[0], b?.[1]); } }
   if (!HM || dt <= 0) return;
   if (flock) { flock.t += dt; flock.g.position.addScaledVector(flock.v, dt); flock.g.visible = visibleAt(flock.g.position.x, flock.g.position.z);   // los pájaros no se ven sobre la niebla flock.birds.forEach((b, i) => { b.scale.y = 1 + Math.sin(flock.t * 12 + i) * .8; b.scale.x = .75 + Math.abs(Math.sin(flock.t * 12 + i)) * .5; });
     if (flock.t > 22) { world.remove(flock.g); flock.g.children.forEach(b => b.geometry.dispose()); flock = null; } }

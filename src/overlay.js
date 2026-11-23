@@ -10,7 +10,7 @@ import { spots, surfY } from './map.js';
 import { camera, canvas, gl, target } from './render.js';
 import { $, S } from './state.js';
 import { floats, pings, sel, sideState, units } from './units.js';
-import { BRIDGE_COST, R, hiddenFrom } from './rules.js';
+import { BRIDGE_COST, R, hiddenFrom, ruleTimer } from './rules.js';
 import { drawWeather } from './ambient.js';
 
 let curScale = 0, curLines = CFG.lines;
@@ -97,6 +97,7 @@ function orderLines() {
 export function drawOverlay(dt) {
   octx.clearRect(0, 0, S.VW, S.VH);
   drawWeather(octx, S.VW, S.VH, dt);
+  if (state === 'play') { const rt = ruleTimer(); if (rt) label(S.VW / 2, 62, rt, '#0f0f1b', rt.startsWith('¡') ? '#ff9a6a' : '#e8c870', 9); }   // contador de mareas, crecidas o volcán
   const showUI = state !== 'menu';
   for (const s of spots) {
     const c = project(spotPos(s), tmpP); s.sx = c.x; s.sy = c.y; s.vis = c.vis && (state !== 'play' || exploredAt(s.x, s.z));

@@ -8,11 +8,13 @@ import { ping } from './effects.js';
 import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, townIncNow, popOf, state, summonHero, toast, towerDmg, towerRange, upgradeTown } from './game.js';
 import { focusOn, heroButton } from './input.js';
 import { MERC, ev, hireMercs, mercRoom } from './events.js';
-import { mapCode, regions, spots } from './map.js';
+import { mapCode, regions, scen, spots } from './map.js';
 import { seed } from './noise.js';
 import { $, S, track } from './state.js';
 import { THUMB, alive, sel, sideState, units } from './units.js';
 import { BRIDGE_COST, buildBridge } from './rules.js';
+import { ruleTimer } from './rules.js';
+import { GEO } from './geo.js';
 
 // ---------- HUD ----------
 // Grupos con F1–F5 (sin barra visible: la barra inferior queda libre para la selección)
@@ -183,7 +185,7 @@ export function syncTools() { $('spd').firstChild.textContent = '×' + S.speed; 
 // menú de pausa: congela la partida mientras está abierto y al cerrarlo la deja como estaba
 export function openMenu() {
   if (state !== 'play' || S.menuOpen) return;
-  S.menuOpen = true; S.pausedBefore = S.paused; S.paused = true; S.amode = false; $('mCode').textContent = mapCode(); $('menu').hidden = false; syncTools(); sfx('select'); $('mResume').focus();
+  S.menuOpen = true; S.pausedBefore = S.paused; S.paused = true; S.amode = false; $('mCode').textContent = mapCode(); { const rt = ruleTimer(); $('mRule').textContent = (GEO.DESC[scen] || '') + (rt ? ' · ' + rt : ''); }   // la regla del mapa (y su próximo cambio) en la pausa $('menu').hidden = false; syncTools(); sfx('select'); $('mResume').focus();
 }
 export function closeMenu() {
   if (!S.menuOpen) return;

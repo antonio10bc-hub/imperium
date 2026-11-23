@@ -162,6 +162,7 @@ button.alt{background:var(--paper)}
 #panel .act kbd{margin-left:4px;border:0;padding:0;opacity:.6}
 #tools{flex:none;display:grid;grid-template-columns:repeat(4,auto);gap:4px;align-content:center}
 #menu .card{min-width:280px;align-items:stretch}
+.mrule{margin:0 0 4px;max-width:300px;text-align:center;font:400 11px/1.5 var(--font);color:var(--mute);text-transform:uppercase}
 .mcode{margin:0;display:flex;align-items:center;justify-content:center;gap:8px;font:400 12px/1 var(--font)}
 .mcode b{font-weight:400;color:var(--blue);letter-spacing:.06em}
 #menu .card .mcode button,.mcode button{font-size:10px;padding:6px 8px}

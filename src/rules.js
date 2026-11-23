@@ -234,7 +234,7 @@ function updateIce(dt) {
     if (on.length < (GEOT[u.node] === 15 ? 5 : 10)) continue;   // el hielo fino aguanta la mitad
     const cx = Math.floor(u.pos.x), cz = Math.floor(u.pos.z), cells = [];
     for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const x = cx + dx, z = cz + dz; if (x >= 0 && z >= 0 && x < MW && z < MD && dx * dx + dz * dz <= 36 && (GEOT[idx(x, z)] === 6 || GEOT[idx(x, z)] === 15)) cells.push(idx(x, z)); }
-    R.breaks.push({ x: u.pos.x, z: u.pos.z, cells, t: 2, phase: 'crack' });
+    R.breaks.push({ x: u.pos.x, z: u.pos.z, cells, t: 2, phase: 'crack' }); if (exploredAt(u.pos.x, u.pos.z)) sfx('crack');
     if (on.some(o => o.side === 0) || u.vis) toast('¡EL HIELO SE AGRIETA! SALID DE AHÍ', 'bad', u.pos);
   }
 }
@@ -340,11 +340,27 @@ function updateVolcano(dt) {
     for (const u of UGRID.near(b.to.x, b.to.z, 2.8, _near)) if (Math.hypot(u.pos.x - b.to.x, u.pos.z - b.to.z) < 2.8) damage({ side: 2, vis: u.vis, def: {} }, u, 40);
   }
   if (v.t > 0) return;
-  if (v.phase === 'calm') { v.phase = 'warn'; v.t = 8; toast('¡EL VOLCÁN RUGE! VA A ENTRAR EN ERUPCIÓN', 'bad', v); sfx('deny'); }
-  else if (v.phase === 'warn') { v.phase = 'erupt'; v.t = 7; toast('¡ERUPCIÓN! LEJOS DEL VOLCÁN', 'bad', v); }
+  if (v.phase === 'calm') { v.phase = 'warn'; v.t = 8; toast('¡EL VOLCÁN RUGE! VA A ENTRAR EN ERUPCIÓN', 'bad', v); sfx('rumble'); }
+  else if (v.phase === 'warn') { v.phase = 'erupt'; v.t = 7; toast('¡ERUPCIÓN! LEJOS DEL VOLCÁN', 'bad', v); sfx('rumble'); }
   else { v.phase = 'calm'; v.t = 160 + Math.random() * 60; }
 }
 
+// contador de la regla con tiempo de la geografía (marea, crecida, volcán), para la pantalla y la pausa
+const mmss = t => { t = Math.max(0, Math.ceil(t)); return `${t / 60 | 0}:${String(t % 60).padStart(2, '0')}`; };
+export function ruleTimer() {
+  const c = R.cycle;
+  if (c) { const tide = R.on.tides; return c.phase === 'open' ? `${tide ? 'MAREA ALTA' : 'CRECIDA'} EN ${mmss(c.t + 10)}` : c.phase === 'warn' ? `${tide ? '¡LA MAREA SUBE!' : '¡EL RÍO CRECE!'} ${mmss(c.t)}` : `${tide ? 'MAREA BAJA' : 'LOS VADOS SE ABREN'} EN ${mmss(c.t)}`; }
+  const v = R.volcano; if (v) return v.phase === 'calm' ? `ERUPCIÓN EN ~${mmss(v.t + 8)}` : v.phase === 'warn' ? '¡EL VOLCÁN RUGE!' : '¡ERUPCIÓN!';
+  return '';
+}
+// avisos en el minimapa: agua que va a cubrir pasos, zona del volcán en erupción y hielo agrietado (parpadean)
+export function drawRulesMini(c) {
+  const blink = (performance.now() / 300 | 0) % 2;
+  const g = R.gates[0], ph = R.cycle?.phase;
+  if (g && (ph === 'warn' || ph === 'closed') && (ph === 'closed' || blink)) { c.fillStyle = ph === 'warn' ? '#ffe06a' : '#3a8ad8'; for (let k = 0; k < g.cells.length; k += 3) { const i = g.cells[k], x = i % MW, z = (i / MW) | 0; if (exploredAt(x, z)) c.fillRect(x - 1, z - 1, 3, 3); } }
+  const v = R.volcano; if (v && v.phase !== 'calm' && exploredAt(v.x, v.z)) { c.strokeStyle = blink ? '#ff7a1a' : '#d83a4a'; c.lineWidth = 3; c.beginPath(); c.arc(v.x, v.z, 34, 0, 7); c.stroke(); }
+  for (const b of R.breaks || []) if (b.phase === 'crack' && blink && exploredAt(b.x, b.z)) { c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.arc(b.x, b.z, 8, 0, 7); c.stroke(); }
+}
 export function updateRules(dt) {
   if (R.cycle) updateCycle(dt);
   if (R.jobs.length) updateJobs(dt);

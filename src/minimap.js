@@ -7,7 +7,7 @@ import { commandAt, focusOn, groundAt } from './input.js';
 import { G, HM, biomeAt, regionCell, regionShown, spots, terrainColor, treeCell } from './map.js';
 import { S } from './state.js';
 import { sel, units } from './units.js';
-import { hiddenFrom } from './rules.js';
+import { drawRulesMini, hiddenFrom } from './rules.js';
 
 // ---------- Minimapa ----------
 const mini = document.getElementById('mini'), mctx = mini.getContext('2d'), MS = 1;
@@ -50,6 +50,7 @@ export function drawMinimap() {
     else if (s.kind === 'base') { mctx.fillStyle = TEAM[s.side].css; mctx.fillRect(s.x - 8, s.z - 8, 16, 16); mctx.strokeRect(s.x - 8, s.z - 8, 16, 16); }
   }
   for (const u of units) { if (u.side !== 0 && (!visibleAt(u.pos.x, u.pos.z) || hiddenFrom(u, 0))) continue; const k = u.type === 'hero' || u.type === 'god' ? 4 : 2; mctx.fillStyle = sel.has(u) ? '#e8c870' : u.type === 'god' ? '#ffe9a0' : u.type === 'hero' ? '#fff' : TEAM[u.side].css; mctx.fillRect(u.pos.x - k, u.pos.z - k, k * 2, k * 2); }
+  drawRulesMini(mctx);
   if (alarm.t > 0 && alarm.pos) { mctx.strokeStyle = (alarm.t * 4 | 0) % 2 ? '#d83a4a' : '#fff'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.arc(alarm.pos.x, alarm.pos.z, 8 + (1 - alarm.t % 1) * 12, 0, 7); mctx.stroke(); }
   for (let i = miniPings.length - 1; i >= 0; i--) {   // destellos de avisos
     const p = miniPings[i]; p.t += .15; const r = 6 + (p.t % .9) * 30;

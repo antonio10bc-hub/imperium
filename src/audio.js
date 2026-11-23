@@ -76,6 +76,17 @@ function clash(t, gain = .05) {
 }
 const N2F = n => 440 * Math.pow(2, (n - 69) / 12);
 // side: bando que suena (carga y héroe del rival con su cuerno); el resto, con el de tu civilización
+// fondo sonoro de cada geografía: un ruido filtrado que suena a viento, oleaje, lluvia o arena (con un vaivén lento)
+let amb = null;
+const AMB = { wind: ['bandpass', 520, .6, .05, .03], waves: ['lowpass', 650, .7, .07, .05], rain: ['highpass', 2300, .5, .05, 0], sand: ['bandpass', 1500, .7, .07, .025] };
+export function setAmbience(kind, level = 1) {
+  if (!S.soundOn || !audio()) return;
+  if (!amb) { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+    s.buffer = noiseBuf; s.loop = true; g.gain.value = 0; lg.gain.value = 0; lfo.frequency.value = .13; s.connect(f).connect(g).connect(sfxBus); lfo.connect(lg).connect(g.gain); s.start(); lfo.start(); amb = { f, g, lg }; }
+  const P = AMB[kind], t = ac.currentTime;
+  if (!P) { amb.g.gain.setTargetAtTime(0, t, .8); amb.lg.gain.setTargetAtTime(0, t, .8); return; }
+  amb.f.type = P[0]; amb.f.frequency.setTargetAtTime(P[1], t, .6); amb.f.Q.value = P[2]; amb.g.gain.setTargetAtTime(P[3] * level, t, .8); amb.lg.gain.setTargetAtTime(P[4] * level, t, .8);
+}
 export function sfx(kind, side = 0) {
   if (!S.soundOn || !audio()) return;
   const P = soundOf(side), H = HORNS[P.horn], beat = (tt, g, st) => PERC[P.perc](tt, g, st, sfxBus);
@@ -95,6 +106,8 @@ export function sfx(kind, side = 0) {
     case 'win': for (let i = 0; i < 6; i++) beat(t + i * .2, .2 + (i % 2) * .1, i % 2 === 0); [...P.capture, P.capture[3] + 4].forEach((n, i) => horn(t + .3 + i * .22, N2F(n), .4 + (i === 4 ? 1 : 0), .06, sfxBus, H)); break;
     case 'charge': P.charge.forEach((n, i) => horn(t + i * .1, N2F(n), .2 + (i === 2 ? .4 : 0), .06, sfxBus, H)); for (let i = 0; i < 6; i++) beat(t + i * .07, .1 + i * .02, i === 0); break;
     case 'hero': beat(t, .25, true); P.capture.map((n, i) => n - (i < 2 ? 12 : 0)).forEach((n, i) => horn(t + .12 + i * .2, N2F(n), .4 + (i === 3 ? .6 : 0), .06, sfxBus, H)); break;
+    case 'crack': for (let i = 0; i < 4; i++) noise(t + i * .09 + Math.random() * .04, .07, { f: 2400 + Math.random() * 1500, q: 7, gain: .13, wet: .3 }); tone(t, 180, .4, { gain: .05, f2: 90, wet: .3 }); break;   // hielo que cruje
+    case 'rumble': noise(t, 2.6, { type: 'lowpass', f: 160, f2: 70, gain: .32, a: .4, wet: .4 }); tone(t, 48, 2.4, { type: 'sawtooth', gain: .05, a: .5, f2: 36, lp: 200 }); break;   // el volcán ruge
     case 'rank': for (const [r, k] of [[1, 1], [2.76, .4], [5.4, .2]]) tone(t, 880 * r, 1.1, { gain: .05 * k, a: .002, wet: .5 }); break;
   }
 }
