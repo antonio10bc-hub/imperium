@@ -213,6 +213,7 @@ button.alt{background:var(--paper)}
   <ul>
     <li>Pulsa el <b>CUARTEL</b> (el edificio de madera de tu fortaleza) para reclutar desde la barra inferior.</li>
     <li>Los <span class="g">pueblos</span> dan oro, tienen una torre y se pueden mejorar. Los caminos dan velocidad y el río solo se cruza por los vados.</li>
+    <li>Algunos pueblos son <b>FORTIFICADOS</b> (escudo encima): más grandes y con diez defensores que atacan a quien se acerque y vuelven a su puesto. Hay que acabar con ellos para conquistarlos; dan el doble de oro.</li>
     <li>Los dos <b>CAMPAMENTOS</b> tienen guardianes neutrales. Derrótalos y conquístalos: te darán jinetes arqueros, hasta 20 por campamento.</li>
     <li>Elige el <b>MAPA</b>: once geografías (río, cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto y caldera). Los pantanos y bajíos frenan, sobre todo a los jinetes; el bosque denso no se atraviesa; los arqueros desde dos niveles por encima llegan más lejos y hacen más daño; la cima de la meseta da oro doble.</li>
     <li>Elige tu <b>CIVILIZACIÓN</b> y la del rival en el menú (o al azar). Todas juegan igual: cambian el aspecto, los edificios y los nombres de las tropas.</li>
@@ -261,7 +262,7 @@ const RANKS = [{ name: '', kills: 0, mul: 1 }, { name: 'BRONCE', kills: 2, mul: 
 const TYPES = ['sword', 'bow', 'horse'], ALLT = ['hero', 'sword', 'bow', 'horse', 'harcher'];
 const RANGED = t => t === 'bow' || t === 'harcher';
 const GAME = { startGold: 150, income: 3, townIncome: 1.5, baseHp: 1500, cap: 80, towns: 16, capture: 4, queueMax: 8, bounty: 6,
-  campGen: 14, campMax: 20, campGuards: 6, heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4 };
+  campGen: 14, campMax: 20, campGuards: 6, fortGuards: 10, heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4 };
 const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, label: 'FÁCIL' }, normal: { inc: 1, attackAt: 5, hero: true, label: 'NORMAL' }, hard: { inc: 1.3, attackAt: 4, hero: true, label: 'DIFÍCIL' } };
 const BASE0 = 0, BASE1 = 1, BARR0 = 2, BARR1 = 3, ALT0 = 4, ALT1 = 5, TOWN0 = 6;
 const TOWN_NAMES = ['VILLAROCA', 'PINARES', 'ALBAMAR', 'ROBLEDO', 'FUENTEVIEJA', 'MONTEALTO', 'LAGUNILLA', 'PEÑASCO', 'VALDEORO', 'SALINAS', 'TORRENUEVA', 'ARENALES', 'CASTROVERDE', 'OLMEDA', 'MIRAFLORES', 'ROCAFRÍA', 'VADOHONDO', 'LOS LLANOS'];
@@ -774,6 +775,15 @@ function generate(newSeed, tries = 0) {
     const c = spots.filter(s => s.kind === 'town' && (s.x < MW / 2) === !half).sort((a, b) => (Math.abs(a.x - MW / 2) + Math.abs(a.z - MD / 2) * .5) - (Math.abs(b.x - MW / 2) + Math.abs(b.z - MD / 2) * .5))[0];
     if (c) { c.camp = true; c.name = 'CAMPAMENTO ' + c.name; }
   }
+  // un 25 % de los pueblos neutrales son fortificados: más grandes, con muchos defensores y el doble de oro
+  const nFort = Math.round(spots.filter(s => s.kind === 'town' && !s.camp).length * .25);
+  for (let k = 0; k < nFort; k++) {
+    const half = k % 2, f = forts[half];
+    const cand = spots.filter(s => s.kind === 'town' && !s.camp && !s.fortified && !s.special && (s.x >= MW / 2) === !!half && Math.hypot(s.x - f.x, s.z - f.z) > 55);
+    const c = cand[(rng() * cand.length) | 0]; if (!c) continue;
+    c.fortified = true;
+    const fl = flats.find(q => q.kind === 'town' && q.x === c.x && q.z === c.z); if (fl) { fl.r0 = 8; fl.r1 = 12; }
+  }
   computeHM(); buildNav();
   for (const s of spots) s.node = nearestNode(s.x, s.z);
   // equilibrio: distancia por camino de cada fortaleza a sus 3 pueblos más cercanos de su mitad; si difiere más de un 18 %, otra semilla
@@ -963,7 +973,7 @@ function drawMinimap() {
   mctx.lineWidth = 2; mctx.strokeStyle = '#0f0f1b';
   for (const s of spots) {
     if (!exploredAt(s.x, s.z)) continue;
-    if (s.kind === 'town') { const r = 7, ko = s.known ?? s.owner; mctx.fillStyle = ko < 0 ? '#f4f4e8' : TEAM[ko].css; mctx.beginPath(); mctx.moveTo(s.x, s.z - r); mctx.lineTo(s.x + r, s.z); mctx.lineTo(s.x, s.z + r); mctx.lineTo(s.x - r, s.z); mctx.closePath(); mctx.fill(); mctx.stroke(); }
+    if (s.kind === 'town') { const r = s.fortified ? 10 : 7, ko = s.known ?? s.owner; mctx.fillStyle = ko < 0 ? '#f4f4e8' : TEAM[ko].css; mctx.beginPath(); mctx.moveTo(s.x, s.z - r); mctx.lineTo(s.x + r, s.z); mctx.lineTo(s.x, s.z + r); mctx.lineTo(s.x - r, s.z); mctx.closePath(); mctx.fill(); mctx.stroke(); }
     else if (s.kind === 'base') { mctx.fillStyle = TEAM[s.side].css; mctx.fillRect(s.x - 8, s.z - 8, 16, 16); mctx.strokeRect(s.x - 8, s.z - 8, 16, 16); }
   }
   for (const u of units) { if (u.side !== 0 && !visibleAt(u.pos.x, u.pos.z)) continue; const k = u.type === 'hero' ? 4 : 2; mctx.fillStyle = sel.has(u) ? '#e8c870' : u.type === 'hero' ? '#fff' : TEAM[u.side].css; mctx.fillRect(u.pos.x - k, u.pos.z - k, k * 2, k * 2); }
@@ -1207,7 +1217,7 @@ const spotPos = (s, lift = 0) => new THREE.Vector3(s.x, s.y + lift, s.z);
 function placeSpot(s, g, face) {
   let m = 1; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) m = Math.max(m, surfY(s.x + dx, s.z + dz));
   s.y = m; g.position.set(s.x, s.y, s.z); g.rotation.y = face; world.add(g); s.group = g; s.base = g.position.clone(); g.updateMatrixWorld();
-  const r = { base: 4.4, barracks: 2.9, altar: 2.7, town: 3.3 }[s.kind] || 3;   // sombra suave desplazada hacia donde cae la luz
+  const r = ({ base: 4.4, barracks: 2.9, altar: 2.7, town: 3.3 }[s.kind] || 3) * (s.fortified ? 1.5 : 1);   // sombra suave desplazada hacia donde cae la luz
   const sh = new THREE.Mesh(new THREE.CircleGeometry(r, 28), basic(0x0f1a2a, .22)); sh.rotation.x = -Math.PI / 2; sh.position.set(s.x + r * .18, s.y + .04, s.z - r * .22); world.add(sh); decos.push(sh); s.shadow = sh;
   s.flags = [];
 }
@@ -1249,15 +1259,20 @@ function buildCamp(s) {
 }
 function buildTown(s) {
   if (s.camp) return buildCamp(s);
-  const g = new THREE.Group(), roofs = [], cv = civOf(sideAt(s.x, s.z)), [wc, wc2] = cv.wall;
+  const big = s.fortified ? 1.5 : 1, g0 = new THREE.Group(), g = CIV.grp(g0, 0, 0, 0, big), roofs = [], cv = civOf(sideAt(s.x, s.z)), [wc, wc2] = cv.wall;
+  if (s.fortified) {   // dos casas más, muralla baja con puerta al frente y dos torres
+    cv.house(CIV.grp(g, -2.5, 0, 1.3, .5, .35)); cv.house(CIV.grp(g, 2.4, 0, 1.4, .5, -.35));
+    for (let k = 0; k < 22; k++) { const a = k / 22 * Math.PI * 2; if (Math.abs(a - Math.PI / 2) < .3) continue; part(g, 1, .75, .38, cv.id === 'galos' ? 0x7a5a34 : wc, Math.cos(a) * 3.45, .28, Math.sin(a) * 3.45, false).rotation.y = -a + Math.PI / 2; }
+    for (const sx of [-1, 1]) { part(g, .8, 1.8, .8, wc, sx * 1.3, .8, 3.35); part(g, 1, .25, 1, wc2, sx * 1.3, 1.8, 3.35); }
+  }
   cv.house(CIV.grp(g, -1.25, 0, -.6, .68, .12)); cv.house(CIV.grp(g, 1.35, 0, -.8, .64, -.14)); cv.house(CIV.grp(g, .1, 0, 1.45, .62, .06));
   part(g, .9, 4, .9, wc, -1.5, 1.2, -1.5); roofs.push(part(g, 1.2, .45, 1.2, wc2, -1.5, 3.4, -1.5));
   part(g, .1, 1.4, .1, 0x8a5a34, -1.5, 4.3, -1.5); s.flag = part(g, .8, .5, .08, 0xffffff, -1.1, 4.7, -1.5, false);
   for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .25 && Math.cos(a) > 0) continue; part(g, .12, .9, .12, cv.id === 'galos' ? 0x7a5a34 : wc2, Math.cos(a) * 2.9, .05, Math.sin(a) * 2.9, false); }
   s.zone = ring(g, 3.5, 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.scale.set(.5, 14, .5); s.beacon.position.y = 9; s.beacon.visible = false; g.add(s.beacon);
-  s.roofs = roofs; placeSpot(s, g, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
-  s.tower = local(s, -1.5, 3.6, -1.5);
+  s.roofs = roofs; placeSpot(s, g0, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
+  s.tower = local(s, -1.5 * big, 3.6 * big, -1.5 * big);
 }
 const decos = [];
 function buildWalls(f) {
@@ -1604,6 +1619,7 @@ function kill(u, by) {
   if (u.flashOn) for (const m of u.fills) m.material = m.userData.m; u.team.visible = false; u.selR.visible = false; u.crest.visible = false;
   corpses.push({ g: u.g, body: u.body, t: 0, side: Math.random() < .5 ? 1 : -1 });
   unassign(u);
+  if (u.home) u.home.guards--;
   if (u.type === 'hero') {
     for (const e of [...u.escort]) unassign(e);
     sideState[u.side].hero = { state: 'dead', t: GAME.heroRespawn };
@@ -1768,15 +1784,32 @@ function playerUnit(u, dt) {
   if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
   if (o?.type === 'capture') {
     const s = spots[o.k]; if (s.owner === 0) { u.order = null; return; }
-    if (fields[o.k][u.node] > 0) followField(u, fields[o.k], dt);
+    spreadTo(u, s.x, s.z, fields[o.k], .5, s.fortified ? 1.1 : .95, dt);
   } else if (o?.type === 'siege') siege(u, spots[BASE1], dt);
 }
 // guardianes de los campamentos: defienden su zona y vuelven a ella
 function guardUnit(u, dt) {
-  const s = u.home, d0 = Math.hypot(u.pos.x - s.x, u.pos.z - s.z);
-  if ((u.think -= dt) <= 0) { u.think = .4; const e = nearestEnemy(u, u.def.aggro + 2); u.enemy = e && Math.hypot(e.pos.x - s.x, e.pos.z - s.z) < 17 ? e : null; }
+  const s = u.home, post = u.post || [s.x, s.z];
+  if ((u.think -= dt) <= 0) { u.think = .4; const e = nearestEnemy(u, u.def.aggro + 2); u.enemy = e && Math.hypot(e.pos.x - s.x, e.pos.z - s.z) < (s.fortified ? 15 : 17) ? e : null; }
   if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
-  if (d0 > 3.2) followField(u, fields[spots.indexOf(s)], dt);
+  const d = Math.hypot(u.pos.x - post[0], u.pos.z - post[1]);   // sin enemigos: de vuelta a su puesto
+  if (d > .4 && (d > 6 || !stepToward(u, post[0], post[1], spd(u) * .8, dt))) followField(u, fields[spots.indexOf(s)], dt);
+  else if (d <= .4) u.fwd.lerp(_h.set(u.pos.x - s.x, 0, u.pos.z - s.z).normalize(), .05).normalize();   // mirando hacia fuera
+}
+// cada tropa ociosa ocupa su propio sitio en un girasol alrededor del punto (ángulo áureo y radio según la raíz de su índice): repartidas, sin montones
+function spreadTo(u, cx, cz, field, r0, k, dt) {
+  const key = cx + ',' + cz;
+  if (u.spreadKey !== key) {   // el sitio se calcula una vez por destino; si cae en una casilla bloqueada o tras un muro, el más cercano que sí valga
+    const i = u.id % 36, a = i * 2.39996, r = r0 + k * Math.sqrt(i); let tx = cx + Math.cos(a) * r, tz = cz + Math.sin(a) * r, c = cellOf(tx, tz);
+    if (!slotOk(field, c, r * 1.6 + 3)) { let best = -1, bd = 1e9; const x0 = Math.floor(tx), z0 = Math.floor(tz);
+      for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) { const xx = x0 + dx, zz = z0 + dz; if (xx < 0 || zz < 0 || xx >= MW || zz >= MD) continue; const j = idx(xx, zz), dd = dx * dx + dz * dz; if (dd < bd && slotOk(field, j, r * 1.6 + 3 + Math.sqrt(dd))) { bd = dd; best = j; } }
+      if (best >= 0) { tx = cellX(best) + (tx % 1 - .5) * .6; tz = cellZ(best) + (tz % 1 - .5) * .6; } }
+    u.spreadKey = key; u.spread = [tx, tz, r];
+  }
+  const [tx, tz, r] = u.spread;
+  if (field[u.node] > r + 5) return followField(u, field, dt);
+  const d = Math.hypot(tx - u.pos.x, tz - u.pos.z); if (d < .4) return false;
+  return stepToward(u, tx, tz, spd(u) * (d < 2 ? .6 : 1), dt) || (field[u.node] > 1 && followField(u, field, dt));
 }
 function aiUnit(u, dt) {
   if (u.leader) return escortUnit(u, dt);
@@ -1784,13 +1817,19 @@ function aiUnit(u, dt) {
   const k = u.hp / u.maxHp; if (k < .3 && u.type !== 'hero') u.retreat = true; else if (k > .85) u.retreat = false;
   if ((u.think -= dt) <= 0) { u.think = .35; u.enemy = nearestEnemy(u, u.retreat ? 1.8 : u.def.aggro); }
   if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
-  if (u.retreat) { if (fields[BASE1][u.node] > 6) followField(u, fields[BASE1], dt); return; }
-  if (aiStance === 'defend') { if (fields[BASE1][u.node] > 4) followField(u, fields[BASE1], dt); return; }
-  // varios frentes: la mitad del ejército va al pueblo más cercano y la otra mitad al segundo
-  let bf = null, bv = 1e9, sf = null, sv = 1e9;
-  for (let t = TOWN0; t < spots.length; t++) if (spots[t].owner !== 1) { const v = fields[t][u.node]; if (v < bv) { sf = bf; sv = bv; bv = v; bf = fields[t]; } else if (v < sv) { sv = v; sf = fields[t]; } }
-  if (u.id % 2 && sf && sv < bv * 2.5 + 20) { bf = sf; bv = sv; }
-  if (bf && (bv < 90 || u.type !== 'hero')) { if (bv > 0) followField(u, bf, dt); }
+  const home = spots[BASE1];
+  if (u.retreat || aiStance === 'defend') { spreadTo(u, home.x, home.z, fields[BASE1], 3.5, 1.15, dt); return; }   // en casa, repartidos por el recinto
+  // varios frentes: la mitad del ejército va al pueblo más cercano y la otra mitad al segundo.
+  // Cada tropa se compromete con su objetivo y solo lo replantea cada pocos segundos o al conquistarlo (antes lo cambiaba a cada paso y se quedaba clavada a medio camino)
+  const valid = t => t >= TOWN0 && spots[t] && spots[t].owner !== 1 && (u.bigArmy || !(spots[t].fortified && spots[t].guards > 0));
+  if ((u.aiReT = (u.aiReT ?? 0) - dt) <= 0 || !valid(u.aiT)) {
+    u.aiReT = 5 + (u.id % 5); u.bigArmy = units.filter(o => o.side === 1 && o.type !== 'hero').length >= 14;
+    let bt = -1, bv = 1e9, st = -1, sv = 1e9;
+    for (let t = TOWN0; t < spots.length; t++) if (valid(t)) { const v = fields[t][u.node]; if (v < bv) { st = bt; sv = bv; bt = t; bv = v; } else if (v < sv) { st = t; sv = v; } }
+    u.aiT = u.id % 2 && st >= 0 && sv < bv * 2.5 + 20 ? st : bt; u.aiV = u.aiT === st ? sv : bv;
+  }
+  const bs = spots[u.aiT];
+  if (bs && (u.aiV < 90 || u.type !== 'hero')) spreadTo(u, bs.x, bs.z, fields[u.aiT], .5, bs.fortified ? 1.1 : .95, dt);   // dentro del círculo de conquista, sin amontonarse
   else siege(u, spots[BASE0], dt);
 }
 function updateUnit(u, dt) {
@@ -1807,8 +1846,8 @@ function updateUnit(u, dt) {
   }
   if (u.side === 0) playerUnit(u, dt); else if (u.side === 1) aiUnit(u, dt); else guardUnit(u, dt);
   for (const o of units) if (o !== u) {
-    const dx = u.pos.x - o.pos.x, dz = u.pos.z - o.pos.z, d = Math.hypot(dx, dz), min = (u.type === 'hero' || o.type === 'hero') ? 1.6 : .85;
-    if (d < min && d > 1e-4) { const k = .7 * dt / d, nx = u.pos.x + dx * k, nz = u.pos.z + dz * k, b = cellOf(nx, nz); if (b === u.node || (walk[b] && inMain[b] && Math.abs(HM[b] - HM[u.node]) <= 1)) { u.pos.x = nx; u.pos.z = nz; u.node = b; } }
+    const dx = u.pos.x - o.pos.x, dz = u.pos.z - o.pos.z, d = Math.hypot(dx, dz), min = (u.type === 'hero' || o.type === 'hero') ? 1.7 : 1.05;
+    if (d < min && d > 1e-4) { const k = (u.moving ? .8 : 1.4) * dt / d, nx = u.pos.x + dx * k, nz = u.pos.z + dz * k, b = cellOf(nx, nz); if (b === u.node || (walk[b] && inMain[b] && Math.abs(HM[b] - HM[u.node]) <= 1)) { u.pos.x = nx; u.pos.z = nz; u.node = b; } }
   }
   if (u.hp < u.maxHp && elapsed - u.lastHit > 3 && (regionOwner(regionCell[u.node]) === u.side || (u.side === 2 && elapsed - u.lastHit > 6))) {
     u.hp = Math.min(u.maxHp, u.hp + GAME.regen * (u.type === 'hero' ? 3 : 1) * dt);
@@ -1919,7 +1958,7 @@ function toast(msg, kind = '', pos = null) {   // avisos en columna, arriba a la
 }
 
 const TOWN_LV = { cost: [0, 120, 220], inc: [1, 1.8, 2.6] };
-const townInc = s => s.camp ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special ? 2 : 1);
+const townInc = s => s.camp ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special ? 2 : 1) * (s.fortified ? 2 : 1);
 const incomeOf = sd => GAME.income + spots.reduce((a, s) => a + (s.kind === 'town' && s.owner === sd ? townInc(s) : 0), 0);
 const towerRange = s => GAME.towerRange + (s.lvl - 1) * 1.5, towerDmg = s => GAME.towerDmg * (1 + (s.lvl - 1) * .5);
 function upgradeTown(side, s) {
@@ -1938,13 +1977,18 @@ function campSpawn(s) {   // el campamento da jinetes arqueros a su dueño, hast
   if (own === 0) { floatText(spotPos(s, 4.5), 'JINETE ARQUERO', '#8ad8f0', 9); refreshPanel(); }
 }
 function spawnGuards() {
-  for (const s of spots) if (s.camp) for (let k = 0; k < GAME.campGuards; k++) { const a = k / GAME.campGuards * 6.28, u = spawnAt(2, k % 2 ? 'harcher' : 'sword', s.x + Math.cos(a) * 2.2, s.z + Math.sin(a) * 2.2, a); u.home = s; }
+  const post = (s, x, z, type, a) => { const n = nearestNode(x, z), u = spawnAt(2, type, cellX(n), cellZ(n), a); u.home = s; u.post = [cellX(n), cellZ(n)]; s.guards = (s.guards || 0) + 1; };
+  for (const s of spots) {
+    if (s.camp) for (let k = 0; k < GAME.campGuards; k++) { const a = k / GAME.campGuards * 6.28; post(s, s.x + Math.cos(a) * 2.2, s.z + Math.sin(a) * 2.2, k % 2 ? 'harcher' : 'sword', a); }
+    if (s.fortified) { const T = ['sword', 'bow', 'sword', 'horse', 'bow', 'sword', 'horse', 'bow', 'sword', 'sword'];   // cuatro dentro, el resto en corro alrededor
+      for (let k = 0; k < GAME.fortGuards; k++) { const inner = k < 4, a = (inner ? k / 4 : (k - 4) / (GAME.fortGuards - 4)) * 6.28 + (inner ? .4 : 0), r = inner ? 2.6 : 7; post(s, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, T[k], a); } }
+  }
 }
 function updateTowns(dt) {
   for (let k = TOWN0; k < spots.length; k++) {
     const s = spots[k], p = spotPos(s), here = [0, 0, 0];
-    for (const u of units) if (u.pos.distanceTo(p) < 3.9) here[u.side]++;
-    if (s.camp && s.owner === -1 && units.some(u => u.home === s)) { s.prog = [0, 0]; continue; }   // hay que acabar antes con los guardianes
+    for (const u of units) if (u.pos.distanceTo(p) < (s.fortified ? 5.7 : 3.9)) here[u.side]++;
+    if ((s.camp || s.fortified) && s.owner === -1 && s.guards > 0) { s.prog = [0, 0]; continue; }   // hay que acabar antes con los defensores
     if (s.camp && s.owner >= 0 && (s.genT -= dt) <= 0) { s.genT = GAME.campGen; campSpawn(s); }
     if (s.owner === -1) {
       for (const sd of [0, 1]) {
@@ -2081,7 +2125,7 @@ function panelContent() {
     let prog = '';
     if (own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; prog = `<div class="hpb"><b style="width:${pct(s.prog[sd])};background:${TEAM[sd].css}"></b><span>CONQUISTA ${pct(s.prog[sd])}</span></div>`; }
     if (own >= 0 && s.lose > 0) prog = `<div class="hpb"><b style="width:${pct(1 - s.lose)};background:${TEAM[own].css}"></b><span>RESISTE ${pct(1 - s.lose)}</span></div>`;
-    return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="info">${prog}<div class="stats"><span>NIVEL <b>${s.lvl}</b></span><span>ORO <b>+${String(Math.round(townInc(s) * 10) / 10).replace('.', ',')}/S</b></span><span>TORRE <b>${Math.round(towerDmg(s))}</b></span><span>ALCANCE <b>${towerRange(s)}</b></span></div><div class="note${s.special ? ' g' : ''}">${s.special ? 'CIMA DE LA MESETA: ORO DOBLE. ' : ''}${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : 'DEJA TROPAS EN EL CÍRCULO PARA CONQUISTARLO.'}</div></div>${own === 0 && s.lvl < 3 ? `<div class="act"><button type="button" class="y" data-act="upgrade" ${sideState[0].gold < TOWN_LV.cost[s.lvl] ? 'disabled' : ''} title="Más oro y torre más fuerte">MEJORAR A NIVEL ${s.lvl + 1} · ${TOWN_LV.cost[s.lvl]} ORO</button></div>` : ''}`;
+    return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="info">${prog}<div class="stats"><span>NIVEL <b>${s.lvl}</b></span><span>ORO <b>+${String(Math.round(townInc(s) * 10) / 10).replace('.', ',')}/S</b></span><span>TORRE <b>${Math.round(towerDmg(s))}</b></span><span>ALCANCE <b>${towerRange(s)}</b></span></div><div class="note${s.special || s.fortified ? ' g' : ''}">${s.fortified ? (own < 0 && s.guards > 0 ? `PUEBLO FORTIFICADO: QUEDAN ${s.guards} DEFENSORES. ORO DOBLE. ` : 'PUEBLO FORTIFICADO: ORO DOBLE. ') : ''}${s.special ? 'CIMA DE LA MESETA: ORO DOBLE. ' : ''}${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : own < 0 && s.guards > 0 ? '' : 'DEJA TROPAS EN EL CÍRCULO PARA CONQUISTARLO.'}</div></div>${own === 0 && s.lvl < 3 ? `<div class="act"><button type="button" class="y" data-act="upgrade" ${sideState[0].gold < TOWN_LV.cost[s.lvl] ? 'disabled' : ''} title="Más oro y torre más fuerte">MEJORAR A NIVEL ${s.lvl + 1} · ${TOWN_LV.cost[s.lvl]} ORO</button></div>` : ''}`;
   }
   const list = [...sel].filter(alive);
   if (!list.length) return '';
@@ -2442,7 +2486,16 @@ const ICONS = {
   horse: ['0002200', '0022220', '0222020', '2222000', '0222000', '0202000', '0202000'],
   harcher: ['0002200', '0022220', '2222020', '2222000', '0222000', '0202000', '0202000'],
   hero:  ['2020202', '2222222', '2222222', '0000000', '0222220', '0222220', '0000000'],
+  shield: ['2222222', '2000002', '2022202', '2022202', '0200020', '0020200', '0002000'],
 };
+// icono grande de acción sobre un edificio (con un pequeño bote)
+function actionIcon(x, y, type, bg, fg = '#0f0f1b') {
+  const k = 3, n = 7, w = n * k + 8, b = Math.round(Math.sin(performance.now() / 260 + x * .01) * 2), x0 = Math.round(x - w / 2), y0 = Math.round(y - w) + b;
+  octx.fillStyle = '#0f0f1b'; octx.fillRect(x0 - 2, y0 - 2, w + 4, w + 4); octx.fillStyle = bg; octx.fillRect(x0, y0, w, w);
+  octx.fillStyle = fg; const m = ICONS[type];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (m[j][i] === '2') octx.fillRect(x0 + 4 + i * k, y0 + 4 + j * k, k, k);
+  octx.fillStyle = '#0f0f1b'; octx.beginPath(); octx.moveTo(x - 5, y0 + w + 2); octx.lineTo(x + 5, y0 + w + 2); octx.lineTo(x, y0 + w + 8); octx.closePath(); octx.fill();
+}
 function unitIcon(x, y, type, css) {
   const k = 2, n = 7, w = n * k + 6, x0 = Math.round(x - w / 2), y0 = Math.round(y - w);
   octx.fillStyle = '#0f0f1b'; octx.fillRect(x0, y0, w, w); octx.fillStyle = css; octx.fillRect(x0 + 1, y0 + 1, w - 2, w - 2);
@@ -2465,10 +2518,15 @@ function drawOverlay(dt) {
       const own = s.owner;
       for (let k = 1; k < s.lvl; k++) pip(top.x + (k - s.lvl / 2) * 10, top.y - 6, '#e8c870');
       const seenT = visibleAt(s.x, s.z);
+      if (s.fortified && s.owner < 0 && s.guards > 0) actionIcon(top.x, top.y - 16, 'shield', '#9a7a3a', '#f4f4e8');
       if (seenT && own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; bar(top.x, top.y + 6, 50, 5, s.prog[sd], TEAM[sd].css); }
       if (seenT && own >= 0 && s.lose > 0) bar(top.x, top.y + 6, 50, 5, 1 - s.lose, TEAM[own].css);
     } else {
       const q = s.kind === 'barracks' ? sideState[s.side].queue[0] : null, h = s.kind === 'altar' ? sideState[s.side].hero : null;
+      if (s.side === 0 && state === 'play') {   // tus edificios con acciones: reclutar tropas y el héroe
+        const ic = project(spotPos(s, s.kind === 'barracks' ? 4.6 : 5.2), tmpQ);
+        actionIcon(ic.x, ic.y - 6, s.kind === 'barracks' ? 'sword' : 'hero', selBld === s.kind ? '#f4f4e8' : '#e8c870');
+      }
       if (s.side === 0 && selBld === s.kind) continue;
       if (s.side === 0 && q) bar(top.x, top.y + 6, 44, 4, 1 - q.t / UNITS[q.type].time, '#e8c870');
       if (s.side === 0 && h?.state === 'training') bar(top.x, top.y + 6, 44, 4, 1 - h.t / UNITS.hero.time, '#e8c870');
@@ -2590,7 +2648,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 window.__game = { units, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
-  step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) camGoal = camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, spawnAt };
+  step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) camGoal = camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, spawnAt, dbg: () => ({ fields, walk, HM, MW, wallHit }) };
 makeThumbs();
 newGame(1 + Math.floor(Math.random() * 99999));
 requestAnimationFrame(frame);
