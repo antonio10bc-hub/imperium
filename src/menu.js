@@ -60,12 +60,31 @@ function fitCam(cam, obj, dir, fill) {
 // Terreno real de la geografía de ejemplo (sin edificios), visto desde el sur como en la partida y acercado al centro del mapa
 const GEOIMG = {};
 // la zona más vistosa del ejemplo: muchos desniveles y orillas, poca cumbre nevada y plana
+// cámara de la vista: desde el sur, inclinada como en la partida, mirando al punto (cx, cz)
+const GEO_W = 640, GEO_H = 1000;
+function geoCam(cx, cz) {
+  const cam = new THREE.PerspectiveCamera(30, GEO_W / GEO_H, 1, 1200), D = 185, pitch = 44 * Math.PI / 180;
+  cam.position.set(cx, 2 + D * Math.sin(pitch), cz + D * Math.cos(pitch)); cam.lookAt(cx, 2, cz); cam.updateMatrixWorld(); return cam;
+}
+// lo que se ve del suelo (y = 0) con la cámara centrada en (0, 0): así se elige un centro desde el que no asome nada fuera del mapa
+let FOOT = null;
+function footprint() {
+  if (FOOT) return FOOT;
+  const cam = geoCam(0, 0), ray = new THREE.Raycaster(), pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit = new THREE.Vector3();
+  FOOT = { x0: 0, x1: 0, z0: 0, z1: 0 };
+  for (const nx of [-1, 0, 1]) for (const ny of [-1, 0, 1]) {
+    ray.setFromCamera(new THREE.Vector2(nx, ny), cam); if (!ray.ray.intersectPlane(pl, hit)) continue;
+    FOOT.x0 = Math.min(FOOT.x0, hit.x); FOOT.x1 = Math.max(FOOT.x1, hit.x); FOOT.z0 = Math.min(FOOT.z0, hit.z); FOOT.z1 = Math.max(FOOT.z1, hit.z);
+  }
+  return FOOT;
+}
 function geoFocus(key) {
-  const p = previewMap(key), H = i => { const g = p.HM[i]; return g >= .5 ? Math.max(1, Math.round(g)) : 0; };
-  let best = [MW / 2, MD / 2], bv = -1e9;
-  for (let cz = 70; cz <= MD - 70; cz += 16) for (let cx = 110; cx <= MW - 110; cx += 16) {
+  const p = previewMap(key), H = i => { const g = p.HM[i]; return g >= .5 ? Math.max(1, Math.round(g)) : 0; }, F = footprint(), m = 3;
+  const xa = Math.ceil(m - F.x0), xb = Math.floor(MW - m - F.x1), za = Math.ceil(m - F.z0), zb = Math.floor(MD - m - F.z1);
+  let best = [THREE.MathUtils.clamp(MW / 2, xa, xb), THREE.MathUtils.clamp(MD / 2, za, zb)], bv = -1e9;
+  for (let cz = za; cz <= zb; cz += 8) for (let cx = Math.max(xa, 50); cx <= Math.min(xb, MW - 50); cx += 16) {
     let v = 0;
-    for (let z = cz - 50; z < cz + 50; z += 2) for (let x = cx - 40; x < cx + 40; x += 2) {
+    for (let z = Math.max(0, cz - 50); z < Math.min(MD - 2, cz + 50); z += 2) for (let x = cx - 40; x < cx + 40; x += 2) {
       const i = idx(x, z), h = H(i), hr = H(i + 2), hd = H(i + 2 * MW);
       if (h !== hr) v += (h === 0) !== (hr === 0) ? 3 : 1;
       if (h !== hd) v += (h === 0) !== (hd === 0) ? 3 : 1;
@@ -79,13 +98,12 @@ function geoFocus(key) {
 function geoRender(key) {
   if (GEOIMG[key]) return GEOIMG[key];
   try {
-    const r = offscreen(), w = 640, h = 1000; r.setSize(w, h, false);
+    const r = offscreen(); r.setSize(GEO_W, GEO_H, false);
     const sc = new THREE.Scene(), SKY = new THREE.Color(0x8ad8f0); sc.background = SKY; sc.fog = new THREE.Fog(SKY, 200, 430);
     const sun = new THREE.DirectionalLight(0xfff6e8, 2.2); sun.position.set(-60, 120, 80); sc.add(sun, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25));
     const [cx, cz] = geoFocus(key), grp = geoTerrain(key, cx - 120, 0, cx + 120, MD); sc.add(grp);
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshToonMaterial({ color: 0x1e4a8a, gradientMap: grad })); sea.rotation.x = -Math.PI / 2; sea.position.set(cx, -1.5, cz); sc.add(sea);
-    const cam = new THREE.PerspectiveCamera(30, w / h, 1, 1200), D = 185, pitch = 44 * Math.PI / 180;
-    cam.position.set(cx, 2 + D * Math.sin(pitch), cz + D * Math.cos(pitch)); cam.lookAt(cx, 2, cz);
+    const cam = geoCam(cx, cz);
     r.render(sc, cam); const url = r.domElement.toDataURL('image/jpeg', .9);
     grp.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); sea.geometry.dispose(); sea.material.dispose();
     return (GEOIMG[key] = url);
