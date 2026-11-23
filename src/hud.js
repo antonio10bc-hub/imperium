@@ -7,6 +7,7 @@ import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, RANKS, TEAM, TYPES, UNITS } from
 import { ping } from './effects.js';
 import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, heroCount, heroOf, heroesOf, incomeOf, newGame, popOf, state, summonHero, toast, towerDmg, towerRange, townInc, upgradeTown } from './game.js';
 import { focusOn, heroButton } from './input.js';
+import { MERC, ev, hireMercs, mercRoom } from './events.js';
 import { regions, spots } from './map.js';
 import { seed } from './noise.js';
 import { $, S, track } from './state.js';
@@ -31,6 +32,8 @@ export function updateHud() {
   $('gold').textContent = Math.floor(st.gold);
   $('rate').textContent = '+' + String(Math.round(incomeOf(0) * 10) / 10).replace('.', ',') + '/S';
   $('pop').textContent = popOf(0); $('cap').textContent = capOf(0);
+  const m = ev.merc, showM = !!m && !m.hired[0]; $('merc').hidden = !showM;   // oferta de mercenarios
+  if (showM) { $('mercT').textContent = `MERCENARIOS VETERANOS · ${Math.ceil(m.t)} S`; const b = $('mercBtn'), room = mercRoom(0); b.textContent = room ? `CONTRATAR · ${MERC.cost}` : 'SIN SITIO'; b.disabled = !room || sideState[0].gold < MERC.cost; }
   const n0 = 1 + owned(0), n1 = 1 + spots.filter(s => s.kind === 'town' && s.known === 1).length, NR = regions.length, key = n0 + ',' + n1 + ',' + NR;
   if (key !== terrKey) { terrKey = key; $('terr').innerHTML = '<i class="b"></i>'.repeat(n0) + '<i></i>'.repeat(Math.max(0, NR - n0 - n1)) + '<i class="r"></i>'.repeat(n1); }
   $('hp0').textContent = Math.max(0, Math.round(spots[BASE0].hp / GAME.baseHp * 100)) + ' %';
@@ -188,6 +191,7 @@ export function init() {
   $('spd').addEventListener('click', () => { S.speed = S.speed === 1 ? 2 : 1; syncTools(); });
   $('pz').addEventListener('click', () => { S.paused = !S.paused; syncTools(); });
   $('menuBtn').addEventListener('click', openMenu);
+  $('mercBtn').addEventListener('click', () => { if (hireMercs(0)) { sfx('capture'); updateHud(); } else sfx('deny'); });
   $('mResume').addEventListener('click', closeMenu);
   $('mRestart').addEventListener('click', () => { track('menu_restart'); S.pendingStart = true; newGame(seed, true); });   // misma semilla y mismas civilizaciones
   $('mSurrender').addEventListener('click', () => { track('menu_surrender'); endGame(false, true); });

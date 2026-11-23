@@ -1,6 +1,7 @@
 // Partida: producción, héroes, pueblos, campamentos, defensas, IA del rival y paso de simulación.
 import * as THREE from 'three';
 import { makeAI, updateAIs } from './ai.js';
+import { raidersAt, resetEvents, updateEvents } from './events.js';
 import { sfx, startMusic } from './audio.js';
 import { updateUnit } from './behavior.js';
 import { buildAltar, buildBarracks, buildCastle, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
@@ -94,7 +95,7 @@ export function newGame(s, keepCivs = false) {
     fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2));
     for (const st of sideState) Object.assign(st, { gold: GAME.startGold, queue: [], heroQ: [] });
     sideState[0].ai = S.aiPlayer ? makeAI(0, S.aiPlayer.diff, S.aiPlayer.brain) : null; sideState[1].ai = makeAI(1, S.diff, S.aiRival);   // el bando 0 lo juega la IA solo en pruebas
-    elapsed = 0; S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
+    elapsed = 0; resetEvents(); S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
     focusOn(spots[BASE0].x, spots[BASE0].z, true);
     $('mt').textContent = GAME.towns; $('cap').textContent = capOf(0);
     updateCtx(); syncDiff();
@@ -178,7 +179,7 @@ function updateTowns(dt) {
       }
     } else {
       const own = s.owner, en = 1 - own;
-      if (here[en] && !here[own]) {
+      if ((here[en] || raidersAt(s, inside)) && !here[own]) {   // el rival o bandidos que asaltan este pueblo, sin defensores
         s.lose += dt / (GAME.capture * 2) * (bonusOf(en).capture || 1); cheer(en);
         if (own === 0) raiseAlarm(p, `¡TE ESTÁN QUITANDO ${s.name}!`);
         if (s.lose >= 1) { s.lose = 0; setOwner(s, -1); }
@@ -194,7 +195,7 @@ function updateTowns(dt) {
 export function updateGame(dt) {
   elapsed += dt; S.bfsBudget = 4;
   for (const sd of [0, 1]) sideState[sd].gold += incomeOf(sd) * dt * (sideState[sd].ai?.inc ?? 1);
-  updateAIs(dt); updateProduction(dt);
+  updateAIs(dt); updateProduction(dt); updateEvents(dt);
   UGRID.rebuild();
   for (const u of [...units]) if (!u.dead) updateUnit(u, dt);
   updateTowns(dt); castleDefense(dt);

@@ -84,6 +84,8 @@ button.alt{background:var(--paper)}
 #tug{left:50%;top:16px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--paper);padding:8px 12px;font-size:12px;white-space:nowrap}
 #tug .t0,#tug .c0{color:var(--cyan)} #tug .t1,#tug .c1{color:#f08a96} #tug b{font-weight:400}
 #tug .cas{margin-left:6px;color:#b4afa2}
+#merc{left:50%;top:58px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--paper);padding:6px 8px 6px 12px;font-size:12px;white-space:nowrap;border-left:4px solid var(--yellow)}
+#merc button{padding:6px 8px 5px;font-size:12px}
 #terr{display:flex;gap:2px}
 #terr i{display:block;width:20px;height:14px;background:#5e5a54}
 #terr i.b{background:var(--blue)} #terr i.r{background:var(--red)}

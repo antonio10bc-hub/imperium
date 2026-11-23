@@ -9,6 +9,7 @@ import { assign, nearestEnemy, siege, strike } from './combat.js';
 import { DIFF, GAME, TOWN0, TYPES, UNITS } from './config.js';
 import { capR, elapsed, enqueue, fields, heroCount, heroesOf, summonHero, townInc, upgradeTown } from './game.js';
 import { spots } from './map.js';
+import { MERC, ev, hireMercs } from './events.js';
 import { UGRID, alive, sideState, units } from './units.js';
 
 // valor aproximado de cada tropa para medir fuerzas (coste, con algo de peso al héroe)
@@ -79,7 +80,7 @@ const near = (a, x, z, r) => Math.hypot(a.x - x, a.z - z) < r;
 function observe(A) {
   const side = A.side, foe = 1 - side, places = spots.filter(s => (s.kind === 'base' && s.side === side) || (s.kind === 'town' && s.owner === side));
   for (const e of units) {
-    if (e.side !== foe) continue;
+    if (e.side !== foe && !(e.side === 2 && e.raid === side)) continue;   // el rival y los bandidos que vienen a por él
     const seen = places.some(s => near(s, e.pos.x, e.pos.z, s.kind === 'base' ? 28 : 14)) || UGRID.near(e.pos.x, e.pos.z, AI_VISION, _seen).some(o => o.side === side && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < AI_VISION);
     if (seen) A.mem.set(e.id, { type: e.type, x: e.pos.x, z: e.pos.z, w: worth(e), t: elapsed });
   }
@@ -112,6 +113,8 @@ function smartPlan(A) {
     h.formShape = A.stance === 'attack' ? 'wedge' : 'block';
     if (h.escort.length < 20) { const free = mine.filter(u => !u.leader && !u.retreat && !A.roles.has(u)).sort((a, b) => a.pos.distanceTo(h.pos) - b.pos.distanceTo(h.pos)); if (free.length > 1) assign(free[0], h); }
   }
+  // --- mercenarios: si hay oferta y le sobra oro, los contrata
+  if (ev.merc && !ev.merc.hired[side] && st.gold >= MERC.cost + 60 && !saving) hireMercs(side);
   // --- mejoras: con oro de sobra, primero los pueblos que más rinden y sin enemigos cerca
   const upAt = off(A, 'eco') ? (foeW > myW ? 420 : 320) : foeW > myW * 1.2 ? 400 : 140;   // una mejora se amortiza en ~80 s: si no va por detrás, mejora pronto
   if (!saving && st.gold > upAt) {

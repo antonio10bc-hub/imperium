@@ -132,6 +132,8 @@ export function drawOverlay(dt) {
     let px = t.x - (hero ? 26 : 16);
     if (u.rank) { pip(px, t.y + 1, RANKS[u.rank].css); px -= 9; }
     if (u.leader) pip(px, t.y + 1, '#e8c870');
+    if (u.raid != null) pip(t.x + (hero ? 26 : 16), t.y + 1, '#d83a4a');   // bandido
+    if (u.caravan) label(t.x, t.y - 6, 'CARAVANA', '#e8c870', '#0f0f1b', 7);
   }
   for (let i = pings.length - 1; i >= 0; i--) {
     const p = pings[i]; p.t += dt; const q = project(p.local, tmpP);
