@@ -54,6 +54,7 @@ function setRally(g) {
 // orden sobre la fortaleza rival (asalto), un pueblo ajeno (conquista) o un punto del suelo (mover); la usan el mapa y el minimapa
 function orderTo(list, sp, g, attack) {
   if (sp && sp.side === 1) { for (const u of list) u.order = { type: 'siege' }; ping(spotPos(spots[BASE1]), '#d83a4a'); sfx('cmd'); toast('¡AL ASALTO DE LA FORTALEZA!'); track('order', { type: 'siege' }); return; }
+  if (sp && sp.kind === 'bridge' && sp.built) { for (const u of list) u.order = { type: 'demolish', b: sp }; ping(new THREE.Vector3(sp.x, sp.hb, sp.z), '#d83a4a'); sfx('cmd'); toast('¡A DERRIBAR EL PUENTE!'); return; }   // derribar un puente
   if (sp && sp.kind === 'town' && sp.owner !== 0) { const k = spots.indexOf(sp); for (const u of list) u.order = { type: 'capture', k }; ping(spotPos(sp), '#e8c870'); sfx('cmd'); track('order', { type: 'capture' }); return; }
   orderMove(list, g.x, g.z, true, attack); sfx('cmd'); track('order', { type: attack ? 'amove' : 'move' });
 }

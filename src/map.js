@@ -48,7 +48,7 @@ let RIVX = new Float32Array(MD).fill(MW / 2);   // x del río en cada fila: sepa
 export let EL = null, G = null, HM = null, flats = [], forts = [];
 function groundXZ(x, z) {
   let g = EL[idx(x, z)]; const cx = x + .5, cz = z + .5;
-  for (const f of flats) { const r = Math.hypot(cx - f.x, cz - f.z); if (r < f.r1) g += (f.h - g) * (1 - smooth01((r - f.r0) / (f.r1 - f.r0))); }
+  for (const f of flats) { const r = Math.hypot(cx - f.x, cz - f.z); if (r < f.r1 && (f.kind !== 'town' || EL[idx(x, z)] > .5)) g += (f.h - g) * (1 - smooth01((r - f.r0) / (f.r1 - f.r0))); }   // la explanada de un pueblo no rellena el agua (dejaba círculos en la costa)
   for (const f of forts) if (f.moat) { const p = polar(f, cx, cz); if (p) { const rw = wallR(f, p[1]); if (p[0] > rw + 2.2 && p[0] < rw + 4.6 && !f.gates.some(ga => angDiff(p[1], ga) * p[0] < 2.4)) g = -1.6; } }
   return g;
 }
@@ -160,6 +160,13 @@ export function terrainColor(x, z) {
   if (gt === 3) return B.sand;
   if (gt === 4) return mixHex(B.ground[0], 0x4f9a3a, .45);
   if (gt === 6) return (x * 5 + z * 3) % 7 ? 0xd4e8f0 : 0xbcd8e8;   // hielo
+  if (gt === 15) return (x * 3 + z * 5) % 6 ? 0xa8cce0 : 0x98c0d8;   // hielo fino (más oscuro)
+  if (gt === 10) return (x + z * 3) % 4 ? 0xff7a1a : 0xffb03a;   // lava
+  if (gt === 11) return n2(cx, cz, .3, 2, 81) > .5 ? 0xe8d29a : 0xdcc488;   // duna
+  if (gt === 12) return 0x8a8a86;   // arrecife
+  if (gt === 13) return (x + z) % 3 ? 0xd8c898 : 0xcdb98c;   // vado de arena
+  if (gt === 14) return n2(cx, cz, .25, 2, 83) > .5 ? 0x6a9a48 : 0x5a8a40;   // ribera
+  if (gt === 16) return 0x7aa858;   // suelo del bosque claro
   if (gt === 7) return h >= 4 ? ((x + z) % 3 ? 0xa8a49a : 0x9a968c) : 0x8e8a80;   // ruinas
   if (gt === 5) return h >= 8 ? 0x3a3034 : (x * 7 + z * 3) % 5 ? 0x4a4448 : 0x5a4a44;   // roca volcánica
   if (h <= 1) return B.sand;
@@ -170,11 +177,12 @@ export function terrainColor(x, z) {
   return geoR?.snow && (geoR.snowSide == null || (cx < geoR.seam(cz)) === (geoR.snowSide === 0)) ? mixHex(col, 0xeef2f6, .62) : col;   // valle helado: todo nevado
 }
 export let meshes = [], spots = [], bridgeSites = [];
+const STRATA = [0xb85a3a, 0xd08a4a, 0xc87850, 0xa04a30, 0xd8a060];
 // código de mapa para compartir: GEOGRAFÍA-SEMILLA (p. ej. RIO-48213). La misma geografía y semilla dan el mismo terreno y los mismos pueblos
 export const mapCode = () => `${scen.toUpperCase()}-${seed}${sizeKey !== 'n' ? '-' + sizeKey.toUpperCase() : ''}`;   // -P o -G: tamaño pequeño o grande
 export function parseCode(t) {
   const m = /^\s*([A-Za-z]+)\s*-\s*(\d{1,9})\s*(?:-\s*([PNGpng]))?\s*$/.exec(t || ''), key = m && m[1].toLowerCase();
-  return m && GEO.LIST[key] ? { geo: key, seed: +m[2], size: (m[3] || 'n').toLowerCase() } : null;
+  return m && GEO.NAME[key] ? { geo: key, seed: +m[2], size: (m[3] || 'n').toLowerCase() } : null;
 }
 export let sizeKey = 'n';
 export function generate(newSeed, tries = 0) {
@@ -184,7 +192,7 @@ export function generate(newSeed, tries = 0) {
   const rng = rngOf(seed);
   // tras muchas semillas fallidas se cae al río clásico, que siempre sale jugable (evita reintentar sin fin)
   const pickR = rng();   // se tira siempre, para que un código de mapa (geografía + semilla) dé el mismo mapa tanto si se eligió al azar como a mano
-  scen = tries >= 20 ? 'rio' : S.wantScen === 'random' ? GEO.keys[pickR * GEO.keys.length | 0] : (GEO.LIST[S.wantScen] ? S.wantScen : 'rio');
+  scen = tries >= 20 ? 'rio' : S.wantScen === 'random' ? GEO.keys[pickR * GEO.keys.length | 0] : (GEO.LIST[S.wantScen] ? S.wantScen : 'canon');
   baseGround(rng);
   flats = []; forts = [];
   computeHM();
@@ -218,13 +226,14 @@ export function generate(newSeed, tries = 0) {
   spots = [lay(0, 'castle'), lay(1, 'castle'), lay(0, 'barracks'), lay(1, 'barracks'), lay(0, 'altar'), lay(1, 'altar'), lay(0, 'temple'), lay(1, 'temple')];   // mismo orden que BASE0…TEMP1 en config
   const names = [...TOWN_NAMES].sort(() => rng() - .5);
   // pueblos lejos de los bordes del mapa (en las esquinas quedaban apartados del juego)
-  let pool = mainList.filter(i => HM[i] <= 7 && GEOT[i] !== 6 && GEOT[i] !== 7 && GEOT[i] !== 9 && cellX(i) > 26 && cellX(i) < MW - 26 && cellZ(i) > 22 && cellZ(i) < MD - 22);
-  if (geoR?.oasis) pool = pool.filter(i => GEOT[i] === 4);   // en el desierto, los pueblos están en los oasis
+  const dry = i => { const x = i % MW, z = (i / MW) | 0; for (const [a, b] of [[6, 0], [-6, 0], [0, 6], [0, -6], [4, 4], [-4, 4], [4, -4], [-4, -4]]) { const xx = x + a, zz = z + b; if (xx < 0 || zz < 0 || xx >= MW || zz >= MD || EL[idx(xx, zz)] <= .5) return false; } return true; };   // sin agua cerca
+  let pool = mainList.filter(i => HM[i] <= 7 && ![6, 7, 9, 10, 11, 13, 15].includes(GEOT[i]) && dry(i) && cellX(i) > 26 && cellX(i) < MW - 26 && cellZ(i) > 22 && cellZ(i) < MD - 22);
   const addTown = (x, z, extra = {}) => { spots.push({ kind: 'town', x, z, name: names[spots.length % names.length], owner: -1, ...extra }); flats.push({ kind: 'town', x, z, r0: 4.8, r1: 8.5, h: plateau(x, z, 4) }); };
   for (const [x, z] of geoR?.special || []) { const n = nearestNode(x, z); if (Math.hypot(cellX(n) - x, cellZ(n) - z) < 8) addTown(cellX(n), cellZ(n), geoR.goldTop || scen === 'lago' ? { special: true } : geoR.oasis ? { oasis: true } : {}); }
   // sitios propios de la geografía: una atalaya en cada puerto de la cordillera y la ciudadela en el paso del istmo
   const onLand = ([x, z], max = 8) => { const n = nearestNode(x, z); return Math.hypot(cellX(n) - x, cellZ(n) - z) < max && spots.every(o => Math.hypot(o.x - cellX(n), o.z - cellZ(n)) > 18) ? n : -1; };
   if (scen === 'cordillera') for (const p of geoR.passes) { const n = onLand(p); if (n >= 0) addTown(cellX(n), cellZ(n), { watch: true }); }
+  if (geoR?.confluence) { const n = onLand(geoR.confluence, 16); if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }   // afluentes: la ciudadela en la confluencia
   if (scen === 'istmo' && geoR.passes[0]) { const n = onLand(geoR.passes[0], 14); if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }
   const halves = [pool.filter(i => cellX(i) < MW / 2), pool.filter(i => cellX(i) >= MW / 2)];
   while (spots.filter(s => s.kind === 'town').length < GAME.towns) {   // mismo número de pueblos en cada mitad
@@ -259,6 +268,7 @@ export function generate(newSeed, tries = 0) {
     const c = cand[(rng() * cand.length) | 0]; if (!c) continue;
     c.fortified = true;
   }
+  for (const c of spots) if (c.kind === 'town' && (geoR?.fumaroles || []).some(([fx, fz]) => Math.hypot(fx - c.x, fz - c.z) < 26)) c.fumarole = true;   // caldera: los pueblos junto a una fumarola dan más oro
   for (const c of spots) if (c.fortified || c.keep) { const fl = flats.find(q => q.kind === 'town' && q.x === c.x && q.z === c.z); if (fl) { fl.r0 = 8; fl.r1 = 12; } }   // los grandes, sobre una explanada mayor
   computeHM(); buildNav();
   for (const s of spots) s.node = nearestNode(s.x, s.z);
@@ -280,8 +290,8 @@ export function generate(newSeed, tries = 0) {
     if (best >= 0) { const xr = RIVX[best], cells = []; for (let dz = -1; dz <= 1; dz++) for (let dx = -7; dx <= 7; dx++) { const c = idx(Math.round(xr + dx), best + dz); if (HM[c] <= 0) cells.push(c); } bridgeSites.push({ x: xr, z: best + .5, cells, axis: 'x', built: false }); }
   }
   for (const [bx, bz] of geoR?.bridges || []) {   // cañón: puentes ya construidos sobre la garganta
-    const cells = []; for (let dz = -3; dz <= 3; dz++) for (let dx = -16; dx <= 16; dx++) { const x = Math.round(bx) + dx, z = Math.round(bz) + dz; if (x >= 0 && z >= 0 && x < MW && z < MD && GEOT[idx(x, z)] === 9) cells.push(idx(x, z)); }
-    if (cells.length) bridgeSites.push({ x: bx, z: bz, cells, axis: 'x', built: true, h: 4, h0: 0, breakable: true });
+    const cells = []; for (let dz = -4; dz <= 4; dz++) for (let dx = -26; dx <= 26; dx++) { const x = Math.round(bx) + dx, z = Math.round(bz) + dz; if (x >= 0 && z >= 0 && x < MW && z < MD && GEOT[idx(x, z)] === 9) cells.push(idx(x, z)); }
+    if (cells.length) bridgeSites.push({ x: bx, z: bz, cells, axis: 'x', built: true, h: 4, h0: 0, breakable: true, style: geoR.bridgeStyles[bridgeSites.length] || 'stone' });
   }
   regions = spots.filter(s => s.kind === 'base' || s.kind === 'town');
   regions.forEach((s, r) => { s.region = r; });
@@ -346,7 +356,7 @@ function buildVoxels() {
   treeCell = new Uint8Array(N);
   for (let z = 1; z < MD - 1; z++) for (let x = 1; x < MW - 1; x++) {
     const i = idx(x, z), h = HM[i], cx = x + .5, cz = z + .5;
-    if (GEOT[i] === 1) { if ((x + z) % 2 === 0 && !nearFlat(cx, cz, 1)) treeCell[i] = 2; continue; }
+    if (GEOT[i] === 1 || GEOT[i] === 16) { if ((x + z) % 2 === 0 && !nearFlat(cx, cz, 1)) treeCell[i] = 2; continue; }
     if (GEOT[i] === 3 || GEOT[i] === 2) continue;   // sin árboles en arena, pantano ni bajío
     if (h < 2 || h > 4 || nearFlat(cx, cz, 3)) continue;
     let ok = true; for (let dz = -2; dz <= 2 && ok; dz++) for (let dx = -2; dx <= 2; dx++) { const j = idx(x + dx, z + dz); if (hAt(x + dx, z + dz) <= 1 || (Math.abs(dx) <= 1 && Math.abs(dz) <= 1 && roadCell[j])) { ok = false; break; } }
@@ -375,9 +385,13 @@ function buildVoxels() {
     let col = terrainColor(x, z); if (shadow[i]) col = mixHex(col, 0x10203a, shadow[i]);
     L.quad(2, x, x + 1, h, h, z, z + 1, col);
     const sc = h <= 1 ? TP.cliffS : TP.cliff, lip = mixHex(col, 0x10203a, .14);   // escalón de 1: color del suelo; más hondo: ladera
-    for (const [a, b, f] of H4) { const hn = Math.max(0, hAt(x + a, z + b)); if (hn >= h) continue; L.quad(f, x, x + 1, h - 1, h, z, z + 1, h <= 1 ? sc : lip); if (hn < h - 1) L.quad(f, x, x + 1, hn, h - 1, z, z + 1, sc); }
-    if (treeCell[i] === 2) { const v0 = L.nv; treeV.set(i, [ck, v0]); const B = biomeAt(cx, cz), r2 = hash(x * 5, 7, z * 3); L.box(cx, h + .5 + r2 * .15, cz, 1.6, .9 + r2 * .3, 1.6, B.treeCol); L.box(cx + .2, h + 1.1 + r2 * .3, cz - .2, .8, .4, .8, mixHex(B.treeCol, 0x9ad86a, .18)); treeV.get(i).push(L.nv); }
+    for (const [a, b, f] of H4) { const hn = Math.max(0, hAt(x + a, z + b)); if (hn >= h) continue;
+      if (scen === 'canon' && h >= 3) { for (let y = hn; y < h; y++) L.quad(f, x, x + 1, y, y + 1, z, z + 1, STRATA[(y + (hash(x, 3, z) < .2 ? 1 : 0)) % STRATA.length]); continue; }   // estratos de colores en las paredes del cañón
+      L.quad(f, x, x + 1, h - 1, h, z, z + 1, h <= 1 ? sc : lip); if (hn < h - 1) L.quad(f, x, x + 1, hn, h - 1, z, z + 1, sc); }
+    if (treeCell[i] === 2) { const v0 = L.nv; treeV.set(i, [ck, v0]); const B = biomeAt(cx, cz), r2 = hash(x * 5, 7, z * 3); const lt = GEOT[i] === 16, tc = lt ? mixHex(B.treeCol, 0xd8e890, .55) : B.treeCol;   // bosque claro: árboles más bajos y claros
+      L.box(cx, h + (lt ? .35 : .5) + r2 * .15, cz, lt ? 1.2 : 1.6, (lt ? .6 : .9) + r2 * .3, lt ? 1.2 : 1.6, tc); L.box(cx + .2, h + (lt ? .8 : 1.1) + r2 * .3, cz - .2, .8, .4, .8, mixHex(tc, 0x9ad86a, .18)); treeV.get(i).push(L.nv); }
     else if (treeCell[i]) { const B = biomeAt(cx, cz), r2 = hash(x * 5, 7, z * 3); treeBoxes(L, B.trees[r2 > .55 ? 1 : 0], cx, h, cz, r2); }
+    else if (GEOT[i] === 14 && hash(x, 11, z) < .35) { for (let k = 0; k < 3; k++) L.box(cx + (k - 1) * .25, h + .35 + k * .05, cz + (k % 2) * .2 - .1, .08, .7 + k * .1, .08, k % 2 ? 0x6a8a3a : 0x8aa04a); L.box(cx, h + .78, cz, .1, .16, .1, 0x7a5a34); }   // juncos
     else if (!nearFlat(cx, cz, 1) && !roadCell[i] && h > 1) {   // piezas pequeñas del paisaje
       const side = sideAt(cx, cz), B = civOf(side).map;
       if (B.feature === 'rocks' && featureAt(x, z, side, B) === 0x8a8e88 && hash(x, 9, z) < .18) { L.box(cx, h + .18, cz, .62, .36, .5, 0x8a8a86); L.box(cx + .15, h + .42, cz + .05, .34, .2, .3, 0x9a9a96); }
@@ -403,14 +417,14 @@ export function geoTerrain(key, x0, z0, x1, z1) {
   for (let z = Math.max(0, z0); z < Math.min(MD, z1); z++) for (let x = Math.max(0, x0); x < Math.min(MW, x1); x++) {
     const i = idx(x, z), h = H(x, z), cx = x + .5, cz = z + .5, t = p.TT[i];
     if (h <= 0 || t === 9) { const nearLand = H4.some(([a, b]) => H(x + a, z + b) > 0); W.quad(2, x, x + 1, 0, 0, z, z + 1, nearLand ? TP.edge : -p.HM[i] < 2.2 ? TP.shallow : TP.deep); continue; }
-    const tree = t === 1 ? ((x + z) % 2 === 0 ? 2 : 0) : (t === 0 && h >= 2 && h <= 7 && n2(cx, cz, .055, 3, 22) > .6 && hash(x * 3, 1, z * 11) < .45) ? 1 : 0;
+    const tree = t === 1 || t === 16 ? ((x + z) % 2 === 0 ? 2 : 0) : (t === 0 && h >= 2 && h <= 7 && n2(cx, cz, .055, 3, 22) > .6 && hash(x * 3, 1, z * 11) < .45) ? 1 : 0;
     let col;
     if (t === 1 || tree) col = TP.lush;
     else if (t === 2) { const w = n2(cx, cz, .12, 2, 71) > .55; col = h <= 1 ? (w ? 0xb8ccc0 : 0xd6cca0) : (w ? 0x6c9a92 : 0x6a8a5a); }
     else if (t === 3 || h <= 1) col = TP.sand;
     else if (t === 4) col = mixHex(PREV_GROUND[0], 0x4f9a3a, .45);
     else if (t === 5) col = h >= 8 ? 0x3a3034 : 0x4a4448;
-    else if (t === 6) col = 0xd4e8f0; else if (t === 7) col = 0xa8a49a;
+    else if (t === 6) col = 0xd4e8f0; else if (t === 7) col = 0xa8a49a; else if (t === 15) col = 0xa8cce0; else if (t === 10) col = 0xff7a1a; else if (t === 11) col = 0xe4cc90; else if (t === 12) col = 0x8a8a86; else if (t === 13) col = 0xd8c898; else if (t === 14) col = 0x5f9044; else if (t === 16) col = 0x4a8a44;
     else { const m = n2(cx, cz, .045, 3, 21) + (h - 2) * .05, tone = THREE.MathUtils.clamp(Math.floor((m - .34) / .09), 0, 3); col = h >= 6 ? (h >= 9 ? 0xe4e2da : mixHex(PREV_GROUND[tone], 0x9a9488, Math.min(1, (h - 5) / 3))) : PREV_GROUND[tone]; }
     if (p.snow && t !== 6 && t !== 3) col = mixHex(col, 0xeef2f6, .62);
     if (H(x - 1, z + 1) > h) col = mixHex(col, 0x10203a, .12);

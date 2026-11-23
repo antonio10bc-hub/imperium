@@ -64,7 +64,7 @@ export function drawWeather(c, w, h, dt) {
 }
 
 // ---------- vida en el paisaje (cerca de la cámara) ----------
-let shore = [], deep = [], flock = null, lifeT = { smoke: 0, wave: 0, fish: 0, bird: 8 };
+let shore = [], deep = [], vents = [], flock = null, lifeT = { smoke: 0, wave: 0, fish: 0, bird: 8, steam: 0 };   // vents: vapor donde la lava toca el agua y fumarolas
 const nearCam = (x, z, r) => Math.abs(x - camT.x) < r && Math.abs(z - camT.z) < r * .8;
 function makeFlock() {
   const g = new THREE.Group(), n = 5 + (fxRand() * 4 | 0), birds = [], m = basic(0x2a2a34);
@@ -77,6 +77,7 @@ export function updateLife(dt) {
   if (flock) { flock.t += dt; flock.g.position.addScaledVector(flock.v, dt); flock.birds.forEach((b, i) => { b.scale.y = 1 + Math.sin(flock.t * 12 + i) * .8; b.scale.x = .75 + Math.abs(Math.sin(flock.t * 12 + i)) * .5; });
     if (flock.t > 22) { world.remove(flock.g); flock.g.children.forEach(b => b.geometry.dispose()); flock = null; } }
   else if ((lifeT.bird -= dt) <= 0) { lifeT.bird = 18 + fxRand() * 25; flock = makeFlock(); }
+  if (vents.length && (lifeT.steam -= dt) <= 0) { lifeT.steam = .18; const [x, z, y, lava] = vents[fxRand() * vents.length | 0]; plume(new THREE.Vector3(x + fxRand() - .5, y, z + fxRand() - .5), fxRand() < .6 ? 0xf4f4f0 : 0xd8d8d4, lava ? 1.1 : .7, 2.4, lava ? 2.2 : 1.6, -.3); }
   if ((lifeT.smoke -= dt) <= 0) { lifeT.smoke = .5;   // humo de las chimeneas de los pueblos
     for (const s of spots) if (s.kind === 'town' && !s.camp && s.group?.visible && nearCam(s.x, s.z, 70) && fxRand() < .5) plume(new THREE.Vector3(s.x + .9 + fxRand() * .4, s.y + 2.6, s.z + .6), fxRand() < .5 ? 0xd8d4cc : 0xbab6ae, .45, 2.6, .9, -.15); }
   if (shore.length && (lifeT.wave -= dt) <= 0) { lifeT.wave = .12;   // espuma en la orilla
@@ -130,7 +131,13 @@ const WHERE = {
 export function setupAmbient() {
   resetWeather(); P.length = 0;
   if (flock) { world.remove(flock.g); flock = null; }
-  shore = []; deep = [];
+  shore = []; deep = []; vents = [];
+  for (const [x, z] of geoR?.lavaEnds || []) vents.push([x, z, .3, true]);
+  for (const [x, z] of geoR?.fumaroles || []) {   // fumarola: grieta humeante entre rocas en la orilla
+    const i = idx(Math.max(0, Math.min(MW - 1, x | 0)), Math.max(0, Math.min(MD - 1, z | 0))), y = Math.max(1, HM[i]), g = new THREE.Group();
+    for (let k = 0; k < 6; k++) { const a = k / 6 * 6.28; part(g, .7, .5 + (k % 2) * .4, .6, 0x6a6266, Math.cos(a) * 1.2, .3, Math.sin(a) * 1.2); } part(g, 1.2, .1, 1.2, 0xe8d050, 0, .05, 0, false);
+    bake(g); g.position.set(x, y, z); world.add(g); decos.push(g); vents.push([x, z, y + .4, false]);
+  }
   for (let z = 1; z < MD - 1; z++) for (let x = 1; x < MW - 1; x++) { const i = idx(x, z); if (HM[i] > 0) continue; if (N4.some(([a, b]) => hAt(x + a, z + b) > 0)) shore.push(i); else if (!N4.some(([a, b]) => hAt(x + a * 3, z + b * 3) > 0)) deep.push(i); }
   // elementos propios: lejos de las fortalezas, los pueblos, los caminos y entre sí
   const r = rngOf(seed * 3 + 7), placed = [], keys = geoR?.mix || [scen], blockCells = [];

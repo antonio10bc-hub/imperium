@@ -139,7 +139,7 @@ export function showPortraits(onlySide = -1, dir = 0) {
 
 function showGeo(dir = 0) {
   const key = S.wantScen, node = GEO.LIST[key] ? Object.assign(new Image(), { alt: '', src: geoRender(key) }) : Object.assign(document.createElement('div'), { className: 'q', textContent: '?' });
-  $('geoName').textContent = GEO.LIST[key] || 'ALEATORIA';
+  $('geoName').textContent = GEO.LIST[key] || 'ALEATORIA'; $('geoDesc').textContent = GEO.DESC[key] || 'UNA GEOGRAFÍA AL AZAR.';
   swapStage($('geoStage'), node, dir);
 }
 

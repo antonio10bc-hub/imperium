@@ -9,24 +9,25 @@
 // (Istmo y cordillera colocan además la ciudadela y las atalayas en sus pasos; la meseta tiene tres rampas estrechas.)
 import * as THREE from 'three';
 import { sfx } from './audio.js';
-import { damage } from './combat.js';
-import { MD, MW, N, RANGED, idx } from './config.js';
+import { damage, shoot } from './combat.js';
+import { MD, MW, N, RANGED, TEAM, idx } from './config.js';
 import { orderMove } from './behavior.js';
 import { burst, dropBox, ping, plume, takeBox } from './effects.js';
 import { refreshFields, toast } from './game.js';
 import { GEOT, HM, bridgeSites, geoR, removeTrees, roadCell, scen, spots, treeCell } from './map.js';
-import { blocked, cellX, cellZ, nearestOpen, refreshCells } from './nav.js';
-import { bake, part, world } from './render.js';
-import { UGRID, sideState, units } from './units.js';
+import { bfs, blocked, cellX, cellZ, nearestOpen, refreshCells } from './nav.js';
+import { bake, mat, part, world } from './render.js';
+import { UGRID, followField, sideState, stepToward, units } from './units.js';
 
-export const R = { half: {}, on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false };
+export const R = { debris: [], half: {}, on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false };
 const _near = [];
 
 // ---------- preparación al empezar cada partida ----------
 export function setupRules() {
   for (const m of R.meshes) { world.remove(m); m.traverse(o => { if (o.isMesh && o.userData.own) { o.geometry.dispose(); o.material.dispose(); } }); }
   for (const b of R.bombs || []) if (b.m) dropBox(b.m);
-  Object.assign(R, { lava: null, on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false, bombs: [], breaks: [], treasures: null });
+  for (const d of R.debris || []) dropBox(d.m);
+  Object.assign(R, { debris: [], lava: null, on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false, bombs: [], breaks: [], treasures: null });
   const on = R.on;
   on.bridges = bridgeSites.length > 0;
   // en una mezcla, cada regla vale solo en la mitad de su geografía
@@ -38,26 +39,26 @@ export function setupRules() {
   on.canyon = has('barrancos'); on.swamp = has('delta');
   on.chop = has('bosque'); on.cover = has('bosque');
   on.thirst = has('oasis'); on.volcano = has('lago') && !!geoR?.volcano;
-  on.ice = has('helado'); on.plains = has('llanura'); on.treasures = has('ruinas');
+  on.ice = has('helado'); on.plains = has('llanura'); on.treasures = has('ruinas') || has('bosque');
   // casillas donde las tropas se ocultan: el fondo de los barrancos y los pantanos del delta
   if (on.canyon || on.swamp) { R.hide = new Uint8Array(N); for (let i = 0; i < N; i++) if ((on.canyon && HM[i] === 1 && inK('barrancos', i)) || (on.swamp && GEOT[i] === 2 && inK('delta', i))) R.hide[i] = 1; }
   // cobertura: junto al bosque denso o entre árboles
-  if (on.cover) { R.cover = new Uint8Array(N); for (let z = 1; z < MD - 1; z++) for (let x = 1; x < MW - 1; x++) { const i = idx(x, z); if (treeCell[i] || [-1, 0, 1].some(dz => [-1, 0, 1].some(dx => GEOT[idx(x + dx, z + dz)] === 1))) R.cover[i] = 1; } }
+  if (on.cover) { R.cover = new Uint8Array(N); for (let z = 1; z < MD - 1; z++) for (let x = 1; x < MW - 1; x++) { const i = idx(x, z); if (treeCell[i] || [-1, 0, 1].some(dz => [-1, 0, 1].some(dx => GEOT[idx(x + dx, z + dz)] === 1 || GEOT[idx(x + dx, z + dz)] === 16))) R.cover[i] = 1; } }
   // agua en el desierto: a menos de 12 casillas de un oasis, del agua o de una fortaleza no hay sed
   if (on.thirst) { R.wet = wetMap(12); if (R.half.oasis) for (let i = 0; i < N; i++) if (!inK('oasis', i)) R.wet[i] = 1; }
   // mareas (bajíos del archipiélago) y crecidas (vados de los afluentes): grupos de casillas que se cierran a ratos
   if (on.tides || on.floods) {
     const cells = [];
     for (let z = 1; z < MD - 1; z++) for (let x = 1; x < MW - 1; x++) { const i = idx(x, z);
-      if (on.tides ? GEOT[i] === 2 && HM[i] === 1 && inK('archipielago', i) : HM[i] === 1 && GEOT[i] === 0 && inK('afluentes', i) && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => HM[idx(x + a, z + b)] <= 0)) cells.push(i); }
+      if (on.tides ? GEOT[i] === 2 && HM[i] === 1 && inK('archipielago', i) : GEOT[i] === 13 && inK('afluentes', i)) cells.push(i); }
     if (cells.length) { const g = { cells, open: true, layer: waterLayer(cells) }; R.gates.push(g); R.cycle = { phase: 'open', t: on.tides ? 100 : 140 }; }
   }
   for (const b of bridgeSites) { const br = makeBridge(b); R.bridges.push(br); if (b.built) { br.built = true; br.group.visible = true; } }
   R.breaks = [];
-  if (on.treasures) R.treasures = (geoR.treasures || []).map(([x, z]) => makeChest(x, z));
+  if (on.treasures) R.treasures = (geoR.treasures || []).map(([x, z]) => Object.assign(makeChest(x, z), { value: scen === 'bosque' || (geoR.mix && R.half.bosque?.(x, z)) ? 150 : 80 }));
   if (on.volcano) {   // lava en el cráter (brilla siempre) y humo constante
     const [x, z] = geoR.volcano, y = HM[idx(Math.floor(x), Math.floor(z))]; R.volcano = { x, z, y: y + 1, t: 150, phase: 'calm' };
-    const lava = R.lava = new THREE.Mesh(new THREE.BoxGeometry(2.6, .2, 2.6), new THREE.MeshBasicMaterial({ color: 0xff7a1a })); lava.position.set(Math.floor(x) + .5, y + .12, Math.floor(z) + .5); lava.userData.own = true; world.add(lava); R.meshes.push(lava);
+    const lava = R.lava = new THREE.Mesh(new THREE.BoxGeometry(5.5, .3, 5.5), new THREE.MeshBasicMaterial({ color: 0xff7a1a })); lava.position.set(Math.floor(x) + .5, y + .12, Math.floor(z) + .5); lava.userData.own = true; world.add(lava); R.meshes.push(lava);
   }
 }
 // distancia (en casillas, sin obstáculos) al agua, a los oasis y a las fortalezas, hasta r
@@ -112,20 +113,40 @@ function updateCycle(dt) {
 
 // ---------- puentes ----------
 export const BRIDGE_COST = 150;
+// tres estilos en el cañón: de piedra con arcos (aguanta mucho), fortificado con dos torres que disparan (se conquista) y colgante (cae antes y se balancea)
+const BRIDGE_HP = { stone: 900, fort: 650, rope: 280, wood: 450 };
 function makeBridge(site) {
   const xs = site.cells.map(c => c % MW), zs = site.cells.map(c => (c / MW) | 0), x0 = Math.min(...xs), x1 = Math.max(...xs) + 1, z0 = Math.min(...zs), z1 = Math.max(...zs) + 1;
-  const hb = site.h ?? 1, b = { kind: 'bridge', x: (x0 + x1) / 2, z: (z0 + z1) / 2, y: hb, hb, cells: site.cells, h0: site.cells.map(c => site.h0 ?? HM[c]), built: false, breakable: !!site.breakable, name: 'PUENTE', group: new THREE.Group() };
-  const g = b.group, L = site.axis === 'x' ? x1 - x0 + 1.5 : z1 - z0 + 1.5, W = site.axis === 'x' ? z1 - z0 : x1 - x0, wood = 0x8a5a34, wood2 = 0x6a4224, stone = 0xa8a49a;
-  const P = (w, h, d, c, x, y, z) => site.axis === 'x' ? part(g, w, h, d, c, x, y, z) : part(g, d, h, w, c, z, y, x);
-  P(L, .25, W, wood, 0, .88, 0);
-  for (let k = 0; k < L; k += 1.1) P(.12, .04, W + .1, wood2, -L / 2 + k, 1.02, 0);   // tablones
-  for (const s of [-1, 1]) { P(L, .12, .14, wood2, 0, 1.55, s * (W / 2 - .05)); for (let k = 0; k <= L; k += 2) P(.16, .7, .16, wood2, -L / 2 + k, 1.25, s * (W / 2 - .05)); }
-  for (let k = 2; k < L - 1; k += 4) P(.8, 1.8 + hb, W - .4, stone, -L / 2 + k, .8 - (1.8 + hb) / 2, 0);   // pilares hasta el agua
-  bake(g); g.position.set(b.x, hb - 1, b.z); g.visible = false; world.add(g); R.meshes.push(g);
+  const style = site.style || 'wood', hb = site.h ?? 1, b = { kind: 'bridge', style, x: (x0 + x1) / 2, z: (z0 + z1) / 2, y: hb, hb, x0, x1, z0, z1, cells: site.cells, h0: site.cells.map(c => site.h0 ?? HM[c]), built: false, breakable: !!site.breakable,
+    name: { stone: 'PUENTE DE PIEDRA', fort: 'PUENTE FORTIFICADO', rope: 'PUENTE COLGANTE', wood: 'PUENTE' }[style], hp: BRIDGE_HP[style], maxHp: BRIDGE_HP[style], owner: -1, cap: [0, 0], towerCd: 0, roofs: [], group: new THREE.Group() };
+  const g = b.group, L = site.axis === 'x' ? x1 - x0 + 2 : z1 - z0 + 2, W = site.axis === 'x' ? z1 - z0 : x1 - x0, wood = 0x8a5a34, wood2 = 0x6a4224, stone = 0xb0aca0, stone2 = 0x8e8a80, rope = 0xc8b080;
+  const P = (w, h, d, c, x, y, z, hull = true) => site.axis === 'x' ? part(g, w, h, d, c, x, y, z, hull) : part(g, d, h, w, c, z, y, x, hull);
+  const deep = 1.8 + hb;
+  if (style === 'rope') {   // colgante: tablones con huecos, cuerdas y postes altos en cada extremo; se comba en el centro
+    for (let k = 0; k < L; k += .7) { const t = k / L, sag = -Math.sin(t * Math.PI) * .45; P(.55, .14, W - .3, k % 1.4 < .7 ? wood : 0x9a6a3e, -L / 2 + k, .9 + sag, 0); }
+    for (const sd of [-1, 1]) { for (let k = 0; k < L; k += .7) { const t = k / L, sag = -Math.sin(t * Math.PI) * .45; P(.7, .06, .06, rope, -L / 2 + k, 1.7 + sag * .8, sd * (W / 2 - .1), false); if (Math.round(k / .7) % 3 === 0) P(.05, .8, .05, rope, -L / 2 + k, 1.3 + sag, sd * (W / 2 - .1), false); }
+      for (const e of [-1, 1]) P(.35, 3, .35, wood2, e * (L / 2 + .2), 1.4, sd * (W / 2 + .1)); }
+  } else {   // piedra (o madera en el río): tablero ancho, pretiles y pilares con arcos hasta el agua
+    const deck = style === 'wood' ? wood : stone;
+    P(L, .35, W, deck, 0, .85, 0);
+    if (style === 'wood') for (let k = 0; k < L; k += 1.1) P(.12, .04, W + .1, wood2, -L / 2 + k, 1.04, 0);
+    else for (let k = 0; k < L; k += 1.6) P(.06, .03, W, stone2, -L / 2 + k, 1.04, 0);   // losas
+    for (const sd of [-1, 1]) { P(L, .55, .35, style === 'wood' ? wood2 : stone2, 0, 1.3, sd * (W / 2 - .15)); if (style !== 'wood') for (let k = 0; k < L; k += 1.4) P(.5, .3, .4, stone2, -L / 2 + k, 1.7, sd * (W / 2 - .15)); }
+    for (let k = 3; k < L - 2; k += 5) { P(1.2, deep, W - .2, style === 'wood' ? stone : stone2, -L / 2 + k, .7 - deep / 2, 0); if (style !== 'wood') { P(3.8, .5, W - .3, stone, -L / 2 + k + 2.5, .4, 0); P(2.2, .5, W - .3, stone, -L / 2 + k + 2.5, .05, 0); } }   // pilares y arcos
+    for (const e of [-1, 1]) for (const sd of [-1, 1]) { P(.3, 1.4, .3, 0x3a3a44, e * (L / 2 - .3), 1.7, sd * (W / 2 - .15)); P(.4, .35, .4, 0xffd86a, e * (L / 2 - .3), 2.5, sd * (W / 2 - .15), false); }   // farolas
+    if (style === 'fort') for (const sd of [-1, 1]) {   // dos torres en el centro, una a cada lado
+      P(2, 4.6, 1.8, stone, 0, 2.9, sd * (W / 2 + .7)); P(2.4, .5, 2.2, stone2, 0, 5.3, sd * (W / 2 + .7));
+      for (const q of [-1, 1]) P(.5, .5, .5, stone2, q * .8, 5.8, sd * (W / 2 + .7));
+      b.roofs.push(P(1.4, .9, 1.3, 0xd8d4c4, 0, 6.2, sd * (W / 2 + .7), false)); b.roofs.push(P(.1, 1.4, .1, 0x5a3a24, 0, 7.3, sd * (W / 2 + .7), false));
+      P(1.4, 2.2, .3, stone, 0, 2.2, sd * (W / 2 - .2));   // arco sobre el tablero
+    }
+  }
+  bake(g, new Set(b.roofs)); g.position.set(b.x, hb - 1, b.z); g.visible = false; world.add(g); R.meshes.push(g);
+  b.tower = new THREE.Vector3(b.x, hb + 5.5, b.z);
   return b;
 }
 export function setBridge(b, built) {
-  b.built = built; b.group.visible = built;
+  b.built = built; b.group.visible = built; if (built) { b.hp = b.maxHp; b.group.position.y = b.hb - 1; b.group.rotation.set(0, 0, 0); }
   b.cells.forEach((c, k) => { HM[c] = built ? b.hb : b.h0[k]; });
   refreshCells(b.cells); if (!built) evict(b.cells, true);
   refreshFields();
@@ -134,19 +155,60 @@ export function buildBridge(side, b) {
   const st = sideState[side];
   if (b.built || st.gold < BRIDGE_COST) { if (side === 0) sfx('deny'); return false; }
   st.gold -= BRIDGE_COST; setBridge(b, true);
-  burst(new THREE.Vector3(b.x, 1.5, b.z), [0x8a5a34, 0xffffff, 0xe8c870], 24, 3, 5, 1, .25); ping(new THREE.Vector3(b.x, 1, b.z), '#e8c870');
+  burst(new THREE.Vector3(b.x, b.hb + .5, b.z), [0x8a5a34, 0xffffff, 0xe8c870], 24, 3, 5, 1, .25); ping(new THREE.Vector3(b.x, b.hb, b.z), '#e8c870');
   toast(side === 0 ? (b.breakable ? '¡PUENTE REPARADO!' : '¡PUENTE CONSTRUIDO!') : 'EL RIVAL HA CONSTRUIDO UN PUENTE', side === 0 ? 'good' : 'bad', b); sfx('capture');
   return true;
 }
-
-// cañón: destruir un puente propio (hace falta una tropa tuya cerca y que quede al menos otro en pie)
-export const canBreak = (side, b) => b.breakable && b.built && R.bridges.some(o => o !== b && o.built) && units.some(u => u.side === side && Math.hypot(u.pos.x - b.x, u.pos.z - b.z) < 12);
+// el último puente en pie del cañón no se puede derribar (si no, el mapa quedaría partido)
+export const lastBridge = b => b.breakable && !R.bridges.some(o => o !== b && o.built);
+// las tropas golpean el puente (clic derecho sobre él); al llegar a 0 se derrumba
+export function hitBridge(u, b, dt) {
+  if (!b.built) { u.order = null; return; }
+  const ends = [[b.x0 - 1.2, b.z], [b.x1 + 1.2, b.z]], [ex, ez] = Math.hypot(u.pos.x - ends[0][0], u.pos.z - ends[0][1]) < Math.hypot(u.pos.x - ends[1][0], u.pos.z - ends[1][1]) ? ends[0] : ends[1];
+  const onDeck = u.pos.x > b.x0 - 1 && u.pos.x < b.x1 + 1 && Math.abs(u.pos.z - b.z) < (b.z1 - b.z0) / 2 + 1.5, reach = RANGED(u.type) ? 7 : 2.2;
+  if (!onDeck && Math.hypot(u.pos.x - ex, u.pos.z - ez) > reach) {
+    if (!u.order.f || u.order.end !== ex) { u.order.end = ex; u.order.f = bfs([nearestOpen(ex, ez, 6)]); }
+    if (!followField(u, u.order.f, dt)) stepToward(u, ex, ez, u.def.speed, dt); return;
+  }
+  u.fwd.set(b.x - u.pos.x, 0, b.z - u.pos.z).normalize();
+  if (u.cd > 0) return;
+  u.cd = u.def.cd; u.lunge = 1;
+  if (lastBridge(b)) { if (u.side === 0 && !b.toldLast) { b.toldLast = true; toast('ES EL ÚLTIMO PUENTE: NO SE PUEDE DERRIBAR', 'bad', b); } u.order = null; return; }
+  b.hp -= u.def.dmg * (RANGED(u.type) ? .35 : 1) * (u.type === 'hero' || u.type === 'god' || u.type === 'titan' ? 1.5 : 1);
+  burst(new THREE.Vector3(ex + (b.x - ex) * .1, b.hb + .6, b.z + (Math.random() - .5) * 2), b.style === 'rope' ? [0x8a5a34, 0xc8b080] : [0xb0aca0, 0x8e8a80, 0x8a5a34], 3, 2, 3, .5, .16);
+  if (b.hp <= 0) breakBridge(u.side, b);
+}
 export function breakBridge(side, b) {
-  if (!canBreak(side, b)) { if (side === 0) sfx('deny'); return false; }
-  setBridge(b, false);
-  burst(new THREE.Vector3(b.x, b.hb, b.z), [0x8a5a34, 0x6a4224, 0xa8a49a], 30, 4, 4, 1.2, .3); plume(new THREE.Vector3(b.x, b.hb, b.z), 0x8a8a86, 1.4, 1.6);
-  toast(side === 0 ? 'HAS DESTRUIDO EL PUENTE' : '¡EL RIVAL HA DESTRUIDO UN PUENTE!', side === 0 ? 'good' : 'bad', b); sfx('lost');
+  if (!b.built || lastBridge(b)) { if (side === 0) sfx('deny'); return false; }
+  setBridge(b, false); b.group.visible = true; b.fallT = .7;   // se hunde y luego se esconde
+  // derrumbe: trozos del puente caen al agua y salpican
+  const cols = b.style === 'rope' ? [0x8a5a34, 0x6a4224, 0xc8b080] : b.style === 'wood' ? [0x8a5a34, 0x6a4224] : [0xb0aca0, 0x8e8a80, 0x9a968c];
+  for (let k = 0; k < 34; k++) { const m = takeBox(cols[k % cols.length]), sz = .3 + Math.random() * .5; m.scale.set(sz * (1 + Math.random()), sz * .6, sz); m.position.set(b.x0 + Math.random() * (b.x1 - b.x0), b.hb + .3, b.z + (Math.random() - .5) * (b.z1 - b.z0));
+    R.debris.push({ m, v: new THREE.Vector3((Math.random() - .5) * 3, 1 + Math.random() * 3, (Math.random() - .5) * 3), r: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6), t: 3 }); }
+  burst(new THREE.Vector3(b.x, b.hb, b.z), cols, 24, 4, 4, 1.2, .3, true); plume(new THREE.Vector3(b.x, b.hb, b.z), 0x8a8a86, 2.2, 2, 1.5, -.6, true);
+  toast(side === 0 ? '¡HAS DERRIBADO EL PUENTE!' : side === 1 ? '¡EL RIVAL HA DERRIBADO UN PUENTE!' : 'UN PUENTE SE HA DERRUMBADO', side === 0 ? 'good' : 'bad', b); sfx('lost');
   return true;
+}
+// puente fortificado: se conquista quedándose en el tablero sin enemigos; sus torres disparan a los enemigos de su dueño
+function updateFortBridge(b, dt) {
+  const here = [0, 0];
+  for (const u of UGRID.near(b.x, b.z, 6, _near)) if (u.side < 2 && Math.hypot(u.pos.x - b.x, u.pos.z - b.z) < 6) here[u.side]++;
+  for (const sd of [0, 1]) if (here[sd] && !here[1 - sd] && b.owner !== sd) { b.cap[sd] += dt / 5; if (b.cap[sd] >= 1) { b.cap = [0, 0]; b.owner = sd; for (const m of b.roofs) m.material = mat(TEAM[sd].c);
+      burst(b.tower, [TEAM[sd].c, 0xffffff], 20, 3, 4, 1, .22); toast(sd === 0 ? '¡EL PUENTE FORTIFICADO ES TUYO! SUS TORRES DISPARAN' : 'EL RIVAL HA TOMADO EL PUENTE FORTIFICADO', sd === 0 ? 'good' : 'bad', b); sfx(sd === 0 ? 'capture' : 'deny'); } }
+    else if (!here[sd]) b.cap[sd] = Math.max(0, b.cap[sd] - dt / 10);
+  if (b.owner < 0 || (b.towerCd -= dt) > 0) return;
+  let best = null, bd = 13; for (const u of UGRID.near(b.x, b.z, 13, _near)) if (u.side !== b.owner) { const d = Math.hypot(u.pos.x - b.x, u.pos.z - b.z); if (d < bd) { bd = d; best = u; } }
+  if (best) { b.towerCd = 1.2; shoot(b.tower, best.pos, 0); damage({ side: b.owner, vis: true, def: {} }, best, 10); }
+}
+// animación (cada fotograma): trozos que caen, puentes que se hunden y el colgante que se balancea
+export function rulesFrame(dt) {
+  for (let k = R.debris.length - 1; k >= 0; k--) { const d = R.debris[k]; d.t -= dt; d.v.y -= 9 * dt; d.m.position.addScaledVector(d.v, dt); d.m.rotation.x += d.r.x * dt; d.m.rotation.y += d.r.y * dt;
+    if (d.m.position.y < -.2 || d.t <= 0) { if (d.t > 0) { burst(d.m.position.clone().setY(0), [0xffffff, 0xbfe4f4], 4, 1.5, 3, .5, .14, true); } dropBox(d.m); R.debris.splice(k, 1); } }
+  const now = performance.now() / 1000;
+  for (const b of R.bridges) {
+    if (b.fallT > 0) { b.fallT -= dt; b.group.position.y -= dt * 4; b.group.rotation.z += dt * .5; if (b.fallT <= 0) { b.group.visible = false; b.group.position.y = b.hb - 1; b.group.rotation.set(0, 0, 0); } }
+    else if (b.style === 'rope' && b.built) b.group.rotation.x = Math.sin(now * 1.3 + b.z) * .025;
+  }
 }
 
 // ---------- hielo que se rompe ----------
@@ -160,11 +222,11 @@ function updateIce(dt) {
   }
   if ((R.iceT = (R.iceT ?? 0) - dt) > 0) return; R.iceT = .5;
   for (const u of units) {
-    if (u.dead || GEOT[u.node] !== 6 || R.breaks.some(b => Math.hypot(b.x - u.pos.x, b.z - u.pos.z) < 10)) continue;
-    const on = UGRID.near(u.pos.x, u.pos.z, 5, _near).filter(o => GEOT[o.node] === 6 && Math.hypot(o.pos.x - u.pos.x, o.pos.z - u.pos.z) < 5);
-    if (on.length < 10) continue;
+    if (u.dead || (GEOT[u.node] !== 6 && GEOT[u.node] !== 15) || R.breaks.some(b => Math.hypot(b.x - u.pos.x, b.z - u.pos.z) < 10)) continue;
+    const on = UGRID.near(u.pos.x, u.pos.z, 5, _near).filter(o => (GEOT[o.node] === 6 || GEOT[o.node] === 15) && Math.hypot(o.pos.x - u.pos.x, o.pos.z - u.pos.z) < 5);
+    if (on.length < (GEOT[u.node] === 15 ? 5 : 10)) continue;   // el hielo fino aguanta la mitad
     const cx = Math.floor(u.pos.x), cz = Math.floor(u.pos.z), cells = [];
-    for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const x = cx + dx, z = cz + dz; if (x >= 0 && z >= 0 && x < MW && z < MD && dx * dx + dz * dz <= 36 && GEOT[idx(x, z)] === 6) cells.push(idx(x, z)); }
+    for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const x = cx + dx, z = cz + dz; if (x >= 0 && z >= 0 && x < MW && z < MD && dx * dx + dz * dz <= 36 && (GEOT[idx(x, z)] === 6 || GEOT[idx(x, z)] === 15)) cells.push(idx(x, z)); }
     R.breaks.push({ x: u.pos.x, z: u.pos.z, cells, t: 2, phase: 'crack' });
     if (on.some(o => o.side === 0) || u.vis) toast('¡EL HIELO SE AGRIETA! SALID DE AHÍ', 'bad', u.pos);
   }
@@ -182,9 +244,9 @@ function updateTreasures() {
     if (t.taken) continue;
     if ((t.fx = (t.fx ?? 0) - .25) <= 0) { t.fx = 1.2; plume(new THREE.Vector3(t.x, t.y + 1, t.z), 0xffe9a0, .18, .9, 1.4, -.6); }   // brillo
     const u = UGRID.near(t.x, t.z, 1.8, _near).find(o => o.side < 2 && Math.hypot(o.pos.x - t.x, o.pos.z - t.z) < 1.8); if (!u) continue;
-    t.taken = true; t.g.visible = false; sideState[u.side].gold += TREASURE;
+    t.taken = true; t.g.visible = false; sideState[u.side].gold += t.value || TREASURE;
     burst(new THREE.Vector3(t.x, t.y + .5, t.z), [0xffd23f, 0xffffff, 0xe8c870], 24, 3, 5, 1, .22);
-    toast(u.side === 0 ? `¡TESORO ENCONTRADO! +${TREASURE} ORO` : 'EL RIVAL HA ENCONTRADO UN TESORO', u.side === 0 ? 'good' : 'bad', t); if (u.side === 0) sfx('capture');
+    toast(u.side === 0 ? `¡TESORO ENCONTRADO! +${t.value || TREASURE} ORO` : 'EL RIVAL HA ENCONTRADO UN TESORO', u.side === 0 ? 'good' : 'bad', t); if (u.side === 0) sfx('capture');
   }
 }
 export const TREASURE = 80;
@@ -196,10 +258,10 @@ export const geoSpeed = u => R.on.plains && (!R.half.llanura || R.half.llanura(u
 export function startChop(x, z, list) {
   if (!R.on.chop || !list.length) return false;
   const cx = Math.floor(x), cz = Math.floor(z), cells = [];
-  for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { const nx = cx + dx, nz = cz + dz; if (nx < 1 || nz < 1 || nx >= MW - 1 || nz >= MD - 1 || dx * dx + dz * dz > 7) continue; const i = idx(nx, nz); if (GEOT[i] === 1) cells.push(i); }
+  for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { const nx = cx + dx, nz = cz + dz; if (nx < 1 || nz < 1 || nx >= MW - 1 || nz >= MD - 1 || dx * dx + dz * dz > 7) continue; const i = idx(nx, nz); if (GEOT[i] === 1 || GEOT[i] === 16) cells.push(i); }
   if (!cells.length) return false;
   const o = nearestOpen(x, z, 12); if (o < 0) return false;
-  const side = list[0].side, job = R.jobs.find(j => Math.hypot(j.x - x, j.z - z) < 3) || (R.jobs.push({ x: cx + .5, z: cz + .5, y: HM[cells[0]], cells, t: 0, need: 6, side }), R.jobs[R.jobs.length - 1]);
+  const side = list[0].side, job = R.jobs.find(j => Math.hypot(j.x - x, j.z - z) < 3) || (R.jobs.push({ x: cx + .5, z: cz + .5, y: HM[cells[0]], cells, t: 0, need: cells.every(c => GEOT[c] === 16) ? 3 : 6, side }), R.jobs[R.jobs.length - 1]);   // el bosque claro se tala en la mitad de tiempo
   orderMove(list, cellX(o), cellZ(o), false);
   if (side === 0) { toast('A TALAR EL BOSQUE: ABRIRÁN UN PASO NUEVO', 'good'); ping(new THREE.Vector3(job.x, job.y, job.z), '#9ad86a'); }
   return true;
@@ -284,6 +346,7 @@ export function updateRules(dt) {
   if (R.hide && (R.hideT = (R.hideT ?? 0) - dt) <= 0) { R.hideT = .3; updateHide(); }
   if (R.wet && (R.thirstT = (R.thirstT ?? 0) - dt) <= 0) { R.thirstT = 1; updateThirst(); }
   if (R.volcano) updateVolcano(dt);
+  for (const b of R.bridges) if (b.style === 'fort' && b.built) updateFortBridge(b, dt);
   if (R.on.ice) updateIce(dt);
   if (R.treasures && (R.trT = (R.trT ?? 0) - dt) <= 0) { R.trT = .25; updateTreasures(); }
 }

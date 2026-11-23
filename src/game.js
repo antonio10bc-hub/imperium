@@ -140,7 +140,7 @@ export function newGame(s, keepCivs = false) {
     if (S.pendingStart) { S.pendingStart = false; startGame(); } else { $('start').hidden = false; showPortraits(); }
   }, 30));
 }
-export function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; toast('MAPA: ' + GEO.LIST[scen] + (geoR?.mix ? ': ' + geoR.mix.map(k => GEO.LIST[k]).join(' + ') : '')); { const b = BONUS[civOf(0).id]; if (b) toast(`${civOf(0).name} · ${b.name}: ${b.text.toUpperCase()}`, 'good'); } resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
+export function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; toast('MAPA: ' + GEO.NAME[scen] + (geoR?.mix ? ': ' + geoR.mix.map(k => GEO.NAME[k]).join(' + ') : '')); { const b = BONUS[civOf(0).id]; if (b) toast(`${civOf(0).name} · ${b.name}: ${b.text.toUpperCase()}`, 'good'); } resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
 export function endGame(win, surrender = false) {
   state = 'end'; $('menu').hidden = true; S.menuOpen = false; $('ui').classList.add('hidden-ui'); $('toast').hidden = true; $('pause').hidden = true;
   const s = spots[win ? BASE1 : BASE0];
@@ -163,7 +163,7 @@ export const TOWN_LV = { cost: [0, 120, 220], inc: [1, 1.5, 2] };
 // pueblos que no dan oro: campamento, ciudadela y atalaya (dan tropas o defensa)
 export const noGold = s => s.camp || s.keep || s.watch;
 // oro de un pueblo por sí solo (nivel, oro doble de los fortificados y de la cima, ventaja de civilización)
-export const townInc = s => noGold(s) ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special || s.fortified || s.oasis ? GAME.richMul : 1) * (bonusOf(s.owner).income || 1);
+export const townInc = s => noGold(s) ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special || s.fortified || s.oasis || s.fumarole ? GAME.richMul : 1) * (bonusOf(s.owner).income || 1);
 // rendimiento decreciente: el pueblo k-ésimo (del que más da al que menos) rinde un 8 % menos que el anterior, hasta un mínimo del 45 %
 const decay = k => Math.max(GAME.townDecayMin, 1 - GAME.townDecay * k);
 const goldTowns = sd => spots.filter(s => s.kind === 'town' && s.owner === sd && !noGold(s)).sort((a, b) => townInc(b) - townInc(a) || spots.indexOf(a) - spots.indexOf(b));

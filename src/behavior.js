@@ -14,6 +14,7 @@ import { bfs, cellX, cellZ, inMain, nearestNode, walk } from './nav.js';
 import { _h } from './overlay.js';
 import { S } from './state.js';
 import { UGRID, _nearSep, alive, sideState, followField, place, roadK, slotOk, slowK, spd, stepToward } from './units.js';
+import { hitBridge } from './rules.js';
 
 // ---------- Órdenes ----------
 // Disposición de una tropa en formación. Coordenadas locales: x a la derecha, z hacia delante.
@@ -119,6 +120,7 @@ function playerUnit(u, dt) {
     return;
   }
   if (o?.type === 'attack') { if (strike(u, o.target, dt)) return; u.order = null; }
+  if (o?.type === 'demolish') { if ((u.think -= dt) <= 0) { u.think = .3; u.enemy = nearestEnemy(u, 3); } if (alive(u.enemy) && strike(u, u.enemy, dt)) return; hitBridge(u, o.b, dt); return; }   // derribar: se defienden si les atacan de cerca
   if ((u.think -= dt) <= 0) { u.think = .3; u.enemy = nearestEnemy(u, u.def.aggro); }
   if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
   if (o?.type === 'capture') {

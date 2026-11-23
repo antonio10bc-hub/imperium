@@ -64,10 +64,12 @@ export const visibleAt = (x, z) => !fogOn || seen[fogIdx(x, z)] === 1;
 export function toggleFog() {
   fogOn = !fogOn;
   if (fogOn) updateFog(true);
-  else { fogData.fill(255); fogTex.needsUpdate = true; markMiniDirty(); for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; for (const u of units) u.g.visible = true; refreshKnownTowns(true); }
+  else { fogData.fill(255); fogTex.needsUpdate = true; markMiniDirty(); for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; showRuleProps(); for (const u of units) u.g.visible = true; refreshKnownTowns(true); }
   toast(fogOn ? 'NIEBLA DE GUERRA: SÍ · N' : 'NIEBLA DE GUERRA: NO · N'); sfx('select');
 }
-export function resetFog(on) { ensureFogSize(); fogOn = on; explored.fill(0); expF.fill(0); fogData.fill(255); if (on) updateFog(true); else { fogTex.needsUpdate = true; for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; } }
+export function resetFog(on) { ensureFogSize(); fogOn = on; explored.fill(0); expF.fill(0); fogData.fill(255); if (on) updateFog(true); else { fogTex.needsUpdate = true; for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; showRuleProps(); } }
+// sin niebla: puentes, cofres y lava se ven siempre (si existen)
+function showRuleProps() { for (const b of R.bridges) b.group.visible = b.built; for (const t of R.treasures || []) t.g.visible = !t.taken; if (R.lava) R.lava.visible = true; }
 
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
 export function init() { ensureFogSize();
