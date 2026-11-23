@@ -154,7 +154,8 @@ export function terrainColor(x, z) {
   const i = idx(x, z), h = HM[i], cx = x + .5, cz = z + .5;
   const pc = groundPaint(cx, cz); if (pc >= 0) return pc;
   const side = sideAt(cx, cz), B = civOf(side).map, gt = GEOT[i];
-  if (roadCell && roadCell[i]) return h <= 1 ? TP.ford : B.road;
+  if (roadCell && roadCell[i]) { const rc = h <= 1 ? TP.ford : B.road; if (roadCell[i] === 1) return rc;   // borde difuminado del camino: mitad camino, mitad suelo
+    const t2 = n2(cx, cz, .045, 3, 21 + side * 7), g2 = B.ground[THREE.MathUtils.clamp(Math.floor((t2 - .34) / .09), 0, 3)]; return mixHex(rc, g2, .5); }
   if (gt === 1) return B.lush;
   if (gt === 2) { const w = n2(cx, cz, .12, 2, 71) > .55; return h <= 1 ? (w ? 0xb8ccc0 : 0xd6cca0) : (w ? 0x6c9a92 : 0x6a8a5a); }   // bajío / pantano: manchas grandes, sin moteado
   if (gt === 3) return B.sand;
@@ -298,6 +299,15 @@ export function generate(newSeed, tries = 0) {
   }
   regions = spots.filter(s => s.kind === 'base' || s.kind === 'town');
   regions.forEach((s, r) => { s.region = r; });
+  if (!ocean.userData.fogged) {   // el mar de fondo también lleva niebla: si no, asomaba por las rendijas entre trozos del terreno
+    ocean.userData.fogged = true; const m = ocean.material;
+    m.onBeforeCompile = sh => { sh.uniforms.uFog = fogU.uFog;
+      sh.vertexShader = 'varying vec2 vFogP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vFogP = (modelMatrix * vec4(transformed, 1.)).xz;');
+      sh.fragmentShader = 'uniform sampler2D uFog; uniform vec2 uMap; varying vec2 vFogP;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  float fv = texture2D(uFog, clamp(vFogP / uMap, 0., 1.)).r; gl_FragColor.rgb = mix(vec3(.075, .09, .12), gl_FragColor.rgb * mix(.58, 1., smoothstep(.47, 1., fv)), smoothstep(.0, .47, fv));');
+      sh.uniforms.uMap = ocean.userData.uMap = { value: new THREE.Vector2(MW, MD) }; };
+    m.needsUpdate = true;   // recompilar con la niebla (el material ya se había usado en el menú)
+  }
+  if (ocean.userData.uMap) ocean.userData.uMap.value.set(MW, MD);
   ocean.material.color.setHex(geoR?.sea ? 0x2f6fa8 : TP.outside);
   regionCell = new Int8Array(N);
   for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) regionCell[idx(x, z)] = regionAt(x + .5, z + .5);
@@ -325,10 +335,15 @@ function buildRoads() {
   for (const [a, b] of edges) {
     const f = F[a], A = Rg[a]; let v = Rg[b].node;
     for (let guard = 0; f[v] > 0 && f[v] < 1e9 && guard < 5000; guard++) {
-      const x = v % MW; let best = -1, bd = 1e9;
-      for (let k = 0, m = stepMask[v]; k < 8; k++) { if (!(m >> k & 1)) continue; const j = v + NBO[k]; if (f[j] !== f[v] - 1) continue; const d = (cellX(j) - A.x) ** 2 + (cellZ(j) - A.z) ** 2; if (d < bd) { bd = d; best = j; } }
+      const x = v % MW, z = (v / MW) | 0; let best = -1, bd = 1e9;
+      // entre las casillas que acercan al destino, elige con un poco de ruido: el camino serpentea en vez de ir recto
+      for (let k = 0, m = stepMask[v]; k < 8; k++) { if (!(m >> k & 1)) continue; const j = v + NBO[k]; if (f[j] !== f[v] - 1) continue; const d = Math.sqrt((cellX(j) - A.x) ** 2 + (cellZ(j) - A.z) ** 2) + (n2(cellX(j), cellZ(j), .06, 2, 91 + a) - .5) * 9; if (d < bd) { bd = d; best = j; } }
       if (best < 0) break;
-      roadCell[v] = 1; for (const j of [v + 1, v + MW]) if (j < N && (j !== v + 1 || x + 1 < MW) && HM[j] > 0 && walk[j]) roadCell[j] = 1;   // siempre dos casillas de ancho (los tramos rectos salían más finos)
+      // ancho irregular: el centro casi siempre es camino; los bordes a veces se difuminan o desaparecen, y en algunos tramos se ensancha
+      const w = n2(x, z, .09, 2, 97), mark = (j, faded) => { if (j >= 0 && j < N && HM[j] > 0 && walk[j] && roadCell[j] !== 1) roadCell[j] = faded ? 2 : 1; };
+      mark(v, hash(x, 17, z) < .08);
+      if (x + 1 < MW) mark(v + 1, w < .45); mark(v + MW, w < .35 || hash(x, 19, z) < .2);
+      if (w > .68 && x > 0) mark(v - 1, true); if (w > .74) mark(v - MW, true);
       v = best;
     }
   }

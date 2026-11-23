@@ -13,6 +13,7 @@ import { GEOT, HM, forts, geoR, roadCell, scen, spots } from './map.js';
 import { blocked, refreshCells, walk } from './nav.js';
 import { rngOf, seed } from './noise.js';
 import { bake, basic, part, world } from './render.js';
+import { visibleAt } from './fog.js';
 
 // ---------- clima ----------
 const KIND = { delta: 'fog', ruinas: 'fog', oasis: 'sand', cordillera: 'snow', helado: 'snow', lago: 'ash' };
@@ -74,7 +75,7 @@ function makeFlock() {
 }
 export function updateLife(dt) {
   if (!HM || dt <= 0) return;
-  if (flock) { flock.t += dt; flock.g.position.addScaledVector(flock.v, dt); flock.birds.forEach((b, i) => { b.scale.y = 1 + Math.sin(flock.t * 12 + i) * .8; b.scale.x = .75 + Math.abs(Math.sin(flock.t * 12 + i)) * .5; });
+  if (flock) { flock.t += dt; flock.g.position.addScaledVector(flock.v, dt); flock.g.visible = visibleAt(flock.g.position.x, flock.g.position.z);   // los pájaros no se ven sobre la niebla flock.birds.forEach((b, i) => { b.scale.y = 1 + Math.sin(flock.t * 12 + i) * .8; b.scale.x = .75 + Math.abs(Math.sin(flock.t * 12 + i)) * .5; });
     if (flock.t > 22) { world.remove(flock.g); flock.g.children.forEach(b => b.geometry.dispose()); flock = null; } }
   else if ((lifeT.bird -= dt) <= 0) { lifeT.bird = 18 + fxRand() * 25; flock = makeFlock(); }
   if (vents.length && (lifeT.steam -= dt) <= 0) { lifeT.steam = .18; const [x, z, y, lava] = vents[fxRand() * vents.length | 0]; plume(new THREE.Vector3(x + fxRand() - .5, y, z + fxRand() - .5), fxRand() < .6 ? 0xf4f4f0 : 0xd8d8d4, lava ? 1.1 : .7, 2.4, lava ? 2.2 : 1.6, -.3); }

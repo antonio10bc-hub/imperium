@@ -16,7 +16,8 @@ import { burst, dropBox, ping, plume, takeBox } from './effects.js';
 import { refreshFields, toast } from './game.js';
 import { GEOT, HM, bridgeSites, geoR, removeTrees, roadCell, scen, spots, treeCell } from './map.js';
 import { bfs, blocked, cellX, cellZ, nearestOpen, refreshCells } from './nav.js';
-import { bake, mat, part, world } from './render.js';
+import { bake, fogU, mat, part, world } from './render.js';
+import { exploredAt } from './fog.js';
 import { UGRID, followField, sideState, stepToward, units } from './units.js';
 
 export const R = { debris: [], half: {}, on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false };
@@ -76,7 +77,13 @@ function waterLayer(cells, color = 0x5fb0d4) {
   const p = [], ix = [];
   for (const c of cells) { const x = c % MW, z = (c / MW) | 0, y = HM[c] + .07, v = p.length / 3; p.push(x, y, z, x + 1, y, z, x + 1, y, z + 1, x, y, z + 1); ix.push(v, v + 2, v + 1, v, v + 3, v + 2); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setIndex(ix); g.computeBoundingSphere();
-  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .92, depthWrite: false })); m.visible = false; m.userData.own = true; m.renderOrder = 1;
+  const mt = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .92, depthWrite: false });
+  mt.onBeforeCompile = sh => {   // donde no se ha explorado, el agua no se ve (la niebla la tapa)
+    sh.uniforms.uFog = fogU.uFog;
+    sh.vertexShader = 'varying vec2 vFogP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vFogP = (modelMatrix * vec4(transformed, 1.)).xz;');
+    sh.fragmentShader = 'uniform sampler2D uFog; varying vec2 vFogP;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', `#include <dithering_fragment>\n  gl_FragColor.a *= smoothstep(.3, .47, texture2D(uFog, vFogP / vec2(${MW}., ${MD}.)).r);`);
+  };
+  const m = new THREE.Mesh(g, mt); m.visible = false; m.userData.own = true; m.renderOrder = 1;
   world.add(m); R.meshes.push(m); return m;
 }
 
@@ -183,7 +190,7 @@ export function breakBridge(side, b) {
   setBridge(b, false); b.group.visible = true; b.fallT = .7;   // se hunde y luego se esconde
   // derrumbe: trozos del puente caen al agua y salpican
   const cols = b.style === 'rope' ? [0x8a5a34, 0x6a4224, 0xc8b080] : b.style === 'wood' ? [0x8a5a34, 0x6a4224] : [0xb0aca0, 0x8e8a80, 0x9a968c];
-  for (let k = 0; k < 34; k++) { const m = takeBox(cols[k % cols.length]), sz = .3 + Math.random() * .5; m.scale.set(sz * (1 + Math.random()), sz * .6, sz); m.position.set(b.x0 + Math.random() * (b.x1 - b.x0), b.hb + .3, b.z + (Math.random() - .5) * (b.z1 - b.z0));
+  for (let k = 0; k < 34; k++) { const m = takeBox(cols[k % cols.length]), sz = .3 + Math.random() * .5; m.visible = exploredAt(b.x, b.z); m.scale.set(sz * (1 + Math.random()), sz * .6, sz); m.position.set(b.x0 + Math.random() * (b.x1 - b.x0), b.hb + .3, b.z + (Math.random() - .5) * (b.z1 - b.z0));
     R.debris.push({ m, v: new THREE.Vector3((Math.random() - .5) * 3, 1 + Math.random() * 3, (Math.random() - .5) * 3), r: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6), t: 3 }); }
   burst(new THREE.Vector3(b.x, b.hb, b.z), cols, 24, 4, 4, 1.2, .3, true); plume(new THREE.Vector3(b.x, b.hb, b.z), 0x8a8a86, 2.2, 2, 1.5, -.6, true);
   toast(side === 0 ? '¡HAS DERRIBADO EL PUENTE!' : side === 1 ? '¡EL RIVAL HA DERRIBADO UN PUENTE!' : 'UN PUENTE SE HA DERRUMBADO', side === 0 ? 'good' : 'bad', b); sfx('lost');
@@ -323,7 +330,7 @@ function updateVolcano(dt) {
   v.t -= dt;
   if (v.phase === 'erupt' && (v.bt = (v.bt ?? 0) - dt) <= 0) {   // bombas de lava alrededor del volcán
     v.bt = .18; const a = Math.random() * 6.28, r = 6 + Math.random() * 26, x = v.x + Math.cos(a) * r, z = v.z + Math.sin(a) * r, i = idx(Math.max(0, Math.min(MW - 1, x | 0)), Math.max(0, Math.min(MD - 1, z | 0)));
-    const to = new THREE.Vector3(x, Math.max(0, HM[i]) + .3, z), T = 1.4, m = takeBox(Math.random() < .5 ? 0xff7a1a : 0xffc83a);   // bomba de lava en arco
+    const to = new THREE.Vector3(x, Math.max(0, HM[i]) + .3, z), T = 1.4, m = takeBox(Math.random() < .5 ? 0xff7a1a : 0xffc83a); m.visible = exploredAt(v.x, v.z);   // bomba de lava en arco (no se ve si el volcán no se ha explorado)
     m.scale.setScalar(.7); m.position.copy(top); R.bombs.push({ to, t: T, m, v: new THREE.Vector3((to.x - top.x) / T, (to.y - top.y + 4.5 * T * T) / T, (to.z - top.z) / T) });
   }
   for (let k = R.bombs.length - 1; k >= 0; k--) { const b = R.bombs[k];
