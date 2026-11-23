@@ -213,10 +213,11 @@ button.alt{background:var(--paper)}
   <ul>
     <li>Pulsa el <b>CUARTEL</b> (el edificio de madera de tu fortaleza) para reclutar desde la barra inferior.</li>
     <li>Los <span class="g">pueblos</span> dan oro, tienen una torre y se pueden mejorar. Los caminos dan velocidad y el río solo se cruza por los vados.</li>
-    <li>Algunos pueblos son <b>FORTIFICADOS</b> (escudo encima): más grandes y con diez defensores que atacan a quien se acerque y vuelven a su puesto. Hay que acabar con ellos para conquistarlos; dan el doble de oro.</li>
+    <li>Algunos pueblos son <b>FORTIFICADOS</b> (escudo encima): más grandes y con veinte defensores (muchos veteranos) que atacan a quien se acerque y vuelven a su puesto. Hay que acabar con ellos para conquistarlos; dan el doble de oro.</li>
     <li>Los dos <b>CAMPAMENTOS</b> tienen guardianes neutrales. Derrótalos y conquístalos: te darán jinetes arqueros, hasta 20 por campamento.</li>
     <li>Elige el <b>MAPA</b>: once geografías (río, cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto y caldera). Los pantanos y bajíos frenan, sobre todo a los jinetes; el bosque denso no se atraviesa; los arqueros desde dos niveles por encima llegan más lejos y hacen más daño; la cima de la meseta da oro doble.</li>
     <li>Elige tu <b>CIVILIZACIÓN</b> y la del rival en el menú (o al azar). Todas juegan igual: cambian el aspecto, los edificios y los nombres de las tropas.</li>
+    <li>Las murallas de tu fortaleza disparan flechas a los enemigos que se acercan. Puedes tener hasta 3 <b>HÉROES</b>; <b>G</b> pasa de uno a otro.</li>
     <li>Invoca un <b>HÉROE</b> en el altar. Asígnale hasta 50 tropas: formarán delante de él en bloque, línea o cuña.</li>
     <li>La niebla de guerra oculta lo que no has explorado. Las tropas suben de rango al matar y se curan en tus regiones.</li>
   </ul>
@@ -261,8 +262,8 @@ const RANKS = [{ name: '', kills: 0, mul: 1 }, { name: 'BRONCE', kills: 2, mul: 
   { name: 'PLATA', kills: 5, mul: 1.25, hex: 0xb4afa2, css: '#b4afa2' }, { name: 'ORO', kills: 10, mul: 1.4, hex: 0xe8c870, css: '#e8c870' }];
 const TYPES = ['sword', 'bow', 'horse'], ALLT = ['hero', 'sword', 'bow', 'horse', 'harcher'];
 const RANGED = t => t === 'bow' || t === 'harcher';
-const GAME = { startGold: 150, income: 3, townIncome: 1.5, baseHp: 1500, cap: 80, towns: 16, capture: 4, queueMax: 8, bounty: 6,
-  campGen: 14, campMax: 20, campGuards: 6, fortGuards: 10, heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4 };
+const GAME = { startGold: 220, income: 1, townIncome: 1.8, baseHp: 1500, cap: 80, towns: 16, capture: 4, queueMax: 30, bounty: 6, maxHeroes: 3, wallShooters: 12, wallRange: 10, wallDmg: 7, wallCd: 1.6,
+  campGen: 14, campMax: 20, campGuards: 6, fortGuards: 20, heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4 };
 const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, label: 'FÁCIL' }, normal: { inc: 1, attackAt: 5, hero: true, label: 'NORMAL' }, hard: { inc: 1.3, attackAt: 4, hero: true, label: 'DIFÍCIL' } };
 const BASE0 = 0, BASE1 = 1, BARR0 = 2, BARR1 = 3, ALT0 = 4, ALT1 = 5, TOWN0 = 6;
 const TOWN_NAMES = ['VILLAROCA', 'PINARES', 'ALBAMAR', 'ROBLEDO', 'FUENTEVIEJA', 'MONTEALTO', 'LAGUNILLA', 'PEÑASCO', 'VALDEORO', 'SALINAS', 'TORRENUEVA', 'ARENALES', 'CASTROVERDE', 'OLMEDA', 'MIRAFLORES', 'ROCAFRÍA', 'VADOHONDO', 'LOS LLANOS'];
@@ -1427,6 +1428,7 @@ function place(u) {
   u.g.position.copy(u.pos); u.g.rotation.y = Math.atan2(u.fwd.x, u.fwd.z);
   u.body.position.set(0, u.moving ? Math.abs(Math.sin(u.bob)) * .12 : 0, u.lunge * .35);
   u.hitT = Math.max(0, (u.hitT || 0) - .016); u.body.rotation.x = u.lunge * .45 - u.hitT * 2.2;   // se inclina al golpear y retrocede al recibir
+  if (u.capT > 0) { u.capT -= .016; u.body.position.y += Math.abs(Math.sin(performance.now() / 120 + u.id * 1.7)) * .5; }   // salto de conquista
   const fl = u.flash > 0; if (fl !== u.flashOn) { u.flashOn = fl; for (const m of u.fills) { m.userData.m ??= m.material; m.material = fl ? FLASH : m.userData.m; } }
   const s = sel.has(u); u.selR.visible = s; if (s) u.selR.scale.setScalar(1 + Math.sin(performance.now() / 120) * .06);
 }
@@ -1585,11 +1587,18 @@ function raiseAlarm(loc, msg) {
   toast(msg + ' · ESPACIO', 'bad', loc); sfx('alarm');
   const a = $('alarm'); a.classList.remove('on'); void a.offsetWidth; a.classList.add('on');
 }
+const METAL = [0, 0xb87333, 0xd4d8e2, 0xf2c23a];
+// tiñe la tropa del metal de su rango; las piezas del color del bando se quedan como están para seguir sabiendo de quién es
+function applyRank(u) {
+  if (!u.rank) return; const team = TEAM[u.side]?.c, R1 = RANKS[u.rank];
+  for (const m of u.fills) { const base = m.userData.base ??= (m.userData.m || m.material).color.getHex(); if (base === team) continue; const nm = mat(mixHex(base, METAL[u.rank], .58)); m.userData.m = nm; if (!u.flashOn) m.material = nm; }
+  u.crest.children[0].material = mat(R1.hex); u.crest.visible = true;
+}
 function promote(u) {   // veteranía: bronce, plata y oro
   while (u.rank < 3 && u.kills >= RANKS[u.rank + 1].kills) {
     u.rank++; const R1 = RANKS[u.rank];
     setMax(u); u.hp = Math.min(u.maxHp, u.hp + u.maxHp * .25);
-    u.crest.children[0].material = mat(R1.hex); u.crest.visible = true;
+    applyRank(u);
     burst(u.pos, [R1.hex, 0xffffff], 14, 2.5, 4, .8, .2);
     if (u.vis) { floatText(u.pos.clone().setY(u.pos.y + (u.type === 'hero' ? 4.8 : 3)), '¡' + R1.name + '!', R1.css, 10); if (u.side === 0) sfx('rank'); }
   }
@@ -1622,7 +1631,7 @@ function kill(u, by) {
   if (u.home) u.home.guards--;
   if (u.type === 'hero') {
     for (const e of [...u.escort]) unassign(e);
-    sideState[u.side].hero = { state: 'dead', t: GAME.heroRespawn };
+    sideState[u.side].heroQ.push({ state: 'dead', t: GAME.heroRespawn });
     toast(u.side === 0 ? 'TU HÉROE HA CAÍDO' : '¡EL HÉROE RIVAL HA CAÍDO!', u.side === 0 ? 'bad' : 'good', u.pos);
     burst(u.pos, [0xffd23f, 0xffffff, TEAM[u.side].c], 26, 5, 5, 1, .3);
   }
@@ -1784,7 +1793,7 @@ function playerUnit(u, dt) {
   if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
   if (o?.type === 'capture') {
     const s = spots[o.k]; if (s.owner === 0) { u.order = null; return; }
-    spreadTo(u, s.x, s.z, fields[o.k], .5, s.fortified ? 1.1 : .95, dt);
+    spreadTo(u, s.x, s.z, fields[o.k], 0, 0, dt, capR(s) - .8);   // repartidas, pero siempre dentro del círculo de conquista
   } else if (o?.type === 'siege') siege(u, spots[BASE1], dt);
 }
 // guardianes de los campamentos: defienden su zona y vuelven a ella
@@ -1797,10 +1806,10 @@ function guardUnit(u, dt) {
   else if (d <= .4) u.fwd.lerp(_h.set(u.pos.x - s.x, 0, u.pos.z - s.z).normalize(), .05).normalize();   // mirando hacia fuera
 }
 // cada tropa ociosa ocupa su propio sitio en un girasol alrededor del punto (ángulo áureo y radio según la raíz de su índice): repartidas, sin montones
-function spreadTo(u, cx, cz, field, r0, k, dt) {
-  const key = cx + ',' + cz;
+function spreadTo(u, cx, cz, field, r0, k, dt, disc = 0) {
+  const key = cx + ',' + cz + ',' + disc;
   if (u.spreadKey !== key) {   // el sitio se calcula una vez por destino; si cae en una casilla bloqueada o tras un muro, el más cercano que sí valga
-    const i = u.id % 36, a = i * 2.39996, r = r0 + k * Math.sqrt(i); let tx = cx + Math.cos(a) * r, tz = cz + Math.sin(a) * r, c = cellOf(tx, tz);
+    const i = u.id % 36, a = i * 2.39996, r = disc ? disc * Math.sqrt(.06 + ((u.id * .618034) % 1) * .94) : r0 + k * Math.sqrt(i); let tx = cx + Math.cos(a) * r, tz = cz + Math.sin(a) * r, c = cellOf(tx, tz);
     if (!slotOk(field, c, r * 1.6 + 3)) { let best = -1, bd = 1e9; const x0 = Math.floor(tx), z0 = Math.floor(tz);
       for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) { const xx = x0 + dx, zz = z0 + dz; if (xx < 0 || zz < 0 || xx >= MW || zz >= MD) continue; const j = idx(xx, zz), dd = dx * dx + dz * dz; if (dd < bd && slotOk(field, j, r * 1.6 + 3 + Math.sqrt(dd))) { bd = dd; best = j; } }
       if (best >= 0) { tx = cellX(best) + (tx % 1 - .5) * .6; tz = cellZ(best) + (tz % 1 - .5) * .6; } }
@@ -1823,13 +1832,13 @@ function aiUnit(u, dt) {
   // Cada tropa se compromete con su objetivo y solo lo replantea cada pocos segundos o al conquistarlo (antes lo cambiaba a cada paso y se quedaba clavada a medio camino)
   const valid = t => t >= TOWN0 && spots[t] && spots[t].owner !== 1 && (u.bigArmy || !(spots[t].fortified && spots[t].guards > 0));
   if ((u.aiReT = (u.aiReT ?? 0) - dt) <= 0 || !valid(u.aiT)) {
-    u.aiReT = 5 + (u.id % 5); u.bigArmy = units.filter(o => o.side === 1 && o.type !== 'hero').length >= 14;
+    u.aiReT = 5 + (u.id % 5); u.bigArmy = units.filter(o => o.side === 1 && o.type !== 'hero').length >= 24;
     let bt = -1, bv = 1e9, st = -1, sv = 1e9;
     for (let t = TOWN0; t < spots.length; t++) if (valid(t)) { const v = fields[t][u.node]; if (v < bv) { st = bt; sv = bv; bt = t; bv = v; } else if (v < sv) { st = t; sv = v; } }
     u.aiT = u.id % 2 && st >= 0 && sv < bv * 2.5 + 20 ? st : bt; u.aiV = u.aiT === st ? sv : bv;
   }
   const bs = spots[u.aiT];
-  if (bs && (u.aiV < 90 || u.type !== 'hero')) spreadTo(u, bs.x, bs.z, fields[u.aiT], .5, bs.fortified ? 1.1 : .95, dt);   // dentro del círculo de conquista, sin amontonarse
+  if (bs && (u.aiV < 90 || u.type !== 'hero')) spreadTo(u, bs.x, bs.z, fields[u.aiT], 0, 0, dt, capR(bs) - .8);   // dentro del círculo de conquista, sin amontonarse
   else siege(u, spots[BASE0], dt);
 }
 function updateUnit(u, dt) {
@@ -1869,11 +1878,14 @@ function enqueue(side, type) {
   return true;
 }
 function cancelQueue(i) { const st = sideState[0], q = st.queue[i]; if (!q) return; st.gold += UNITS[q.type].cost; st.queue.splice(i, 1); sfx('deny'); refreshPanel(); }
-function heroOf(side) { return units.find(u => u.side === side && u.type === 'hero'); }
+const heroesOf = side => units.filter(u => u.side === side && u.type === 'hero');
+const heroCount = side => heroesOf(side).length + sideState[side].heroQ.length;   // vivos + en camino + esperando a volver tras caer
+// el héroe "activo": para ti, el seleccionado (o el primero); para la IA, el primero
+function heroOf(side) { if (side === 0) { const hs = [...sel].find(u => u.type === 'hero' && u.side === 0 && !u.dead); if (hs) return hs; } return units.find(u => u.side === side && u.type === 'hero'); }
 function summonHero(side) {
-  const st = sideState[side], h = st.hero;
-  if (state !== 'play' || (h && h.state !== 'none') || st.gold < UNITS.hero.cost) { if (side === 0) sfx('deny'); return false; }
-  st.gold -= UNITS.hero.cost; st.hero = { state: 'training', t: UNITS.hero.time };
+  const st = sideState[side];
+  if (state !== 'play' || heroCount(side) >= GAME.maxHeroes || st.gold < UNITS.hero.cost) { if (side === 0) sfx('deny'); return false; }
+  st.gold -= UNITS.hero.cost; st.heroQ.push({ state: 'training', t: UNITS.hero.time });
   if (side === 0) { sfx('select'); track('hero_summon'); refreshPanel(); }
   return true;
 }
@@ -1888,13 +1900,12 @@ function updateProduction(dt) {
         burst(u.pos, [0xffffff, TEAM[side].l], 6, 1.5, 2, .4, .16);
       }
     }
-    const h = st.hero;
-    if (h && (h.state === 'training' || h.state === 'dead')) {
-      h.t -= dt;
+    for (let i = st.heroQ.length - 1; i >= 0; i--) {
+      const h = st.heroQ[i]; h.t -= dt;
       if (h.t <= 0) {
-        if (h.state === 'dead') st.hero = { state: 'none' };
-        else {
-          const u = spawnUnit(side, 'hero', ALT0); st.hero = { state: 'alive' };
+        st.heroQ.splice(i, 1);
+        if (h.state === 'training') {
+          const u = spawnUnit(side, 'hero', ALT0);
           burst(u.pos, [0xffd23f, 0xffffff, TEAM[side].c], 24, 3, 6, 1, .26); ping(u.pos, '#e8c870');
           toast(side === 0 ? '¡TU HÉROE HA LLEGADO!' : 'EL RIVAL TIENE UN HÉROE', side === 0 ? 'good' : 'bad', side === 0 ? u.pos : null); sfx('hero');
         }
@@ -1928,7 +1939,7 @@ function newGame(s) {
     spawnGuards(); makeThumbs();
     regions.forEach((_, r) => paintRegion(r));
     fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2));
-    for (const st of sideState) Object.assign(st, { gold: GAME.startGold, queue: [], hero: { state: 'none' } });
+    for (const st of sideState) Object.assign(st, { gold: GAME.startGold, queue: [], heroQ: [] });
     aiStance = 'defend'; elapsed = 0; selBld = null; selSpot = null; alarm = { t: 0, pos: null, cool: 0 }; paused = false; speed = 1; syncTools();
     focusOn(spots[BASE0].x, spots[BASE0].z, true);
     $('mt').textContent = GAME.towns; $('cap').textContent = GAME.cap;
@@ -1977,28 +1988,45 @@ function campSpawn(s) {   // el campamento da jinetes arqueros a su dueño, hast
   if (own === 0) { floatText(spotPos(s, 4.5), 'JINETE ARQUERO', '#8ad8f0', 9); refreshPanel(); }
 }
 function spawnGuards() {
-  const post = (s, x, z, type, a) => { const n = nearestNode(x, z), u = spawnAt(2, type, cellX(n), cellZ(n), a); u.home = s; u.post = [cellX(n), cellZ(n)]; s.guards = (s.guards || 0) + 1; };
+  const post = (s, x, z, type, a) => { const n = nearestNode(x, z), u = spawnAt(2, type, cellX(n), cellZ(n), a); u.home = s; u.post = [cellX(n), cellZ(n)]; s.guards = (s.guards || 0) + 1; return u; };
   for (const s of spots) {
     if (s.camp) for (let k = 0; k < GAME.campGuards; k++) { const a = k / GAME.campGuards * 6.28; post(s, s.x + Math.cos(a) * 2.2, s.z + Math.sin(a) * 2.2, k % 2 ? 'harcher' : 'sword', a); }
-    if (s.fortified) { const T = ['sword', 'bow', 'sword', 'horse', 'bow', 'sword', 'horse', 'bow', 'sword', 'sword'];   // cuatro dentro, el resto en corro alrededor
-      for (let k = 0; k < GAME.fortGuards; k++) { const inner = k < 4, a = (inner ? k / 4 : (k - 4) / (GAME.fortGuards - 4)) * 6.28 + (inner ? .4 : 0), r = inner ? 2.6 : 7; post(s, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, T[k], a); } }
+    if (s.fortified) { const T = ['sword', 'bow', 'sword', 'horse', 'bow'];   // seis dentro y el resto en dos corros alrededor; muchos son veteranos
+      for (let k = 0; k < GAME.fortGuards; k++) { const ring = k < 6 ? 0 : k < 14 ? 1 : 2, n = [6, 8, GAME.fortGuards - 14][ring], j = k - [0, 6, 14][ring], a = j / n * 6.28 + ring * .4, r = [2.6, 6.6, 9.2][ring];
+        const u = post(s, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, T[k % 5], a); u.rank = k % 4 === 0 ? 2 : k % 2 ? 1 : 0; if (u.rank) { setMax(u); u.hp = u.maxHp; applyRank(u); } } }
+  }
+}
+const capR = s => s.fortified ? 5.7 : 3.9;   // radio del círculo de conquista
+// arqueros en las murallas: varios puntos del recinto disparan a los enemigos que se acercan
+function castleDefense(dt) {
+  for (const f of forts) {
+    if (!f.shooters) { f.shooters = []; for (let k = 0; k < GAME.wallShooters; k++) { const th = k / GAME.wallShooters * Math.PI * 2, p = fortPt(f, wallR(f, th), th); f.shooters.push({ x: p.x, z: p.z, cd: Math.random() * GAME.wallCd }); } }
+    for (const sh of f.shooters) {
+      if ((sh.cd -= dt) > 0) continue;
+      let best = null, bd = GAME.wallRange;
+      for (const u of units) if (u.side !== f.side) { const d = Math.hypot(u.pos.x - sh.x, u.pos.z - sh.z); if (d < bd) { bd = d; best = u; } }
+      if (!best) { sh.cd = .35; continue; }
+      sh.cd = GAME.wallCd; const from = new THREE.Vector3(sh.x, Math.round(f.h) + 2.2, sh.z);
+      shoot(from, best.pos, 0); damage({ side: f.side, vis: seenAt(from), def: {} }, best, GAME.wallDmg);
+    }
   }
 }
 function updateTowns(dt) {
   for (let k = TOWN0; k < spots.length; k++) {
     const s = spots[k], p = spotPos(s), here = [0, 0, 0];
-    for (const u of units) if (u.pos.distanceTo(p) < (s.fortified ? 5.7 : 3.9)) here[u.side]++;
+    const inside = units.filter(u => u.pos.distanceTo(p) < capR(s)); for (const u of inside) here[u.side]++;
+    const cheer = sd => { for (const u of inside) if (u.side === sd && !u.enemy) u.capT = .25; };   // los que conquistan saltan en el sitio
     if ((s.camp || s.fortified) && s.owner === -1 && s.guards > 0) { s.prog = [0, 0]; continue; }   // hay que acabar antes con los defensores
     if (s.camp && s.owner >= 0 && (s.genT -= dt) <= 0) { s.genT = GAME.campGen; campSpawn(s); }
     if (s.owner === -1) {
       for (const sd of [0, 1]) {
-        if (here[sd] && !here[1 - sd]) s.prog[sd] += dt / GAME.capture; else s.prog[sd] = Math.max(0, s.prog[sd] - dt / GAME.capture / 2);
+        if (here[sd] && !here[1 - sd]) { s.prog[sd] += dt / GAME.capture; cheer(sd); } else s.prog[sd] = Math.max(0, s.prog[sd] - dt / GAME.capture / 2);
         if (s.prog[sd] >= 1 && s.owner === -1) { s.prog = [0, 0]; setOwner(s, sd); }
       }
     } else {
       const own = s.owner, en = 1 - own;
       if (here[en] && !here[own]) {
-        s.lose += dt / (GAME.capture * 2);
+        s.lose += dt / (GAME.capture * 2); cheer(en);
         if (own === 0) raiseAlarm(p, `¡TE ESTÁN QUITANDO ${s.name}!`);
         if (s.lose >= 1) { s.lose = 0; setOwner(s, -1); }
       } else s.lose = Math.max(0, s.lose - dt / GAME.capture);
@@ -2013,14 +2041,14 @@ function updateTowns(dt) {
 function updateAI() {
   const Df = DIFF[diff], mine = units.filter(u => u.side === 1 && u.type !== 'hero'), theirs = units.filter(u => u.side === 0);
   const count = t => theirs.filter(u => u.type === t).length, st = sideState[1];
-  const saving = Df.hero && st.hero.state === 'none' && mine.length >= 4;   // ahorra para el héroe
-  if (Df.hero && st.hero.state === 'none' && mine.length >= 3 && st.gold >= UNITS.hero.cost) summonHero(1);
+  const wantH = Df.hero ? Math.min(GAME.maxHeroes, 1 + Math.floor(mine.length / 10)) : 0, hc = heroCount(1);
+  const saving = hc < wantH && mine.length >= 4;   // ahorra para el siguiente héroe
+  if (hc < wantH && mine.length >= 3 && st.gold >= UNITS.hero.cost) summonHero(1);
   else if (!saving && st.queue.length < 2 && st.gold >= UNITS[aiNext].cost && enqueue(1, aiNext)) {
     const r = Math.random();
     aiNext = count('bow') > count('sword') && r < .6 ? 'horse' : count('horse') > count('bow') && r < .6 ? 'sword' : count('sword') > count('horse') && r < .6 ? 'bow' : TYPES[r * 3 | 0];
   }
-  const h = heroOf(1);
-  if (h) {   // escolta en formación: hasta 20 tropas, en cuña para atacar y en bloque para defender
+  for (const h of heroesOf(1)) {   // escolta en formación para cada héroe: hasta 20 tropas, en cuña para atacar y en bloque para defender
     h.formShape = aiStance === 'attack' ? 'wedge' : 'block';
     if (h.escort.length < 20) { const free = mine.filter(u => !u.leader && !u.retreat).sort((a, b) => a.pos.distanceTo(h.pos) - b.pos.distanceTo(h.pos)); if (free.length > 1) assign(free[0], h); }
   }
@@ -2036,7 +2064,7 @@ function updateGame(dt) {
   for (const sd of [0, 1]) sideState[sd].gold += incomeOf(sd) * dt * (sd === 1 ? DIFF[diff].inc : 1);
   updateAI(); updateProduction(dt);
   for (const u of [...units]) if (!u.dead) updateUnit(u, dt);
-  updateTowns(dt);
+  updateTowns(dt); castleDefense(dt);
   for (let i = arrows.length - 1; i >= 0; i--) {
     const a = arrows[i]; a.t += dt * 4; const k = Math.min(1, a.t);
     a.m.position.copy(a.a).lerp(a.b, k); a.m.position.y += Math.sin(k * Math.PI) * 1.2;
@@ -2053,7 +2081,7 @@ const GROUPS = [['hero', 'HÉROE'], ['sword', 'ESPADAS'], ['bow', 'ARCOS'], ['ho
 function groupUnits(k) {
   const mine = units.filter(u => u.side === 0);
   if (k === 'all') return mine;
-  if (k === 'hero') { const h = heroOf(0); return h ? [h, ...h.escort] : []; }
+  if (k === 'hero') return heroesOf(0).flatMap(h => [h, ...h.escort]);
   return mine.filter(u => u.type === k && !u.leader);
 }
 function pickGroup(i) {
@@ -2079,16 +2107,13 @@ const VS = { sword: 'VENCE A JINETE', bow: 'VENCE A ESPADA', horse: 'VENCE A ARC
 // Retrato del héroe a la izquierda (como en Imperium), con las tropas asignadas
 let heroesHtml = '';
 function renderHeroes() {
-  const h = sideState[0].hero, u = heroOf(0); let html = '';
-  if (u) {
-    const on = sel.has(u);
-    html = `<button type="button" class="hc${on ? ' on' : ''}" data-hero title="Héroe · clic: seleccionar con su escolta"><kbd>G</kbd><img alt="Héroe" src="${THUMB.hero || ''}"><span class="n">${u.escort.length}</span><i><b style="width:${pct(u.hp / u.maxHp)};background:${hpCol(u.hp / u.maxHp)}"></b></i></button>`;
-  } else if (h && (h.state === 'training' || h.state === 'dead')) {
-    html = `<button type="button" class="hc off" data-hero title="${h.state === 'dead' ? 'Tu héroe ha caído' : 'Tu héroe está en camino'}"><img alt="Héroe" src="${THUMB.hero || ''}"><span class="st">${Math.ceil(h.t)} S</span><i><b style="width:${pct(h.state === 'training' ? 1 - h.t / UNITS.hero.time : 0)};background:var(--yellow)"></b></i></button>`;
-  }
+  let html = '';
+  heroesOf(0).forEach((u, i) => { const on = sel.has(u);
+    html += `<button type="button" class="hc${on ? ' on' : ''}" data-hero="${u.id}" title="Héroe ${i + 1} · clic: seleccionar con su escolta"><kbd>${i ? i + 1 : 'G'}</kbd><img alt="Héroe" src="${THUMB.hero || ''}"><span class="n">${u.escort.length}</span><i><b style="width:${pct(u.hp / u.maxHp)};background:${hpCol(u.hp / u.maxHp)}"></b></i></button>`; });
+  for (const h of sideState[0].heroQ) html += `<button type="button" class="hc off" data-hero="0" title="${h.state === 'dead' ? 'Un héroe ha caído' : 'Un héroe está en camino'}"><img alt="Héroe" src="${THUMB.hero || ''}"><span class="st">${Math.ceil(h.t)} S</span><i><b style="width:${pct(h.state === 'training' ? 1 - h.t / UNITS.hero.time : 0)};background:var(--yellow)"></b></i></button>`;
   if (html !== heroesHtml) { heroesHtml = html; $('heroes').innerHTML = html; }
 }
-$('heroes').addEventListener('pointerdown', e => { if (e.button === 0 && e.target.closest('[data-hero]')) heroButton(); });
+$('heroes').addEventListener('pointerdown', e => { const b = e.button === 0 && e.target.closest('[data-hero]'); if (!b) return; const u = units.find(o => o.id === +b.dataset.hero); if (u) { setSelection([u, ...u.escort], false); follow = u; focusGoal = null; } else heroButton(); });
 
 // Panel de la barra inferior: vacío por defecto; muestra el edificio, el pueblo o las unidades seleccionadas
 let panelHtml = '';
@@ -2106,11 +2131,10 @@ function panelContent() {
     return `<div class="ph" title="Clic derecho en el mapa: punto de reunión"><h3>CUARTEL</h3><em>COLA ${st.queue.length}/${GAME.queueMax}</em><em>TROPAS ${popOf(0)}/${GAME.cap}</em></div>${cards}<div class="qu">${q || '<span class="none">COLA VACÍA</span>'}</div>`;
   }
   if (selBld === 'altar') {
-    const h = st.hero, u = heroOf(0); let btn, note;
-    if (u) { btn = `<button type="button" class="y" data-act="hero">SELECCIONAR HÉROE</button>`; note = `ESCOLTA ${u.escort.length}/${GAME.escortMax}`; }
-    else if (h.state === 'training') { btn = `<button type="button" disabled>EN CAMINO · ${Math.ceil(h.t)} S</button>`; note = 'LLEGA AL ALTAR'; }
-    else if (h.state === 'dead') { btn = `<button type="button" disabled>HA CAÍDO · ${Math.ceil(h.t)} S</button>`; note = 'VUELVE PRONTO'; }
-    else { btn = `<button type="button" class="y" data-act="summon" ${st.gold < UNITS.hero.cost ? 'disabled' : ''}>INVOCAR · ${UNITS.hero.cost} ORO</button>`; note = 'TARDA ' + UNITS.hero.time + ' S'; }
+    const n = heroCount(0), alive = heroesOf(0).length, tr = st.heroQ.filter(h => h.state === 'training'), dead = st.heroQ.filter(h => h.state === 'dead');
+    let btn = n < GAME.maxHeroes ? `<button type="button" class="y" data-act="summon" ${st.gold < UNITS.hero.cost ? 'disabled' : ''}>INVOCAR · ${UNITS.hero.cost} ORO</button>` : `<button type="button" disabled>MÁXIMO ${GAME.maxHeroes} HÉROES</button>`;
+    if (alive) btn = `<button type="button" data-act="hero">SELECCIONAR</button>` + btn;
+    const note = `HÉROES ${n}/${GAME.maxHeroes}` + (tr.length ? ` · LLEGA EN ${Math.ceil(tr[0].t)} S` : '') + (dead.length ? ` · VUELVE EN ${Math.ceil(dead[0].t)} S` : '');
     return `<div class="ph"><h3>ALTAR</h3><em>${note}</em></div><img class="big" alt="" src="${THUMB.hero || ''}"><div class="info"><div class="note">MÁS FUERTE, CARGA CONTRA EL ENEMIGO.</div><div class="note">HASTA ${GAME.escortMax} TROPAS EN FORMACIÓN.</div></div><div class="act">${btn}</div>`;
   }
   if (selSpot) {
@@ -2350,7 +2374,9 @@ canvas.addEventListener('wheel', e => {
   focusGoal = null; zoomAnchor = { sx: e.clientX, sy: e.clientY, x: g.x, z: g.z, y: HM ? surfY(g.x, g.z) : 2 };
 }, { passive: false });
 const keys = new Set();
-function heroButton() { const h = heroOf(0); if (h) { setSelection([h, ...h.escort], false); follow = h; focusGoal = null; } else { selectBuilding('altar'); focusOn(spots[ALT0].x, spots[ALT0].z); } }
+function heroButton() {   // G: va pasando por tus héroes; sin héroes, al altar
+  const hs = heroesOf(0), cur = hs.findIndex(u => sel.has(u)), h = hs.length ? hs[(cur + 1) % hs.length] : null;
+  if (h) { setSelection([h, ...h.escort], false); follow = h; focusGoal = null; } else { selectBuilding('altar'); focusOn(spots[ALT0].x, spots[ALT0].z); } }
 addEventListener('keydown', e => {
   if (e.target.closest?.('button') && (e.key === ' ' || e.key === 'Enter')) return;
   const k = e.key.toLowerCase(); keys.add(k);
@@ -2524,7 +2550,7 @@ function drawOverlay(dt) {
       if (seenT && own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; bar(top.x, top.y + 6, 50, 5, s.prog[sd], TEAM[sd].css); }
       if (seenT && own >= 0 && s.lose > 0) bar(top.x, top.y + 6, 50, 5, 1 - s.lose, TEAM[own].css);
     } else {
-      const q = s.kind === 'barracks' ? sideState[s.side].queue[0] : null, h = s.kind === 'altar' ? sideState[s.side].hero : null;
+      const q = s.kind === 'barracks' ? sideState[s.side].queue[0] : null, h = s.kind === 'altar' ? sideState[s.side].heroQ.find(e => e.state === 'training') : null;
       if (s.side === 0 && state === 'play') {   // tus edificios con acciones: reclutar tropas y el héroe
         const ic = project(spotPos(s, s.kind === 'barracks' ? 4.6 : 5.2), tmpQ);
         actionIcon(ic.x, ic.y - 6, s.kind === 'barracks' ? 'sword' : 'hero', selBld === s.kind ? '#f4f4e8' : '#e8c870');
@@ -2650,7 +2676,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 window.__game = { units, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
-  step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) camGoal = camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, spawnAt, dbg: () => ({ fields, walk, HM, MW, wallHit }) };
+  step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) camGoal = camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, spawnAt, dbg: () => ({ fields, walk, HM, MW, wallHit, promote }) };
 makeThumbs();
 newGame(1 + Math.floor(Math.random() * 99999));
 requestAnimationFrame(frame);
