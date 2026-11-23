@@ -10,6 +10,7 @@ import { spots, surfY } from './map.js';
 import { camera, canvas, gl, target } from './render.js';
 import { $, S } from './state.js';
 import { floats, pings, sel, sideState, units } from './units.js';
+import { BRIDGE_COST, R, hiddenFrom } from './rules.js';
 
 let curScale = 0, curLines = CFG.lines;
 export function applyRes(lines, force) {
@@ -45,6 +46,7 @@ const ICONS = {
   horse: ['0002200', '0022220', '0222020', '2222000', '0222000', '0202000', '0202000'],
   harcher: ['0002200', '0022220', '2222020', '2222000', '0222000', '0202000', '0202000'],
   hero:  ['2020202', '2222222', '2222222', '0000000', '0222220', '0222220', '0000000'],
+  bridge: ['0000000', '2000002', '2222222', '2202022', '2000002', '2000002', '0000000'],
   titan: ['0222200', '0222220', '2222222', '2022202', '0222200', '0220220', '0220220'],
   god:   ['2002002', '0222220', '0200020', '2202022', '0200020', '0222220', '2002002'],
   shield: ['2222222', '2000002', '2022202', '2022202', '0200020', '0020200', '0002000'],
@@ -120,10 +122,15 @@ export function drawOverlay(dt) {
       if (s.kind === 'temple' && s.side === 0) { const st = sideState[0]; if (st.ritual?.state === 'ritual') bar(top.x, top.y + 6, 44, 4, 1 - st.ritual.t / GAME.ritualTime, '#ffe9a0'); else if (st.godQ) bar(top.x, top.y + 6, 44, 4, 1 - st.godQ.t / UNITS.god.time, '#ffe9a0'); }
     }
   }
+  for (const b of R.bridges) {   // puentes: sitio para construir (icono) o puente en pie
+    const c = project(_h.set(b.x, 1, b.z), tmpP); b.sx = c.x; b.sy = c.y; b.vis = c.vis && state === 'play' && exploredAt(b.x, b.z); b.pr = 26;
+    if (b.vis && showUI && !b.built) { actionIcon(c.x, c.y - 10, 'bridge', S.selSpot === b ? '#f4f4e8' : '#e8c870'); label(c.x, c.y + 12, 'PUENTE · ' + BRIDGE_COST, '#0f0f1b', '#e8c870', 7); }
+  }
+  for (const j of R.jobs) { const c = project(_h.set(j.x, j.y + 2.5, j.z), tmpP); if (c.vis && showUI) bar(c.x, c.y, 44, 5, j.t / j.need, '#9ad86a'); }   // tala en curso
   if (state === 'play' && showUI) orderLines();
   for (const u of units) {
     project(u.pos, tmpP); u.sx = tmpP.x; u.sy = tmpP.y;
-    const hidden = u.side !== 0 && state === 'play' && !visibleAt(u.pos.x, u.pos.z); u.g.visible = !hidden; u.vis = tmpP.vis && !hidden;
+    const hidden = u.side !== 0 && state === 'play' && (!visibleAt(u.pos.x, u.pos.z) || hiddenFrom(u, 0)); u.g.visible = !hidden; u.vis = tmpP.vis && !hidden;
     if (!u.vis || !showUI) continue;
     const tip = project(_h.copy(u.pos).setY(u.pos.y + 1.6), tmpQ), small = Math.hypot(tip.x - u.sx, tip.y - u.sy) < 16;
     if (small) unitIcon(tip.x, tip.y - 4, u.type, sel.has(u) ? '#e8c870' : TEAM[u.side].css);

@@ -9,11 +9,12 @@ import { ping } from './effects.js';
 import { exploredAt, toggleFog } from './fog.js';
 import { enqueue, heroesOf, newGame, startGame, state, toast } from './game.js';
 import { closeMenu, openMenu, pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
-import { HM, spots, surfY } from './map.js';
+import { GEOT, HM, cellOf, spots, surfY } from './map.js';
 import { seed } from './noise.js';
 import { camera, canvas, part, world } from './render.js';
 import { $, S, track } from './state.js';
 import { sel, units } from './units.js';
+import { R, startChop } from './rules.js';
 
 // ---------- Proyección y selección ----------
 const _p = new THREE.Vector3();
@@ -29,7 +30,7 @@ export function pickUnit(x, y, side) {
 export const pickEnemy = (x, y) => pickUnit(x, y, 1) || pickUnit(x, y, 2);
 export function pickSpot(x, y) {
   let best = null, bd = 1e9;
-  for (const s of spots) if (s.vis) { const d = Math.hypot(s.sx - x, s.sy - y); if (d < s.pr && d < bd) { bd = d; best = s; } }
+  for (const s of [...spots, ...R.bridges]) if (s.vis) { const d = Math.hypot(s.sx - x, s.sy - y); if (d < s.pr && d < bd) { bd = d; best = s; } }
   return best;
 }
 const ray = new THREE.Raycaster();
@@ -74,6 +75,7 @@ export function command(x, y, attack = false) {
   const eu = pickEnemy(x, y);
   if (eu) { for (const u of list) u.order = { type: 'attack', target: eu }; ping(eu.pos, '#d83a4a'); sfx('cmd'); track('order', { type: 'attack' }); return; }
   const sp = pickSpot(x, y), g = sp ? { x: sp.x, z: sp.z } : groundAt(x, y); if (!g) return;
+  if (!sp && !attack && GEOT[cellOf(g.x, g.z)] === 1 && startChop(g.x, g.z, list)) { sfx('cmd'); return; }   // bosque denso: talarlo
   orderTo(list, sp, g, attack);
 }
 // orden desde el minimapa (clic derecho): punto de reunión con el cuartel seleccionado; si no, mover, conquistar o asaltar
@@ -157,7 +159,7 @@ export function init() {
           S.follow = null; const sp = pickSpot(e.clientX, e.clientY);
           if (sp && sp.side === 0 && (sp.kind === 'barracks' || sp.kind === 'altar' || sp.kind === 'temple')) { selectBuilding(sp.kind); sfx('select'); }
           else if (sp && sp.side === 0) { selectBuilding('barracks'); sfx('select'); }
-          else if (sp && (sp.kind === 'town' || sp.kind === 'base')) { selectSpot(sp); sfx('select'); }
+          else if (sp && (sp.kind === 'town' || sp.kind === 'base' || sp.kind === 'bridge')) { selectSpot(sp); sfx('select'); }
           else { S.selBld = null; setSelection([], d.shift); }
         }
         lastClick = now;

@@ -72,9 +72,9 @@ export const GEO = (() => {
     },
     meseta(M, r, s, F) {
       const cx = 96 + (r() - .5) * 36, cz = 64 + (r() - .5) * 34, f = blobR(cx, cz, 30 + r() * 10, 22 + r() * 8, .7, s + 12);
-      const angs = [0, 1, 2, 3].map(i => i * Math.PI / 2 + (r() - .5) * 1.1), ramps = angs.map(a => { let k = .5; while (k < 3 && f(cx + Math.cos(a) * k * 10, cz + Math.sin(a) * k * 10) < 1) k += .05; return [cx + Math.cos(a) * k * 10, cz + Math.sin(a) * k * 10]; });
+      const angs = [0, 1, 2].map(i => i * Math.PI * 2 / 3 + (r() - .5) * .9), ramps = angs.map(a => { let k = .5; while (k < 3 && f(cx + Math.cos(a) * k * 10, cz + Math.sin(a) * k * 10) < 1) k += .05; return [cx + Math.cos(a) * k * 10, cz + Math.sin(a) * k * 10]; });
       M.each((x, z) => { const v = f(x, z); let h = v < 1 ? 6 + fbm(x * .1, z * .1, s + 13) : v < 1.12 ? 3 : 2 + Math.max(0, fbm(x * .05, z * .05, s + 14) - .45) * 6;
-        for (const [px, pz] of ramps) { const d = Math.hypot(x - px, z - pz); if (d < 6 && v < 1.3) h = Math.min(6, 3 + Math.max(0, (v < 1 ? 3 : 2) - d * .4)); }
+        for (const [px, pz] of ramps) { const d = Math.hypot(x - px, z - pz); if (d < 3.2 && v < 1.3) h = Math.min(6, 3 + Math.max(0, (v < 1 ? 3 : 2) - d * .4)); }   // tres rampas estrechas: fáciles de defender
         return [h, 0]; });
       M.special = [[cx, cz]]; return ramps;
     },
@@ -115,15 +115,18 @@ export const GEO = (() => {
     lago(M, r, s, F) {
       const cx = 96 + (r() - .5) * 30, cz = 64 + (r() - .5) * 24, f = blobR(cx, cz, 42 + r() * 12, 24 + r() * 8, .8, s + 26);
       const islands = scatter(r, 2, 16, [cx - 25, cz - 12, cx + 25, cz + 12]), gaps = [0, 1, 2].map(i => (i / 3) * Math.PI * 2 + r() * 1.6);
+      const vol = islands[1] && Math.hypot(islands[1][0] - islands[0][0], islands[1][1] - islands[0][1]) > 15 ? islands[1] : [cx + (islands[0] && islands[0][0] > cx ? -18 : 18), cz];   // el volcán, en una isla sin camino
       const dykeTo = islands[0], dyke = dykeTo && wander(r, dykeTo[0], dykeTo[1], dykeTo[0] + (r() < .5 ? -1 : 1) * 30, dykeTo[1] + (r() - .5) * 40, 5, 8);
       M.each((x, z) => { const v = f(x, z);
-        if (islands.some(([ix, iz]) => Math.hypot(x - ix, z - iz) < 5 + fbm(x * .2, z * .2, s, 2) * 3)) return [2, 0];
+        const dv = Math.hypot(x - vol[0], z - vol[1]);
+        if (dv < 7.5) return [dv < 1.6 ? 6 : 2 + (7.5 - dv) * 1.25 + fbm(x * .4, z * .4, s + 3, 2), 5];   // cono con cráter
+        if (islands.slice(0, 1).some(([ix, iz]) => Math.hypot(x - ix, z - iz) < 5 + fbm(x * .2, z * .2, s, 2) * 3)) return [2, 0];
         if (v < 1) return dyke && polyD(x, z, dyke) < 1.6 ? [1, 3] : [v < .85 ? -2 : -1, 0];
         if (v < 1.08) return [1, 3];
         const a = Math.atan2(z - cz, x - cx), gap = gaps.some(g => Math.abs(((a - g + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < .22);
         if (v < 1.45 && !gap) return [4 + fbm(x * .1, z * .1, s + 27) * 3, 0];
         return [2 + Math.max(0, fbm(x * .05, z * .05, s + 28) - .5) * 5, 0]; });
-      M.special = islands.slice(0, 1);
+      M.special = islands.slice(0, 1); M.volcano = vol;
       return gaps.map(g => { let k = 1; while (k < 1.6 && f(cx + Math.cos(g) * 40 * k, cz + Math.sin(g) * 25 * k) < 1.25) k += .02; return [cx + Math.cos(g) * 40 * k, cz + Math.sin(g) * 25 * k]; });
     },
   };
@@ -137,6 +140,7 @@ export const GEO = (() => {
     for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 11 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
     const up = p => [p[0] * 2, p[1] * 2];
     return { HM: HMg, TT: TTg, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z / 2) * 2 : null,
+      volcano: M.volcano ? up(M.volcano) : null,
       sea: id === 'istmo' || id === 'archipielago', river: id === 'afluentes', goldTop: id === 'meseta', oasis: id === 'oasis' };
   }
   return { build, LIST, keys: Object.keys(LIST) };

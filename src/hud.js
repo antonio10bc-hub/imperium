@@ -12,6 +12,7 @@ import { mapCode, regions, spots } from './map.js';
 import { seed } from './noise.js';
 import { $, S, track } from './state.js';
 import { THUMB, alive, sel, sideState, units } from './units.js';
+import { BRIDGE_COST, buildBridge } from './rules.js';
 
 // ---------- HUD ----------
 // Grupos con F1–F5 (sin barra visible: la barra inferior queda libre para la selección)
@@ -93,6 +94,9 @@ function panelContent() {
   }
   if (S.selSpot) {
     const s = S.selSpot;
+    if (s.kind === 'bridge') {   // sitio de puente (río): se construye con oro
+      return `<div class="ph"><h3>PUENTE</h3><em>${s.built ? 'EN PIE' : 'SIN CONSTRUIR'}</em></div><div class="info"><div class="note g">${s.built ? 'LAS TROPAS CRUZAN EL RÍO POR AQUÍ.' : 'UN PASO NUEVO SOBRE EL RÍO, LEJOS DE LOS VADOS.'}</div></div>${s.built ? '' : `<div class="act"><button type="button" class="y" data-act="bridge" ${sideState[0].gold < BRIDGE_COST ? 'disabled' : ''}>CONSTRUIR · ${BRIDGE_COST} ORO</button></div>`}`;
+    }
     if (s.kind === 'base') { const k = s.hp / GAME.baseHp;
       return `<div class="ph"><h3>${s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA RIVAL'}</h3></div><div class="info"><div class="hpb"><b style="width:${pct(k)};background:${TEAM[s.side].css}"></b><span>${Math.max(0, Math.ceil(s.hp))}/${GAME.baseHp}</span></div><div class="note">${s.side === 1 ? 'CLIC DERECHO CON TROPAS: ASALTAR.' : 'SI CAE, PIERDES LA PARTIDA.'}</div></div>`; }
     const own = s.owner, who = own < 0 ? 'NEUTRAL' : own === 0 ? 'TUYO' : 'DEL RIVAL';
@@ -110,7 +114,7 @@ function panelContent() {
       const g = units.filter(u => u.home === s).length, n = own >= 0 ? units.filter(u => u.campOf === s && u.side === own).length : 0;
       return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><img class="big" alt="" src="${THUMB.harcher || ''}"><div class="info">${own < 0 ? `<div class="note">${g ? `QUEDAN ${g} GUARDIANES. DERRÓTALOS PARA PODER CONQUISTARLO.` : 'SIN GUARDIANES: DEJA TROPAS EN EL CÍRCULO.'}</div>` : `<div class="stats"><span>JINETES ARQUEROS <b>${n}/${GAME.campMax}</b></span><span>UNO CADA <b>${GAME.campGen} S</b></span></div>`}<div class="note">DA JINETES ARQUEROS: RÁPIDOS Y A DISTANCIA.</div></div>`;
     }
-    return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="info">${prog}<div class="stats"><span>NIVEL <b>${s.lvl}</b></span><span>ORO <b>+${String(Math.round(townIncNow(s) * 10) / 10).replace('.', ',')}/S</b></span><span>TORRE <b>${Math.round(towerDmg(s))}</b></span><span>ALCANCE <b>${towerRange(s)}</b></span></div><div class="note${s.special || s.fortified ? ' g' : ''}">${s.fortified ? (own < 0 && s.guards > 0 ? `PUEBLO FORTIFICADO: QUEDAN ${s.guards} DEFENSORES. MÁS ORO. ` : 'PUEBLO FORTIFICADO: MÁS ORO. ') : ''}${s.special ? 'CIMA DE LA MESETA: MÁS ORO. ' : ''}${own === 0 ? 'CUANTOS MÁS PUEBLOS, MENOS RINDE CADA UNO. ' : ''}${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : own < 0 && s.guards > 0 ? '' : 'DEJA TROPAS EN EL CÍRCULO PARA CONQUISTARLO.'}</div></div>${own === 0 && s.lvl < 3 ? `<div class="act"><button type="button" class="y" data-act="upgrade" ${sideState[0].gold < TOWN_LV.cost[s.lvl] ? 'disabled' : ''} title="Más oro y torre más fuerte">MEJORAR A NIVEL ${s.lvl + 1} · ${TOWN_LV.cost[s.lvl]} ORO</button></div>` : ''}`;
+    return `<div class="ph"><h3>${s.name}</h3><em style="color:${own < 0 ? 'var(--txt)' : TEAM[own].css}">${who}</em></div><div class="info">${prog}<div class="stats"><span>NIVEL <b>${s.lvl}</b></span><span>ORO <b>+${String(Math.round(townIncNow(s) * 10) / 10).replace('.', ',')}/S</b></span><span>TORRE <b>${Math.round(towerDmg(s))}</b></span><span>ALCANCE <b>${towerRange(s)}</b></span></div><div class="note${s.special || s.fortified ? ' g' : ''}">${s.fortified ? (own < 0 && s.guards > 0 ? `PUEBLO FORTIFICADO: QUEDAN ${s.guards} DEFENSORES. MÁS ORO. ` : 'PUEBLO FORTIFICADO: MÁS ORO. ') : ''}${s.special ? 'TERRENO RICO: MÁS ORO. ' : ''}${s.oasis ? 'OASIS: MÁS ORO. ' : ''}${own === 0 ? 'CUANTOS MÁS PUEBLOS, MENOS RINDE CADA UNO. ' : ''}${own === 0 ? 'TUS TROPAS SE CURAN AQUÍ.' : own < 0 && s.guards > 0 ? '' : 'DEJA TROPAS EN EL CÍRCULO PARA CONQUISTARLO.'}</div></div>${own === 0 && s.lvl < 3 ? `<div class="act"><button type="button" class="y" data-act="upgrade" ${sideState[0].gold < TOWN_LV.cost[s.lvl] ? 'disabled' : ''} title="Más oro y torre más fuerte">MEJORAR A NIVEL ${s.lvl + 1} · ${TOWN_LV.cost[s.lvl]} ORO</button></div>` : ''}`;
   }
   const list = [...sel].filter(alive);
   if (!list.length) return '';
@@ -200,6 +204,7 @@ export function init() {
     else if (a === 'hero') heroButton();
     else if (a === 'assign') assignSelected();
     else if (a === 'upgrade' && S.selSpot) upgradeTown(0, S.selSpot);
+    else if (a === 'bridge' && S.selSpot?.kind === 'bridge') { buildBridge(0, S.selSpot); refreshPanel(); }
     else if (a === 'type') { const l = [...sel].filter(u => u.type === b.dataset.t); if (e.shiftKey) { l.forEach(u => sel.delete(u)); updateCtx(); } else setSelection(l, false); }
     else if (a === 'esc') { const h = heroOf(0); if (h) setSelection(h.escort.filter(u => u.type === b.dataset.t), false); }
     else if (a === 'shape') { const h = heroOf(0); if (h) { h.formShape = b.dataset.s; sfx('cmd'); } }

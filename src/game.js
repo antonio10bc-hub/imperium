@@ -20,6 +20,7 @@ import { seed } from './noise.js';
 import { bakedGeos, world } from './render.js';
 import { $, S, track } from './state.js';
 import { UGRID, _nearTown, _nearWall, arrows, floats, makeThumbs, pings, puffs, sel, setMax, sideState, spawnAt, spawnUnit, units } from './units.js';
+import { setupRules, updateRules } from './rules.js';
 
 // ---------- Cuartel, cola y héroe ----------
 // límite de tropas: crece con el territorio (pueblos y campamentos propios)
@@ -124,6 +125,7 @@ export function newGame(s, keepCivs = false) {
     const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, temple: buildTemple, town: buildTown };
     for (const sp of spots) B[sp.kind](sp);
     for (const f of forts) buildWalls(f);
+    setupRules();
     spawnGuards(); makeThumbs();
     regions.forEach((_, r) => paintRegion(r));
     fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2));
@@ -160,7 +162,7 @@ export const TOWN_LV = { cost: [0, 120, 220], inc: [1, 1.5, 2] };
 // pueblos que no dan oro: campamento, ciudadela y atalaya (dan tropas o defensa)
 export const noGold = s => s.camp || s.keep || s.watch;
 // oro de un pueblo por sí solo (nivel, oro doble de los fortificados y de la cima, ventaja de civilización)
-export const townInc = s => noGold(s) ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special || s.fortified ? GAME.richMul : 1) * (bonusOf(s.owner).income || 1);
+export const townInc = s => noGold(s) ? 0 : GAME.townIncome * TOWN_LV.inc[s.lvl - 1] * (s.special || s.fortified || s.oasis ? GAME.richMul : 1) * (bonusOf(s.owner).income || 1);
 // rendimiento decreciente: el pueblo k-ésimo (del que más da al que menos) rinde un 8 % menos que el anterior, hasta un mínimo del 45 %
 const decay = k => Math.max(GAME.townDecayMin, 1 - GAME.townDecay * k);
 const goldTowns = sd => spots.filter(s => s.kind === 'town' && s.owner === sd && !noGold(s)).sort((a, b) => townInc(b) - townInc(a) || spots.indexOf(a) - spots.indexOf(b));
@@ -200,6 +202,8 @@ function spawnGuards() {
         const u = post(s, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, T[k % 5], a); u.rank = k % 4 === 0 ? 2 : k % 2 ? 1 : 0; if (u.rank) { setMax(u); u.hp = u.maxHp; applyRank(u); } } }
   }
 }
+// campos de camino hacia cada sitio: se rehacen cuando una regla de la geografía abre o cierra casillas
+export function refreshFields() { fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2)); }
 export const capR = s => s.fortified || s.keep ? 5.7 : 3.9;   // radio del círculo de conquista
 // arqueros en las murallas: varios puntos del recinto disparan a los enemigos que se acercan
 function castleDefense(dt) {
@@ -246,7 +250,7 @@ function updateTowns(dt) {
 export function updateGame(dt) {
   elapsed += dt; S.bfsBudget = 4;
   for (const sd of [0, 1]) sideState[sd].gold += incomeOf(sd) * dt * (sideState[sd].ai?.inc ?? 1);
-  updateAIs(dt); updateProduction(dt); updateEvents(dt);
+  updateAIs(dt); updateProduction(dt); updateEvents(dt); updateRules(dt);
   UGRID.rebuild();
   for (const u of [...units]) if (!u.dead) updateUnit(u, dt);
   updateTowns(dt); castleDefense(dt);

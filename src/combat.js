@@ -10,6 +10,7 @@ import { bfs } from './nav.js';
 import { VCMAT, mat } from './render.js';
 import { $ } from './state.js';
 import { UGRID, _nearEn, alive, arrows, charging, followField, sel, setMax, sideState, spd, stepToward, unitGeo, units } from './units.js';
+import { geoDmg } from './rules.js';
 
 // ---------- Combate ----------
 export const alarm = { t: 0, pos: null, cool: 0 }; export let lastCombat = -99;
@@ -101,7 +102,7 @@ export function strike(u, tgt, dt) {
     u.fwd.set(tgt.pos.x - u.pos.x, 0, tgt.pos.z - u.pos.z).normalize(); u.combatT = 2;
     if (u.cd <= 0) {
       u.cd = u.def.cd; if (RANGED(u.type)) { shoot(u.pos, tgt.pos); if (u.vis) sfx('arrow'); } else u.lunge = 1;
-      const k = (u.def.vs[tgt.type] || 1) * (u.leader ? GAME.escortBonus : 1) * (charging(u) ? 1.5 : 1) * RANKS[u.rank].mul * (high ? 1.25 : 1);
+      const k = (u.def.vs[tgt.type] || 1) * (u.leader ? GAME.escortBonus : 1) * (charging(u) ? 1.5 : 1) * RANKS[u.rank].mul * (high ? 1.25 : 1) * geoDmg(u, tgt);
       damage(u, tgt, u.def.dmg * k * (.85 + Math.random() * .3));
     }
   }

@@ -10,6 +10,7 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 ## Qué tiene
 
 - Mapas de 384×256 con once geografías irregulares (río, cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto y caldera), elegibles en el menú o al azar. El generador descarta las semillas desequilibradas (mismos pueblos por mitad y distancias por camino parecidas).
+- Cada geografía tiene una regla propia (`src/rules.js`): puentes en el río, nieve y atalayas en los puertos de la cordillera, ciudadela en el istmo, mareas en el archipiélago, emboscadas en los barrancos, rampas estrechas en la meseta, crecidas en los afluentes, pantanos que ocultan en el delta, tala en el bosque, sed en el desierto y volcán en la caldera.
 - Terreno con reglas: pantanos y bajíos frenan (más a los jinetes), el bosque denso no se atraviesa, los tiradores desde dos niveles por encima ganan alcance y daño, y la cima de la meseta da oro doble. Caminos entre pueblos y niebla de guerra.
 - Dos campamentos con guardianes neutrales: al conquistarlos dan jinetes arqueros (hasta 20 por campamento).
 - En el centro, una ciudadela guardada por colosos: quien la conquista recibe colosos (hasta 10), lentos, duros y cuerpo a cuerpo.
@@ -54,6 +55,7 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 | `units.js` | Plantillas de tropas, miniaturas, aparición, movimiento y rejilla espacial |
 | `ai.js` | IA de los bandos: cerebro simple (la original) y smart |
 | `events.js` | Eventos neutrales: bandidos, mercenarios y caravanas |
+| `rules.js` | Reglas propias de cada geografía (puentes, mareas, crecidas, tala, sed, volcán, tropas ocultas) |
 | `combat.js`, `behavior.js` | Daño, rangos y muertes; formaciones, órdenes, escolta e IA de cada tropa |
 | `game.js` | Partida: producción, héroes, pueblos, defensas, IA del rival y paso de simulación |
 | `hud.js`, `input.js`, `menu.js`, `overlay.js` | Interfaz, ratón/teclado/cámara, menú principal y capa 2D |

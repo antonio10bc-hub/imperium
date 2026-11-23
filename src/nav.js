@@ -13,9 +13,12 @@ function canStep(x, z, nx, nz) {
 }
 // stepMask[i]: bit k encendido si desde la casilla i se puede pasar a su vecina NB8[k]. Se calcula una vez por mapa
 // y así las búsquedas (BFS, seguir un campo) no repiten las comprobaciones de desnivel y esquinas en cada paso
+// blocked: casillas cerradas por una regla de la geografía (marea alta, crecida, hielo roto…), aunque el terreno se pueda pisar
+export let blocked = null;
+const baseWalk = (x, z) => { const i = idx(x, z); return HM[i] >= 1 && GEOT[i] !== 1 && !blocked[i] && !wallHit(x + .5, z + .5) ? 1 : 0; };
 export function buildNav() {
-  walk = new Uint8Array(N); inMain = new Uint8Array(N); stepMask = new Uint8Array(N);
-  for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) { const i = idx(x, z); walk[i] = HM[i] >= 1 && GEOT[i] !== 1 && !wallHit(x + .5, z + .5) ? 1 : 0; }
+  walk = new Uint8Array(N); inMain = new Uint8Array(N); stepMask = new Uint8Array(N); blocked = new Uint8Array(N);
+  for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) walk[idx(x, z)] = baseWalk(x, z);
   for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) { const i = idx(x, z); if (!walk[i]) continue; let m = 0; for (let k = 0; k < 8; k++) if (canStep(x, z, x + NB8[k][0], z + NB8[k][1])) m |= 1 << k; stepMask[i] = m; }
   const comp = new Int32Array(N).fill(-1); let best = -1, bestN = 0, cid = 0, landN = 0;
   for (let i = 0; i < N; i++) {
@@ -26,6 +29,24 @@ export function buildNav() {
   }
   mainList = []; for (let i = 0; i < N; i++) if (comp[i] === best) { inMain[i] = 1; mainList.push(i); }
   return bestN / Math.max(1, landN);
+}
+// tras cambiar el terreno de unas casillas (alturas, bosque o blocked): recalcula su paso y el de sus vecinas
+export function refreshCells(cells) {
+  const near = new Set();
+  for (const c of cells) { const x = c % MW, z = (c / MW) | 0; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, nz = z + dz; if (nx >= 0 && nz >= 0 && nx < MW && nz < MD) near.add(idx(nx, nz)); } }
+  for (const c of cells) walk[c] = baseWalk(c % MW, (c / MW) | 0);
+  for (const c of near) { const x = c % MW, z = (c / MW) | 0; let m = 0; if (walk[c]) for (let k = 0; k < 8; k++) if (canStep(x, z, x + NB8[k][0], z + NB8[k][1])) m |= 1 << k; stepMask[c] = m; }
+  for (const c of cells) if (walk[c] && !inMain[c]) { inMain[c] = 1; mainList.push(c); }   // un puente o una tala puede abrir casillas nuevas
+}
+// casilla transitable abierta más cercana (para sacar a las tropas de una casilla que se cierra)
+export function nearestOpen(x, z, maxR = 10) {
+  const cx = Math.floor(x), cz = Math.floor(z);
+  for (let R = 1; R <= maxR; R++) for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dz)) !== R) continue;
+    const nx = cx + dx, nz = cz + dz; if (nx < 0 || nz < 0 || nx >= MW || nz >= MD) continue;
+    const i = idx(nx, nz); if (walk[i] && inMain[i] && stepMask[i]) return i;
+  }
+  return -1;
 }
 const _q = new Int32Array(N);
 // campo de distancias por camino desde las casillas de origen. Con stop, para en cuanto llega a esa casilla:
