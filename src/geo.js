@@ -163,7 +163,7 @@ export const GEO = (() => {
     canon(M, r, s, F) {   // una garganta seca (17 = fondo de roca) parte el mapa; en el centro se abre en una cuenca redonda con una isla (la ciudadela) unida a cada orilla por un puente; otro puente al norte y otro al sur
       const P = wander(r, 96 + (r() - .5) * 20, -4, 96 + (r() - .5) * 20, H + 4, 22, 16), atZ = z => { for (let i = 0; i + 1 < P.length; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1]; if ((az - z) * (bz - z) <= 0) return ax + (bx - ax) * ((z - az) / ((bz - az) || 1)); } return 96; };
       M.div = atZ;
-      const zc = H * .5 + (r() - .5) * 6, ic = [atZ(zc), zc], isl = blobR(ic[0], ic[1], 10, 11, .8, s + 63), basin = blobR(ic[0], ic[1], 20, 22, .9, s + 64);   // cuenca e isla irregulares
+      const zc = H * .5 + (r() - .5) * 6, ic = [atZ(zc), zc], isl = blobR(ic[0], ic[1], 10, 11, .8, s + 63), basin = blobR(ic[0], ic[1], 15, 16.5, .6, s + 64);   // cuenca e isla irregulares
       // en la fila de los puentes centrales, los bordes de la isla y de la cuenca (para que los tableros encajen entre paredes rectas)
       const edge = (f, dir) => { let x = ic[0]; while (f(x, zc) < 1 && Math.abs(x - ic[0]) < 60) x += dir * .25; return x; };
       const iW = edge(isl, -1), iE = edge(isl, 1), bW = edge(basin, -1), bE = edge(basin, 1);
