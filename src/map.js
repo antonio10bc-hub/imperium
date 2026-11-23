@@ -4,7 +4,7 @@ import { civOf } from './civs.js';
 import { BASE0, BASE1, GAME, MAP_SIZES, MD, MW, N, TOWN_NAMES, setMapSize, TP, idx, mixHex } from './config.js';
 import { GEO } from './geo.js';
 import { buildMinimap, markMiniDirty } from './minimap.js';
-import { NBO, bfs, buildNav, cellX, cellZ, inMain, mainList, nearestNode, stepMask } from './nav.js';
+import { NBO, bfs, buildNav, cellX, cellZ, inMain, mainList, nearestNode, stepMask, walk } from './nav.js';
 import { hash, n2, plains, rngOf, seed, setSeed, smooth01 } from './noise.js';
 import { fogU, grad, ocean, world } from './render.js';
 import { S } from './state.js';
@@ -305,21 +305,30 @@ export function generate(newSeed, tries = 0) {
   buildVoxels();
   buildMinimap();
 }
+// caminos: árbol de mínima distancia POR CAMINO (no en línea recta) entre fortalezas y pueblos, más algunos atajos que cierran bucles,
+// para que no salgan caminos que rodean medio mapa (al otro lado de un cañón, un lago o un brazo de mar) ni ramales sueltos
 function buildRoads() {
   roadCell = new Uint8Array(N);
-  const Rg = regions, inT = [0], edges = [];
-  while (inT.length < Rg.length) {
+  const Rg = regions, n = Rg.length, F = Rg.map(r => bfs([r.node])), D = (a, b) => F[a][Rg[b].node];
+  const inT = [0], edges = [], adj = Rg.map(() => []);
+  while (inT.length < n) {
     let best = null, bd = 1e9;
-    for (const i of inT) for (let j = 0; j < Rg.length; j++) if (!inT.includes(j)) { const d = Math.hypot(Rg[i].x - Rg[j].x, Rg[i].z - Rg[j].z); if (d < bd) { bd = d; best = [i, j]; } }
-    inT.push(best[1]); edges.push(best);
+    for (const i of inT) for (let j = 0; j < n; j++) if (!inT.includes(j) && D(i, j) < bd) { bd = D(i, j); best = [i, j]; }
+    if (!best) break;   // lo que no se alcanza por tierra se queda sin camino
+    inT.push(best[1]); edges.push(best); adj[best[0]].push([best[1], bd]); adj[best[1]].push([best[0], bd]);
   }
+  // atajos: si dos sitios cercanos por camino quedan muy lejos siguiendo el árbol, se unen directamente
+  const treeDist = a => { const d = Array(n).fill(1e9), st = [a]; d[a] = 0; while (st.length) { const v = st.pop(); for (const [w, c] of adj[v]) if (d[w] > d[v] + c) { d[w] = d[v] + c; st.push(w); } } return d; };
+  const extra = [];
+  for (let a = 0; a < n; a++) { const td = treeDist(a); for (let b = a + 1; b < n; b++) { const d = D(a, b); if (d < 120 && td[b] > d * 2.2) extra.push([d, a, b]); } }
+  extra.sort((p, q) => p[0] - q[0]).slice(0, Math.ceil(n / 4)).forEach(([, a, b]) => edges.push([a, b]));
   for (const [a, b] of edges) {
-    const f = bfs([Rg[a].node]), A = Rg[a]; let v = Rg[b].node;
+    const f = F[a], A = Rg[a]; let v = Rg[b].node;
     for (let guard = 0; f[v] > 0 && f[v] < 1e9 && guard < 5000; guard++) {
-      const x = v % MW, z = (v / MW) | 0; let best = -1, bd = 1e9;
+      const x = v % MW; let best = -1, bd = 1e9;
       for (let k = 0, m = stepMask[v]; k < 8; k++) { if (!(m >> k & 1)) continue; const j = v + NBO[k]; if (f[j] !== f[v] - 1) continue; const d = (cellX(j) - A.x) ** 2 + (cellZ(j) - A.z) ** 2; if (d < bd) { bd = d; best = j; } }
       if (best < 0) break;
-      roadCell[v] = 1; if (x + 1 < MW && HM[v + 1] > 0) roadCell[v + 1] = 1;
+      roadCell[v] = 1; for (const j of [v + 1, v + MW]) if (j < N && (j !== v + 1 || x + 1 < MW) && HM[j] > 0 && walk[j]) roadCell[j] = 1;   // siempre dos casillas de ancho (los tramos rectos salían más finos)
       v = best;
     }
   }
