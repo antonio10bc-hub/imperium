@@ -11,6 +11,7 @@ import { camera, canvas, gl, target } from './render.js';
 import { $, S } from './state.js';
 import { floats, pings, sel, sideState, units } from './units.js';
 import { BRIDGE_COST, R, hiddenFrom } from './rules.js';
+import { drawWeather } from './ambient.js';
 
 let curScale = 0, curLines = CFG.lines;
 export function applyRes(lines, force) {
@@ -95,6 +96,7 @@ function orderLines() {
 }
 export function drawOverlay(dt) {
   octx.clearRect(0, 0, S.VW, S.VH);
+  drawWeather(octx, S.VW, S.VH, dt);
   const showUI = state !== 'menu';
   for (const s of spots) {
     const c = project(spotPos(s), tmpP); s.sx = c.x; s.sy = c.y; s.vis = c.vis && (state !== 'play' || exploredAt(s.x, s.z));

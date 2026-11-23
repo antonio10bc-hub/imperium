@@ -12,6 +12,7 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 - Tres tamaños de mapa (288×192, 384×256 y 480×320, con 12, 16 o 22 pueblos), mezclas de dos geografías (una por mitad) y código de mapa (`GEOGRAFÍA-SEMILLA[-P|-G]`, también como `?mapa=` en la dirección) para repetir o compartir un mapa.
 - Mapas con dieciséis geografías (río, cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto, caldera, valle helado, cañón, costa, llanura y ruinas), elegibles en el menú o al azar. El generador descarta las semillas desequilibradas (mismos pueblos por mitad y distancias por camino parecidas).
 - Cada geografía tiene una regla propia (`src/rules.js`): puentes en el río, nieve y atalayas en los puertos de la cordillera, ciudadela en el istmo, mareas en el archipiélago, emboscadas en los barrancos, rampas estrechas en la meseta, crecidas en los afluentes, pantanos que ocultan en el delta, tala en el bosque, sed en el desierto, volcán en la caldera, hielo que se rompe en el valle helado, puentes destruibles en el cañón, jinetes rápidos en la llanura y tesoros en las ruinas.
+- Ambiente (`src/ambient.js`): clima por geografía que reduce un poco la visión mientras dura, pájaros, humo en los pueblos, espuma en la costa, peces y elementos propios de cada geografía (faros, barcas, molinos, menhires, pirámides, estatuas, palafitos…), que no se atraviesan.
 - Terreno con reglas: pantanos y bajíos frenan (más a los jinetes), el bosque denso no se atraviesa, los tiradores desde dos niveles por encima ganan alcance y daño, y la cima de la meseta da oro doble. Caminos entre pueblos y niebla de guerra.
 - Dos campamentos con guardianes neutrales: al conquistarlos dan jinetes arqueros (hasta 20 por campamento).
 - En el centro, una ciudadela guardada por colosos: quien la conquista recibe colosos (hasta 10), lentos, duros y cuerpo a cuerpo.
@@ -56,6 +57,7 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 | `units.js` | Plantillas de tropas, miniaturas, aparición, movimiento y rejilla espacial |
 | `ai.js` | IA de los bandos: cerebro simple (la original) y smart |
 | `events.js` | Eventos neutrales: bandidos, mercenarios y caravanas |
+| `ambient.js` | Clima, vida en el paisaje y elementos propios de cada geografía |
 | `rules.js` | Reglas propias de cada geografía (puentes, mareas, crecidas, tala, sed, volcán, tropas ocultas) |
 | `combat.js`, `behavior.js` | Daño, rangos y muertes; formaciones, órdenes, escolta e IA de cada tropa |
 | `game.js` | Partida: producción, héroes, pueblos, defensas, IA del rival y paso de simulación |

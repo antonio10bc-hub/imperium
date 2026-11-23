@@ -27,7 +27,7 @@ for (const file of order) {
   const aliases = [];
   code = code.replace(IMPORT, (all, spec) => {
     const m = all.match(/\{([^}]*)\}/);
-    if (m && spec.startsWith('./')) for (const part of m[1].split(',')) { const [a, b] = part.trim().split(/\s+as\s+/); if (b) aliases.push(`const ${b} = ${a}__${spec.slice(2, -3)};`); }
+    if (m && spec.startsWith('./')) for (const part of m[1].split(',')) { const [a, b] = part.trim().split(/\s+as\s+/); if (b) aliases.push(`const ${b} = ${a === 'init' ? `${a}__${spec.slice(2, -3)}` : a};`); }   // solo las init se renombran por módulo; el resto conserva su nombre
     return '';
   });
   code = code.replace(/^export function init\(/m, `function init__${file.slice(0, -3)}(`);

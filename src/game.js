@@ -21,6 +21,7 @@ import { bakedGeos, world } from './render.js';
 import { $, S, track } from './state.js';
 import { UGRID, _nearTown, _nearWall, arrows, floats, makeThumbs, pings, puffs, sel, setMax, sideState, spawnAt, spawnUnit, units } from './units.js';
 import { setupRules, updateRules } from './rules.js';
+import { setupAmbient, updateWeather } from './ambient.js';
 
 // ---------- Cuartel, cola y héroe ----------
 // límite de tropas: crece con el territorio (pueblos y campamentos propios)
@@ -125,7 +126,7 @@ export function newGame(s, keepCivs = false) {
     const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, temple: buildTemple, town: buildTown };
     for (const sp of spots) B[sp.kind](sp);
     for (const f of forts) buildWalls(f);
-    setupRules();
+    setupRules(); setupAmbient();
     spawnGuards(); makeThumbs();
     regions.forEach((_, r) => paintRegion(r));
     fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2));
@@ -250,7 +251,7 @@ function updateTowns(dt) {
 export function updateGame(dt) {
   elapsed += dt; S.bfsBudget = 4;
   for (const sd of [0, 1]) sideState[sd].gold += incomeOf(sd) * dt * (sideState[sd].ai?.inc ?? 1);
-  updateAIs(dt); updateProduction(dt); updateEvents(dt); updateRules(dt);
+  updateAIs(dt); updateProduction(dt); updateEvents(dt); updateRules(dt); updateWeather(dt);
   UGRID.rebuild();
   for (const u of [...units]) if (!u.dead) updateUnit(u, dt);
   updateTowns(dt); castleDefense(dt);

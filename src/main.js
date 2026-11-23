@@ -25,6 +25,7 @@ import { init as init_input } from './input.js';
 import { init as init_menu, setSize } from './menu.js';
 import { init as init_overlay } from './overlay.js';
 import { R, breakBridge, buildBridge, canBreak, startChop } from './rules.js';
+import { WEA, ambientInfo, updateLife } from './ambient.js';
 
 // ---------- Bucle ----------
 let prev = performance.now(), hudT = 0, miniT = 0, fogT = 0;
@@ -54,7 +55,7 @@ function frame(now) {
   if (state === 'play' && !S.paused) { for (let i = 0; i < S.speed; i++) if (state === 'play') updateGame(dt); if ((hudT -= dt) <= 0) { hudT = .1; updateHud(); } }
   const live = state !== 'play' || !S.paused;
   if (live) {
-    damageFx(dt); templeFx(dt, now);
+    damageFx(dt); templeFx(dt, now); updateLife(dt);
     for (const s of spots) if (s.shake > 0) { s.shake -= dt; s.group.position.copy(s.base).add(_h.set(Math.random() - .5, 0, Math.random() - .5).multiplyScalar(s.shake * 1.5)); if (s.shake <= 0) s.group.position.copy(s.base); }
     for (let i = corpses.length - 1; i >= 0; i--) {
       const c = corpses[i]; c.t += dt; const k = Math.min(1, c.t / .35);
@@ -78,7 +79,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 init_minimap(); init_fog(); init_hud(); init_input(); init_menu(); init_overlay();
-window.__game = { S, gl, units, triggerEvent, ev, R, buildBridge, breakBridge, startChop, canBreak, get scen() { return scen; },
+window.__game = { WEATHER: WEA, ambientInfo, S, gl, units, triggerEvent, ev, R, buildBridge, breakBridge, startChop, canBreak, get scen() { return scen; },
   // pruebas: pone un cerebro de IA en un bando (diff: dificultad base; over: ajustes que la sobrescriben) o se lo quita con diff = null
   setAI(sd, diff, brain, over) { sideState[sd].ai = diff ? makeAI(sd, diff, brain) : null; if (over && sideState[sd].ai) { const A = sideState[sd].ai; A.Df = { ...A.Df, ...over }; if (over.inc != null) A.inc = over.inc; } }, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
   step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) S.camGoal = S.camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, spawnAt, dbg: () => ({ fields, walk, HM, GEOT, MW, wallHit, promote }) };

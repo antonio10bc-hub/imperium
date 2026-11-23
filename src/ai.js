@@ -12,6 +12,7 @@ import { spots } from './map.js';
 import { MERC, ev, hireMercs } from './events.js';
 import { UGRID, alive, sideState, units } from './units.js';
 import { hiddenFrom } from './rules.js';
+import { weatherVis } from './ambient.js';
 
 // valor aproximado de cada tropa para medir fuerzas (coste, con algo de peso al héroe)
 const WORTH = { sword: 40, bow: 55, horse: 80, harcher: 70, titan: 150, hero: 260, god: 400, cart: 0 };
@@ -82,7 +83,7 @@ function observe(A) {
   const side = A.side, foe = 1 - side, places = spots.filter(s => (s.kind === 'base' && s.side === side) || (s.kind === 'town' && s.owner === side));
   for (const e of units) {
     if (e.side !== foe && !(e.side === 2 && e.raid === side)) continue;   // el rival y los bandidos que vienen a por él
-    const seen = places.some(s => near(s, e.pos.x, e.pos.z, s.kind === 'base' ? 28 : s.watch ? GAME.watchVision : 14)) || UGRID.near(e.pos.x, e.pos.z, AI_VISION, _seen).some(o => o.side === side && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < AI_VISION);
+    const seen = places.some(s => near(s, e.pos.x, e.pos.z, s.kind === 'base' ? 28 : s.watch ? GAME.watchVision : 14)) || UGRID.near(e.pos.x, e.pos.z, AI_VISION, _seen).some(o => o.side === side && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < AI_VISION * weatherVis());
     if (seen && !hiddenFrom(e, side)) A.mem.set(e.id, { type: e.type, x: e.pos.x, z: e.pos.z, w: worth(e), t: elapsed });
   }
   const live = new Set(); for (const u of units) live.add(u.id);
