@@ -23,7 +23,7 @@ export const RANKS = [{ name: '', kills: 0, mul: 1 }, { name: 'BRONCE', kills: 2
   { name: 'PLATA', kills: 5, mul: 1.25, hex: 0xb4afa2, css: '#b4afa2' }, { name: 'ORO', kills: 10, mul: 1.4, hex: 0xe8c870, css: '#e8c870' }];
 export const TYPES = ['sword', 'bow', 'horse'], ALLT = ['hero', 'sword', 'bow', 'horse', 'harcher'];
 export const RANGED = t => t === 'bow' || t === 'harcher';
-export const GAME = { startGold: 220, income: 1, townIncome: 1.8, baseHp: 1500, cap: 80, towns: 16, capture: 4, queueMax: 30, bounty: 6, maxHeroes: 3, wallShooters: 12, wallRange: 10, wallDmg: 7, wallCd: 1.6,
+export const GAME = { startGold: 220, income: 1, townIncome: 1.8, baseHp: 1500, capBase: 30, capTown: 6, capMax: 100, towns: 16, capture: 4, queueMax: 30, bounty: 6, maxHeroes: 3, wallShooters: 12, wallRange: 10, wallDmg: 7, wallCd: 1.6,
   campGen: 14, campMax: 20, campGuards: 6, fortGuards: 20, heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4 };
 export const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, label: 'FÁCIL' }, normal: { inc: 1, attackAt: 5, hero: true, label: 'NORMAL' }, hard: { inc: 1.3, attackAt: 4, hero: true, label: 'DIFÍCIL' } };
 export const BASE0 = 0, BASE1 = 1, BARR0 = 2, BARR1 = 3, ALT0 = 4, ALT1 = 5, TOWN0 = 6;

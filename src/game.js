@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { sfx, startMusic } from './audio.js';
 import { updateUnit } from './behavior.js';
-import { buildAltar, buildBarracks, buildCastle, buildTown, buildWalls, decos, setOwner, spotPos } from './buildings.js';
+import { buildAltar, buildBarracks, buildCastle, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
 import { resolveCivs, uname } from './civs.js';
 import { alarm, applyRank, assign, corpses, damage, raiseAlarm, shoot } from './combat.js';
 import { ALT0, BARR0, BASE0, BASE1, DIFF, GAME, TEAM, TOWN0, TYPES, UNITS } from './config.js';
@@ -20,11 +20,13 @@ import { $, S, track } from './state.js';
 import { UGRID, _nearTown, _nearWall, arrows, floats, makeThumbs, pings, puffs, sel, setMax, sideState, spawnAt, spawnUnit, units } from './units.js';
 
 // ---------- Cuartel, cola y héroe ----------
+// límite de tropas: crece con el territorio (pueblos y campamentos propios)
+export const capOf = side => Math.min(GAME.capMax, GAME.capBase + GAME.capTown * spots.filter(s => s.kind === 'town' && s.owner === side).length);
 export const popOf = side => units.filter(u => u.side === side && u.type !== 'hero').length + sideState[side].queue.length;
 export function enqueue(side, type) {
   const st = sideState[side], def = UNITS[type];
   if (state !== 'play') return false;
-  if (st.gold < def.cost || st.queue.length >= GAME.queueMax || popOf(side) >= GAME.cap) { if (side === 0) sfx('deny'); return false; }
+  if (st.gold < def.cost || st.queue.length >= GAME.queueMax || popOf(side) >= capOf(side)) { if (side === 0) sfx('deny'); return false; }
   st.gold -= def.cost; st.queue.push({ type, t: def.time });
   if (side === 0) { sfx('select'); track('unit_queued', { type }); refreshPanel(); }
   return true;
@@ -77,10 +79,11 @@ function clearWorld() {
   for (const g of bakedGeos) g.dispose(); bakedGeos.length = 0;   // edificios y murallas fundidos de la partida anterior
   if (S.rallyFlag) { world.remove(S.rallyFlag); S.rallyFlag = null; } S.rally = null;
 }
-export function newGame(s) {
-  $('loading').hidden = false; $('end').hidden = true; $('start').hidden = true; $('ui').classList.add('hidden-ui');
+// keepCivs: conserva las civilizaciones de la partida actual (reiniciar el mismo mapa)
+export function newGame(s, keepCivs = false) {
+  $('loading').hidden = false; $('end').hidden = true; $('start').hidden = true; $('menu').hidden = true; S.menuOpen = false; $('ui').classList.add('hidden-ui');
   requestAnimationFrame(() => setTimeout(() => {
-    clearWorld(); resetFog(false); resolveCivs(true);
+    clearWorld(); resetFog(false); if (!keepCivs) resolveCivs(true);
     generate(s);
     const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, town: buildTown };
     for (const sp of spots) B[sp.kind](sp);
@@ -91,24 +94,24 @@ export function newGame(s) {
     for (const st of sideState) Object.assign(st, { gold: GAME.startGold, queue: [], heroQ: [] });
     aiStance = 'defend'; elapsed = 0; S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
     focusOn(spots[BASE0].x, spots[BASE0].z, true);
-    $('mt').textContent = GAME.towns; $('cap').textContent = GAME.cap;
+    $('mt').textContent = GAME.towns; $('cap').textContent = capOf(0);
     updateCtx(); syncDiff();
     $('loading').hidden = true; state = 'menu'; S.menuDirty = false;
     if (S.pendingStart) { S.pendingStart = false; startGame(); } else { $('start').hidden = false; showPortraits(); }
   }, 30));
 }
 export function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; toast('MAPA: ' + GEO.LIST[scen]); resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
-function endGame(win) {
-  state = 'end'; $('ui').classList.add('hidden-ui'); $('toast').hidden = true; $('pause').hidden = true;
+export function endGame(win, surrender = false) {
+  state = 'end'; $('menu').hidden = true; S.menuOpen = false; $('ui').classList.add('hidden-ui'); $('toast').hidden = true; $('pause').hidden = true;
   const s = spots[win ? BASE1 : BASE0];
   for (let k = 0; k < 4; k++) burst(spotPos(s, 2 + k), [0xd4cde2, TEAM[s.side].c, 0xffa03a, 0x3a2a4a], 14, 6, 6, 1.4, .45);
   focusOn(s.x, s.z);
   $('endT').textContent = win ? 'VICTORIA' : 'DERROTA';
   $('endT').style.color = win ? 'var(--blue)' : 'var(--red)';
   const m = Math.floor(elapsed / 60), sec = Math.floor(elapsed % 60);
-  $('endP').textContent = (win ? 'La fortaleza roja ha caído' : 'Tu fortaleza ha caído') + ` en ${m}:${String(sec).padStart(2, '0')} (${DIFF[S.diff].label}).`;
+  $('endP').textContent = (win ? 'La fortaleza roja ha caído' : surrender ? 'Te has rendido' : 'Tu fortaleza ha caído') + ` en ${m}:${String(sec).padStart(2, '0')} (${DIFF[S.diff].label}).`;
   setTimeout(() => { $('end').hidden = false; }, 1400);
-  sfx(win ? 'win' : 'lost'); track('game_end', { win, seconds: Math.round(elapsed), diff: S.diff });
+  sfx(win ? 'win' : 'lost'); track('game_end', { win, surrender, seconds: Math.round(elapsed), diff: S.diff });
 }
 export const miniPings = [];
 export function toast(msg, kind = '', pos = null) {   // avisos en columna, arriba a la derecha; con posición se pueden pulsar para ir allí
@@ -123,14 +126,14 @@ export const towerRange = s => GAME.towerRange + (s.lvl - 1) * 1.5, towerDmg = s
 export function upgradeTown(side, s) {
   const st = sideState[side];
   if (s.camp || s.owner !== side || s.lvl >= 3 || st.gold < TOWN_LV.cost[s.lvl]) { if (side === 0) sfx('deny'); return false; }
-  st.gold -= TOWN_LV.cost[s.lvl]; s.lvl++;
+  st.gold -= TOWN_LV.cost[s.lvl]; s.lvl++; townLevelLook(s);
   burst(spotPos(s, 1), [0xffd23f, 0xffffff], 16, 2.5, 5, .9, .22);
   if (side === 0) { sfx('capture'); floatText(spotPos(s, 5), 'NIVEL ' + s.lvl, '#e8c870', 10); refreshPanel(); }
   return true;
 }
 export function campSpawn(s) {   // el campamento da jinetes arqueros a su dueño, hasta 20 vivos por campamento
   const own = s.owner; if (own < 0) return;
-  if (units.filter(u => u.campOf === s && u.side === own).length >= GAME.campMax || popOf(own) >= GAME.cap) return;
+  if (units.filter(u => u.campOf === s && u.side === own).length >= GAME.campMax || popOf(own) >= capOf(own)) return;
   const a = Math.random() * 6.28, u = spawnAt(own, 'harcher', s.x + Math.cos(a) * 4.5, s.z + Math.sin(a) * 4.5, a); u.campOf = s;
   burst(u.pos, [0xffffff, TEAM[own].l], 6, 1.5, 2, .4, .16);
   if (own === 0) { floatText(spotPos(s, 4.5), 'JINETE ARQUERO', '#8ad8f0', 9); refreshPanel(); }

@@ -153,7 +153,9 @@ button.alt{background:var(--paper)}
 .shp button{padding:6px 6px 5px!important}
 #panel .act kbd{margin-left:4px;border:0;padding:0;opacity:.6}
 #tools{flex:none;display:grid;grid-template-columns:repeat(4,auto);gap:4px;align-content:center}
+#menu .card{min-width:280px;align-items:stretch}
+#menu .card button{font-size:14px;padding:12px 16px}
 #tools .tl{display:flex;align-items:center;justify-content:center;gap:4px;height:30px;padding:0 7px;background:var(--bar3);color:var(--txt);border:2px solid var(--ink);box-shadow:0 2px 0 var(--ink);font-size:12px}
 #tools .tl kbd{margin:0;border:0;padding:0;font-size:12px;color:var(--dim);opacity:1}
 #tools .tl.on{background:var(--pink)}
-@media (max-width:900px){:root{--barH:64px} #mini{width:72px;height:48px} #tug .cas{display:none} .rc{width:auto;height:46px;grid-template-columns:26px auto} .rc img{width:26px;height:26px} .big{width:40px;height:40px} .hpb{width:120px} .info{min-width:120px} .stats,.note{display:none} #panel .ph{min-width:70px} #tools{grid-template-columns:repeat(2,auto)} #tools .tl{height:24px;padding:0 5px} #tools .tl:nth-child(n+5){display:none}}
+@media (max-width:900px){:root{--barH:64px} #mini{width:72px;height:48px} #tug .cas{display:none} .rc{width:auto;height:46px;grid-template-columns:26px auto} .rc img{width:26px;height:26px} .big{width:40px;height:40px} .hpb{width:120px} .info{min-width:120px} .stats,.note{display:none} #panel .ph{min-width:70px} #tools{grid-template-columns:repeat(2,auto)} #tools .tl{height:24px;padding:0 5px} #tools .tl:nth-child(n+4):not(#menuBtn){display:none}}

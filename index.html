@@ -23,6 +23,7 @@
       <button id="spd" type="button" class="tl" title="Velocidad">×1<kbd>V</kbd></button>
       <button id="pz" type="button" class="tl" title="Pausa"><img class="ic" data-ic="pause" data-c="#f4f4e8" alt=""><kbd>P</kbd></button>
       <button id="snd" type="button" class="tl" title="Sonido">♪ NO</button>
+      <button id="menuBtn" type="button" class="tl" title="Menú"><img class="ic" data-ic="menu" data-c="#f4f4e8" alt=""><kbd>ESC</kbd></button>
     </div>
   </div>
 </div>
@@ -57,12 +58,20 @@
     <li>Los dos <b>CAMPAMENTOS</b> tienen guardianes neutrales. Derrótalos y conquístalos: te darán jinetes arqueros, hasta 20 por campamento.</li>
     <li>Elige el <b>MAPA</b>: once geografías (río, cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto y caldera). Los pantanos y bajíos frenan, sobre todo a los jinetes; el bosque denso no se atraviesa; los arqueros desde dos niveles por encima llegan más lejos y hacen más daño; la cima de la meseta da oro doble.</li>
     <li>Elige tu <b>CIVILIZACIÓN</b> y la del rival en el menú (o al azar). Todas juegan igual: cambian el aspecto, los edificios y los nombres de las tropas.</li>
+    <li>Tu límite de tropas crece con tu territorio: 30 de base y 6 más por cada pueblo o campamento (hasta 100).</li>
     <li>Las murallas de tu fortaleza disparan flechas a los enemigos que se acercan. Puedes tener hasta 3 <b>HÉROES</b>; <b>G</b> pasa de uno a otro.</li>
     <li>Invoca un <b>HÉROE</b> en el altar. Asígnale hasta 50 tropas: formarán delante de él en bloque, línea o cuña.</li>
     <li>La niebla de guerra oculta lo que no has explorado. Las tropas suben de rango al matar y se curan en tus regiones.</li>
   </ul>
-  <div class="ctl"><b>IZQ</b> seleccionar · arrastrar caja · doble clic: mismo tipo<br><b>DER</b> mover, atacar o conquistar · sobre tu héroe: asignar tropas<br><b>E</b> ataque-mover · <b>WASD</b>, borde o <b>DER+ARRASTRAR</b>: cámara · <b>RUEDA</b> zoom<br><b>1 2 3</b> reclutar · <b>B</b> cuartel · <b>G</b> héroe · <b>H</b> base · <b>F1–F5</b> grupos · <b>ESPACIO</b> alerta · <b>P</b> pausa · <b>V</b> velocidad · <b>N</b> quitar o poner la niebla de guerra</div>
+  <div class="ctl"><b>IZQ</b> seleccionar · arrastrar caja · doble clic: mismo tipo<br><b>DER</b> mover, atacar o conquistar · sobre tu héroe: asignar tropas<br><b>E</b> ataque-mover · <b>WASD</b>, borde o <b>DER+ARRASTRAR</b>: cámara · <b>RUEDA</b> zoom<br><b>1 2 3</b> reclutar · <b>B</b> cuartel · <b>G</b> héroe · <b>H</b> base · <b>F1–F5</b> grupos · <b>ESPACIO</b> alerta · <b>P</b> pausa · <b>V</b> velocidad · <b>N</b> quitar o poner la niebla de guerra · <b>ESC</b> menú</div>
   <button id="howBack" type="button">VOLVER</button>
+</div></div>
+<div id="menu" class="overlay" hidden><div class="card">
+  <h2>PAUSA</h2>
+  <button id="mResume" type="button">CONTINUAR</button>
+  <button id="mRestart" type="button" class="alt">REINICIAR ESTE MAPA</button>
+  <button id="mSurrender" type="button" class="alt">RENDIRSE</button>
+  <button id="mQuit" type="button" class="alt">MENÚ PRINCIPAL</button>
 </div></div>
 <div id="end" class="overlay" hidden><div class="card">
   <h2 id="endT">VICTORIA</h2><p id="endP" style="text-align:center"></p>

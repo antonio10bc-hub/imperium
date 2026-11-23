@@ -1,7 +1,7 @@
 // Punto de entrada: bucle principal y arranque.
 import * as THREE from 'three';
 import { layout, orderMove } from './behavior.js';
-import { setOwner } from './buildings.js';
+import { damageFx, setOwner } from './buildings.js';
 import { alarm, assign, corpses, promote } from './combat.js';
 import { CFG, MD, MW } from './config.js';
 import { dropBox } from './effects.js';
@@ -51,6 +51,7 @@ function frame(now) {
   if (state === 'play' && !S.paused) { for (let i = 0; i < S.speed; i++) if (state === 'play') updateGame(dt); if ((hudT -= dt) <= 0) { hudT = .1; updateHud(); } }
   const live = state !== 'play' || !S.paused;
   if (live) {
+    damageFx(dt);
     for (const s of spots) if (s.shake > 0) { s.shake -= dt; s.group.position.copy(s.base).add(_h.set(Math.random() - .5, 0, Math.random() - .5).multiplyScalar(s.shake * 1.5)); if (s.shake <= 0) s.group.position.copy(s.base); }
     for (let i = corpses.length - 1; i >= 0; i--) {
       const c = corpses[i]; c.t += dt; const k = Math.min(1, c.t / .35);
@@ -58,7 +59,7 @@ function frame(now) {
       if (c.t > 8) c.g.position.y -= dt * .45;
       if (c.t > 10.5) { world.remove(c.g); corpses.splice(i, 1); }
     }
-    for (let i = puffs.length - 1; i >= 0; i--) { const p = puffs[i]; p.t -= dt; p.v.y -= 9 * dt; p.m.position.addScaledVector(p.v, dt); p.m.scale.setScalar(Math.max(.01, p.s * p.t / p.life)); if (p.t <= 0) { dropBox(p.m); puffs.splice(i, 1); } }
+    for (let i = puffs.length - 1; i >= 0; i--) { const p = puffs[i], k = p.t / p.life; p.t -= dt; p.v.y -= (p.g ?? 9) * dt; p.m.position.addScaledVector(p.v, dt); p.m.scale.setScalar(Math.max(.01, p.grow ? p.s * (.5 + (1 - k) * .8) * Math.min(1, k * 3) : p.s * k)); if (p.t <= 0) { dropBox(p.m); puffs.splice(i, 1); } }
   }
   for (const s of spots) if (s.anim > 0 && s.group) {   // conquista: el pueblo da un bote y la bandera sube por el mástil
     s.anim = Math.max(0, s.anim - dt); const k = s.anim / 1.4, t = 1.4 - s.anim;

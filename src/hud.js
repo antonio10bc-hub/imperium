@@ -5,9 +5,10 @@ import { uname } from './civs.js';
 import { assign } from './combat.js';
 import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, RANKS, TEAM, TYPES, UNITS } from './config.js';
 import { ping } from './effects.js';
-import { TOWN_LV, cancelQueue, enqueue, heroCount, heroOf, heroesOf, incomeOf, popOf, state, summonHero, toast, towerDmg, towerRange, townInc, upgradeTown } from './game.js';
+import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, heroCount, heroOf, heroesOf, incomeOf, newGame, popOf, state, summonHero, toast, towerDmg, towerRange, townInc, upgradeTown } from './game.js';
 import { focusOn, heroButton } from './input.js';
 import { regions, spots } from './map.js';
+import { seed } from './noise.js';
 import { $, S, track } from './state.js';
 import { THUMB, alive, sel, sideState, units } from './units.js';
 
@@ -29,7 +30,7 @@ export function updateHud() {
   const st = sideState[0], owned = sd => spots.filter(s => s.owner === sd).length;
   $('gold').textContent = Math.floor(st.gold);
   $('rate').textContent = '+' + String(Math.round(incomeOf(0) * 10) / 10).replace('.', ',') + '/S';
-  $('pop').textContent = popOf(0);
+  $('pop').textContent = popOf(0); $('cap').textContent = capOf(0);
   const n0 = 1 + owned(0), n1 = 1 + spots.filter(s => s.kind === 'town' && s.known === 1).length, NR = regions.length, key = n0 + ',' + n1 + ',' + NR;
   if (key !== terrKey) { terrKey = key; $('terr').innerHTML = '<i class="b"></i>'.repeat(n0) + '<i></i>'.repeat(Math.max(0, NR - n0 - n1)) + '<i class="r"></i>'.repeat(n1); }
   $('hp0').textContent = Math.max(0, Math.round(spots[BASE0].hp / GAME.baseHp * 100)) + ' %';
@@ -57,11 +58,11 @@ function renderPanel() {
 function panelContent() {
   const st = sideState[0];
   if (S.selBld === 'barracks') {
-    const full = popOf(0) >= GAME.cap || st.queue.length >= GAME.queueMax;
+    const full = popOf(0) >= capOf(0) || st.queue.length >= GAME.queueMax;
     const cards = TYPES.map((t, i) => { const d = UNITS[t];
       return `<button type="button" class="rc" data-act="rec" data-t="${t}" ${full || st.gold < d.cost ? 'disabled' : ''} title="${uname(0, t)} · ${d.time} s · ${VS[t]}"><kbd>${i + 1}</kbd><img alt="" src="${THUMB[t] || ''}"><b>${uname(0, t)}</b><s>${d.cost}</s></button>`; }).join('');
     const q = st.queue.map((it, i) => `<button type="button" class="q" data-act="cancel" data-i="${i}" title="Cancelar (devuelve el oro)"><img alt="${uname(0, it.type)}" src="${THUMB[it.type] || ''}">${i === 0 ? `<i><b style="width:${pct(1 - it.t / UNITS[it.type].time)}"></b></i>` : ''}</button>`).join('');
-    return `<div class="ph" title="Clic derecho en el mapa: punto de reunión"><h3>CUARTEL</h3><em>COLA ${st.queue.length}/${GAME.queueMax}</em><em>TROPAS ${popOf(0)}/${GAME.cap}</em></div>${cards}<div class="qu">${q || '<span class="none">COLA VACÍA</span>'}</div>`;
+    return `<div class="ph" title="Clic derecho en el mapa: punto de reunión"><h3>CUARTEL</h3><em>COLA ${st.queue.length}/${GAME.queueMax}</em><em>TROPAS ${popOf(0)}/${capOf(0)}</em></div>${cards}<div class="qu">${q || '<span class="none">COLA VACÍA</span>'}</div>`;
   }
   if (S.selBld === 'altar') {
     const n = heroCount(0), alive = heroesOf(0).length, tr = st.heroQ.filter(h => h.state === 'training'), dead = st.heroQ.filter(h => h.state === 'dead');
@@ -122,7 +123,7 @@ function unitDetail(u) {
       <div class="stats"><span>ATQ <b>${Math.round(u.def.dmg * mul)}</b></span><span>ALC <b>${u.def.range}</b></span><span>VEL <b>${u.def.speed}</b></span>${hero ? `<span>BAJAS <b>${u.kills}</b></span>` : ''}</div>
       <div class="note${u.leader || hero ? ' g' : ''}">${note}</div></div>${esc}${asg}`;
 }
-export function refreshPanel() { panelHtml = ''; renderPanel(); renderHeroes(); }
+export function refreshPanel() { panelHtml = null; renderPanel(); renderHeroes(); }   // null y no '': si no, un panel que pasa a vacío no se borraba
 function assignSelected() {
   const h = heroOf(0); if (!h) return;
   let n = 0; for (const u of sel) if (assign(u, h)) n++;
@@ -139,12 +140,21 @@ const UI_IC = {
   coin: ['0011100','0111110','1110111','1101011','1110111','0111110','0011100'], army: ['0011100','0111110','1111111','1101011','1100011','1100011','0000000'],
   castle: ['1010101','1111111','0111110','0111110','0110110','0110110','1111111'], house: ['0001000','0011100','0111110','1111111','0100010','0101010','0111110'],
   crown: ['1010101','1111111','1111111','0000000','0111110','0111110','0000000'], target: ['0011100','0100010','1001001','1011101','1001001','0100010','0011100'],
-  pause: ['0000000','0110110','0110110','0110110','0110110','0110110','0000000'],
+  pause: ['0000000','0110110','0110110','0110110','0110110','0110110','0000000'], menu: ['0000000','1111111','0000000','1111111','0000000','1111111','0000000'],
 };
 export function selectBuilding(kind) { sel.clear(); S.follow = null; S.selBld = kind; S.selSpot = null; updateCtx(); }
 export function selectSpot(s) { sel.clear(); S.follow = null; S.selBld = null; S.selSpot = s; updateCtx(); }
 export function setSelection(list, add) { S.amode = false; if (!add) sel.clear(); for (const u of list) sel.add(u); S.selBld = null; S.selSpot = null; if (list.length) sfx('select'); updateCtx(); }
-export function syncTools() { $('spd').firstChild.textContent = '×' + S.speed; $('spd').classList.toggle('on', S.speed > 1); $('pz').classList.toggle('on', S.paused); $('pause').hidden = !S.paused; }
+export function syncTools() { $('spd').firstChild.textContent = '×' + S.speed; $('spd').classList.toggle('on', S.speed > 1); $('pz').classList.toggle('on', S.paused); $('pause').hidden = !S.paused || S.menuOpen; }
+// menú de pausa: congela la partida mientras está abierto y al cerrarlo la deja como estaba
+export function openMenu() {
+  if (state !== 'play' || S.menuOpen) return;
+  S.menuOpen = true; S.pausedBefore = S.paused; S.paused = true; S.amode = false; $('menu').hidden = false; syncTools(); sfx('select'); $('mResume').focus();
+}
+export function closeMenu() {
+  if (!S.menuOpen) return;
+  S.menuOpen = false; S.paused = S.pausedBefore; $('menu').hidden = true; syncTools(); sfx('select');
+}
 export function syncDiff() { document.querySelectorAll('.diff button[data-d]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.d === S.diff))); }
 
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
@@ -177,6 +187,11 @@ export function init() {
   $('fHero').addEventListener('click', heroButton);
   $('spd').addEventListener('click', () => { S.speed = S.speed === 1 ? 2 : 1; syncTools(); });
   $('pz').addEventListener('click', () => { S.paused = !S.paused; syncTools(); });
+  $('menuBtn').addEventListener('click', openMenu);
+  $('mResume').addEventListener('click', closeMenu);
+  $('mRestart').addEventListener('click', () => { track('menu_restart'); S.pendingStart = true; newGame(seed, true); });   // misma semilla y mismas civilizaciones
+  $('mSurrender').addEventListener('click', () => { track('menu_surrender'); endGame(false, true); });
+  $('mQuit').addEventListener('click', () => { track('menu_quit'); newGame(1 + Math.floor(Math.random() * 99999)); });
   $('snd').textContent = '♪ ' + (S.soundOn ? 'SÍ' : 'NO');
   $('snd').addEventListener('click', () => { S.soundOn = !S.soundOn; $('snd').textContent = '♪ ' + (S.soundOn ? 'SÍ' : 'NO'); try { localStorage.setItem('imperium-sound', S.soundOn ? '1' : '0'); } catch (e) {} if (S.soundOn && state === 'play') startMusic(); if (audio()) master.gain.setTargetAtTime(S.soundOn ? .9 : 0, ac.currentTime, .05); });
 }

@@ -6,6 +6,9 @@ import { floats, pings, puffs } from './units.js';
 
 // ---------- Efectos ----------
 const UP = new THREE.Vector3(0, 1, 0);
+// azar propio de los efectos de ambiente: no consume Math.random, que usa la simulación
+let fxSeed = 1;
+export const fxRand = () => (fxSeed = (fxSeed * 16807) % 2147483647) / 2147483647;
 // partículas y flechas salen de un pool de cajas: se reutilizan en vez de crear y tirar una malla por cada una
 const boxPool = [];
 export function takeBox(color) { const m = boxPool.pop() || new THREE.Mesh(BOX); m.material = mat(color); m.visible = true; m.rotation.set(0, 0, 0); m.scale.set(1, 1, 1); world.add(m); return m; }
@@ -15,6 +18,12 @@ export function burst(loc, colors, n, speed, up, life = .6, size = .22) {
   for (let k = 0; k < n; k++) {
     const m = takeBox(colors[k % colors.length]); m.scale.setScalar(size); m.position.copy(loc).y += .6; puffs.push({ m, v: new THREE.Vector3().randomDirection().multiplyScalar(speed).addScaledVector(UP, up), t: life, life, s: size });
   }
+}
+// humo o fuego que sube: g < 0 es empuje hacia arriba (las chispas de burst caen con g = 9) y grow hace que la bocanada crezca antes de deshacerse
+export function plume(loc, color, size, life, up = 1.2, g = -.6) {
+  if (!seenAt(loc)) return;
+  const m = takeBox(color); m.scale.setScalar(size * .5); m.position.copy(loc);
+  puffs.push({ m, v: new THREE.Vector3((fxRand() - .5) * .5, up, (fxRand() - .5) * .5), t: life, life, s: size, g, grow: true });
 }
 // lo que pasa en la niebla no se ve: textos, señales, partículas y flechas
 export const seenAt = p => !fogOn || visibleAt(p.x, p.z);

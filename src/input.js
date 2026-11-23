@@ -8,7 +8,7 @@ import { ALT0, BARR0, BASE0, BASE1, GAME, MD, MW, TYPES } from './config.js';
 import { ping } from './effects.js';
 import { toggleFog } from './fog.js';
 import { enqueue, heroesOf, newGame, startGame, state, toast } from './game.js';
-import { pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
+import { closeMenu, openMenu, pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
 import { HM, spots, surfY } from './map.js';
 import { seed } from './noise.js';
 import { camera, canvas, part, world } from './render.js';
@@ -158,6 +158,7 @@ export function init() {
     if (e.target.closest?.('button') && (e.key === ' ' || e.key === 'Enter')) return;
     const k = e.key.toLowerCase(); keys.add(k);
     if (state !== 'play') return;
+    if (S.menuOpen) { if (k === 'escape') closeMenu(); return; }   // con el menú abierto, el juego no recibe teclas
     if (/^f[1-5]$/.test(k)) { e.preventDefault(); pickGroup(+k[1] - 1); }
     else if (k === '1' || k === '2' || k === '3') enqueue(0, TYPES[+k - 1]);
     else if (k === 'b') { selectBuilding('barracks'); focusOn(spots[BARR0].x, spots[BARR0].z); }
@@ -168,7 +169,11 @@ export function init() {
     else if (k === ' ') { e.preventDefault(); if (alarm.pos) focusOn(alarm.pos.x, alarm.pos.z); }
     else if (k === 'n') toggleFog();
     else if (k === 'e') { if (sel.size) { S.amode = !S.amode; sfx('select'); } }
-    else if (k === 'escape') { if (S.amode) S.amode = false; else { S.follow = null; setSelection([], false); } }
+    else if (k === 'escape') {   // por orden: cancela ataque-mover, quita la selección y, si no hay nada, abre el menú
+      if (S.amode) S.amode = false;
+      else if (sel.size || S.selBld || S.selSpot) { S.follow = null; setSelection([], false); }
+      else openMenu();
+    }
     else if (k === 'a' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setSelection(units.filter(u => u.side === 0), false); }
   });
   addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));

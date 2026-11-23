@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { CIV, civOf } from './civs.js';
 import { GAME, TEAM, mixHex } from './config.js';
-import { burst, floatText, ping, seenAt } from './effects.js';
+import { burst, floatText, fxRand, ping, plume, seenAt } from './effects.js';
 import { visibleAt } from './fog.js';
 import { campSpawn, toast } from './game.js';
 import { fortPt, forts, inGate, paintRegion, sideAt, spots, surfY, wallR } from './map.js';
@@ -70,8 +70,31 @@ export function buildTown(s) {
   for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .25 && Math.cos(a) > 0) continue; part(g, .12, .9, .12, cv.id === 'galos' ? 0x7a5a34 : wc2, Math.cos(a) * 2.9, .05, Math.sin(a) * 2.9, false); }
   s.zone = ring(g, 3.5, 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.scale.set(.5, 14, .5); s.beacon.position.y = 9; s.beacon.visible = false; g.add(s.beacon);
-  s.roofs = roofs; bake(g0, new Set([...roofs, s.flag])); placeSpot(s, g0, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
+  s.roofs = roofs; s.townG = g; s.townCiv = cv; s.lvlG = null; bake(g0, new Set([...roofs, s.flag])); placeSpot(s, g0, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
   s.tower = local(s, -1.5 * big, 3.6 * big, -1.5 * big);
+}
+// cada nivel de mejora se ve en el pueblo: nivel 2, una casa más; nivel 3, otra casa y remates dorados en la torre
+export function townLevelLook(s) {
+  if (s.camp || !s.townG) return;
+  if (s.lvlG) { s.townG.remove(s.lvlG); for (const c of s.lvlG.children) c.geometry?.dispose(); s.lvlG = null; }
+  if (s.lvl < 2) return;
+  const g = new THREE.Group(), lots = s.fortified ? [[1.7, -2.2, .5, -.2], [-.2, -2.5, .5, .15]] : [[1.75, .95, .55, -.3], [-1.85, .85, .55, .3]];   // x, z, escala, giro
+  for (let k = 0; k < s.lvl - 1; k++) { const [x, z, sc, ry] = lots[k]; s.townCiv.house(CIV.grp(g, x, 0, z, sc, ry)); }
+  if (s.lvl >= 3) for (const [dx, dz] of [[-.5, -.5], [.5, -.5], [-.5, .5], [.5, .5]]) part(g, .22, .3, .22, 0xe8c050, -1.5 + dx, 3.8, -1.5 + dz);
+  s.townG.add(g); bake(g); s.lvlG = g;
+}
+// fortaleza dañada: humo por debajo del 75 % de vida; por debajo del 50 %, también fuego, y más cuanto menos vida le queda
+export function damageFx(dt) {
+  for (const s of spots) {
+    if (s.kind !== 'base' || !s.group?.visible) continue;
+    const k = s.hp / GAME.baseHp; if (k >= .75) continue;
+    const heavy = k < .25 ? 2 : k < .5 ? 1 : 0;
+    if ((s.fxT = (s.fxT ?? 0) - dt) > 0) continue;
+    s.fxT = [.35, .16, .07][heavy];
+    const p = spotPos(s, 2.2 + fxRand() * 2.6), r = 2 * (s.sc || 1); p.x += (fxRand() - .5) * 2 * r; p.z += (fxRand() - .5) * 2 * r;
+    plume(p, fxRand() < .5 ? 0x34343a : 0x56565c, .8 + heavy * .25, 2.2 + fxRand(), 1.1);
+    if (heavy) plume(p, fxRand() < .5 ? 0xff7a1a : 0xffc83a, .55 + heavy * .15, .45 + fxRand() * .3, 1.8, -1.5);
+  }
 }
 export const decos = [];
 export function buildWalls(f) {
@@ -114,7 +137,7 @@ function townLook(s) {
 // al verlo de nuevo, el pueblo muestra su dueño real
 export function refreshKnownTowns(all) { for (const s of spots) if (s.kind === 'town' && s.known !== s.owner && (all || visibleAt(s.x, s.z))) { s.known = s.owner; townLook(s); } }
 export function setOwner(s, sd) {
-  const prev = s.owner; s.owner = sd; if (sd < 0) s.lvl = 1;
+  const prev = s.owner; s.owner = sd; if (sd < 0 && s.lvl > 1) { s.lvl = 1; townLevelLook(s); }
   const p = spotPos(s), col = sd < 0 ? null : TEAM[sd];
   if (sd >= 0 && s.camp) { s.genT = GAME.campGen; for (let k = 0; k < 3; k++) campSpawn(s); }   // el campamento da tropas aunque no se vea
   if (!seenAt(p) && prev !== 0) return;   // en la niebla no te enteras (salvo que pierdas un pueblo tuyo)
@@ -122,7 +145,8 @@ export function setOwner(s, sd) {
   if (sd >= 0) {
     burst(spotPos(s, 1), [0xffd23f, 0xffe98a, col.c], 22, 3, 7, 1.1, .26); burst(spotPos(s, 4), [col.c, col.l, 0xffffff], 34, 4, 6, 1.6, .18); ping(p, '#e8c870'); ping(p, col.css);
     floatText(spotPos(s, 5.5), sd === 0 ? (s.camp ? 'JINETES ARQUEROS' : '+1,5 ORO/S') : 'PUEBLO PERDIDO', sd === 0 ? '#e8c870' : '#d83a4a', 10);
-    toast(sd === 0 ? (s.camp ? `¡${s.name} ES TUYO! JINETES ARQUEROS` : `¡${s.name} ES TUYO! +1,5 ORO/S`) : `EL RIVAL HA TOMADO ${s.name}`, sd === 0 ? 'good' : 'bad', s);
+    if (sd === 0) floatText(spotPos(s, 3.4), `+${GAME.capTown} TROPAS`, '#8ad8f0', 9);
+    toast(sd === 0 ? (s.camp ? `¡${s.name} ES TUYO! JINETES ARQUEROS · +${GAME.capTown} TROPAS` : `¡${s.name} ES TUYO! +1,5 ORO/S · +${GAME.capTown} TROPAS`) : `EL RIVAL HA TOMADO ${s.name}`, sd === 0 ? 'good' : 'bad', s);
     sfx(sd === 0 ? 'capture' : 'deny'); if (sd === 0) track('town_captured');
   } else {
     burst(spotPos(s, 1), [0xffffff, TEAM[prev].c], 14, 3, 4, .8, .22); ping(p, '#ffffff');

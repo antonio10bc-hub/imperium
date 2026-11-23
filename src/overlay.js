@@ -1,11 +1,11 @@
 // Capa 2D sobre el 3D (barras, iconos, textos), cursores y tamaño de la ventana.
 import * as THREE from 'three';
 import { spotPos } from './buildings.js';
-import { CFG, GAME, RANKS, TEAM, UNITS } from './config.js';
+import { BARR0, BASE1, CFG, GAME, RANKS, TEAM, UNITS } from './config.js';
 import { exploredAt, visibleAt } from './fog.js';
 import { state } from './game.js';
 import { drag, mouse, pickEnemy, pickSpot, pickUnit, project } from './input.js';
-import { spots } from './map.js';
+import { spots, surfY } from './map.js';
 import { camera, canvas, gl, target } from './render.js';
 import { $, S } from './state.js';
 import { floats, pings, sel, sideState, units } from './units.js';
@@ -62,6 +62,32 @@ function unitIcon(x, y, type, css) {
   octx.fillStyle = '#0f0f1b'; octx.fillRect(Math.round(x) - 1, y0 + w, 2, 3);
 }
 export const tmpP = {}, LBL = { barracks: 'CUARTEL', altar: 'ALTAR DEL HÉROE' }, _h = new THREE.Vector3();
+// líneas de destino de lo seleccionado: verde al moverse, roja al atacar o asediar, amarilla al conquistar; azul del cuartel al punto de reunión
+const _lp = new THREE.Vector3(), LA = {}, LB = {};
+const scr = (x, y, z, out) => { _lp.set(x, y, z).project(camera); out.x = (_lp.x * .5 + .5) * S.VW; out.y = (-_lp.y * .5 + .5) * S.VH; return _lp.z < 1; };   // false si queda detrás de la cámara
+function dashLine(ax, ay, bx, by, color) {
+  octx.setLineDash([6, 5]); octx.lineWidth = 4; octx.strokeStyle = 'rgba(15,15,27,.45)'; octx.beginPath(); octx.moveTo(ax, ay); octx.lineTo(bx, by); octx.stroke();
+  octx.lineWidth = 2; octx.strokeStyle = color; octx.stroke(); octx.setLineDash([]); octx.lineWidth = 1;
+}
+function orderLines() {
+  const ends = new Map();
+  octx.globalAlpha = .75;
+  for (const u of sel) {
+    const o = u.order; if (u.dead || u.side !== 0 || u.leader || !o) continue;
+    let x, z, c;
+    if (o.type === 'move') { x = o.tx; z = o.tz; c = o.attack ? '#d83a4a' : '#9ad86a'; }
+    else if (o.type === 'attack') { if (!o.target || o.target.dead) continue; x = o.target.pos.x; z = o.target.pos.z; c = '#d83a4a'; }
+    else if (o.type === 'capture') { const t = spots[o.k]; x = t.x; z = t.z; c = '#e8c870'; }
+    else if (o.type === 'siege') { const t = spots[BASE1]; x = t.x; z = t.z; c = '#d83a4a'; }
+    else continue;
+    if (!scr(u.pos.x, u.pos.y + .3, u.pos.z, LA) || !scr(x, surfY(x, z) + .1, z, LB)) continue;
+    dashLine(LA.x, LA.y, LB.x, LB.y, c); ends.set(Math.round(LB.x / 4) + ',' + Math.round(LB.y / 4), [LB.x, LB.y, c]);
+  }
+  const b = spots[BARR0];
+  if (S.selBld === 'barracks' && S.rally && scr(b.x, b.y + .5, b.z, LA) && scr(S.rally.x, surfY(S.rally.x, S.rally.z) + .1, S.rally.z, LB)) { dashLine(LA.x, LA.y, LB.x, LB.y, '#8ad8f0'); ends.set('rally', [LB.x, LB.y, '#8ad8f0']); }
+  octx.globalAlpha = 1;
+  for (const [x, y, c] of ends.values()) { octx.fillStyle = '#0f0f1b'; octx.fillRect(x - 4, y - 4, 8, 8); octx.fillStyle = c; octx.fillRect(x - 2.5, y - 2.5, 5, 5); }   // marca en cada destino
+}
 export function drawOverlay(dt) {
   octx.clearRect(0, 0, S.VW, S.VH);
   const showUI = state !== 'menu';
@@ -90,6 +116,7 @@ export function drawOverlay(dt) {
       if (s.side === 0 && h?.state === 'training') bar(top.x, top.y + 6, 44, 4, 1 - h.t / UNITS.hero.time, '#e8c870');
     }
   }
+  if (state === 'play' && showUI) orderLines();
   for (const u of units) {
     project(u.pos, tmpP); u.sx = tmpP.x; u.sy = tmpP.y;
     const hidden = u.side !== 0 && state === 'play' && !visibleAt(u.pos.x, u.pos.z); u.g.visible = !hidden; u.vis = tmpP.vis && !hidden;
