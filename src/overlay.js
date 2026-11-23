@@ -5,8 +5,8 @@ import { ALT0, BARR0, BASE1, CFG, GAME, RANKS, TEAM, TEMP0, UNITS } from './conf
 import { uname } from './civs.js';
 import { exploredAt, visibleAt } from './fog.js';
 import { state } from './game.js';
-import { RALLY_BLD, drag, mouse, pickEnemy, pickSpot, pickUnit, project } from './input.js';
-import { spots, surfY } from './map.js';
+import { RALLY_BLD, drag, groundAt, mouse, pickEnemy, pickSpot, pickUnit, project } from './input.js';
+import { GEOT, cellOf, spots, surfY } from './map.js';
 import { camera, canvas, gl, target } from './render.js';
 import { $, S } from './state.js';
 import { floats, pings, sel, sideState, units } from './units.js';
@@ -184,6 +184,7 @@ const CUR = {
   flag: makeCursor(['2........', '2333.....', '233333...', '2333333..', '23333....', '2........', '2........', '2........', '2........', '22.......'], { 2: '#8a5a34', 3: '#e8c870' }, 0, 9, 'pointer'),
   rally: makeCursor(['2........', '2333.....', '233333...', '2333333..', '23333....', '2........', '2........', '2........', '2........', '22.......'], { 2: '#8a5a34', 3: '#3a6ad8' }, 0, 9, 'pointer'),
   assign: makeCursor(['1..1..1', '11.1.11', '1111111', '1111111', '2222222'], { 1: '#e8c870', 2: '#c07a40' }, 3, 2, 'pointer'),
+  chop: makeCursor(['....3333...', '...331333..', '...3333332.', '....33.22..', '......22...', '.....22....', '....22.....', '...22......', '..22.......', '.22........', '22.........'], { 1: '#f4f4e8', 2: '#8a5a34', 3: '#c8ccd8' }, 6, 2, 'pointer'),   // hacha: talar el bosque
   move: makeCursor(['1.......', '11......', '121.....', '1221....', '12221...', '122221..', '1222111.', '121.....', '11......'], { 1: '#f4f4e8', 2: '#9ad86a' }, 0, 0, 'default'),
 };
 function hoverCursor() {
@@ -194,7 +195,8 @@ function hoverCursor() {
   const own = pickUnit(x, y, 0);
   if (own) return has && own.type === 'hero' && [...sel].some(u => u !== own && u.type !== 'hero') ? CUR.assign : 'pointer';
   const sp = pickSpot(x, y);
-  if (sp) { if (has && sp.side === 1) return CUR.attack; if (has && sp.kind === 'town' && sp.owner !== 0) return CUR.flag; return 'pointer'; }
+  if (sp) { if (has && ((sp.kind === 'base' && sp.side !== 0) || (sp.kind === 'bridge' && sp.built))) return CUR.attack; if (has && sp.kind === 'town' && sp.owner !== 0) return CUR.flag; return 'pointer'; }
+  if (has && R.on.chop) { const g = groundAt(x, y); if (g) { const t = GEOT[cellOf(g.x, g.z)]; if (t === 1 || t === 16) return CUR.chop; } }   // sobre el bosque: talarlo
   return has ? CUR.move : 'default';
 }
 
