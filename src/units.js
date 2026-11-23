@@ -131,10 +131,12 @@ export const units = [], arrows = [], puffs = [], floats = [], pings = [];
 // (separación, enemigo más cercano, conquista, torres) miran solo las celdas cercanas en vez de todas las unidades.
 const byId = (a, b) => a.id - b.id;
 export const UGRID = (() => {
-  const S = 4, W = Math.ceil(MW / S), D = Math.ceil(MD / S), cells = Array.from({ length: W * D }, () => []), used = [];
+  const S = 4; let W = 0, D = 0, mw = 0, md = 0, cells = []; const used = [];
+  const resize = () => { mw = MW; md = MD; W = Math.ceil(MW / S); D = Math.ceil(MD / S); cells = Array.from({ length: W * D }, () => []); used.length = 0; }; resize();
   const cx = x => Math.min(W - 1, Math.max(0, Math.floor(x / S))), cz = z => Math.min(D - 1, Math.max(0, Math.floor(z / S)));
   return {
-    rebuild() { for (const k of used) cells[k].length = 0; used.length = 0; for (const u of units) { const k = cz(u.pos.z) * W + cx(u.pos.x); if (!cells[k].length) used.push(k); cells[k].push(u); } },
+    resize,   // al cambiar el tamaño del mapa
+    rebuild() { if (mw !== MW || md !== MD) resize(); for (const k of used) cells[k].length = 0; used.length = 0; for (const u of units) { const k = cz(u.pos.z) * W + cx(u.pos.x); if (!cells[k].length) used.push(k); cells[k].push(u); } },
     // unidades vivas de las celdas que tocan el círculo (x, z, r), en out (se reutiliza; no anidar llamadas con el mismo out).
     // Margen de 1 casilla: dentro de un paso las unidades se mueven un poco respecto a la celda en la que se apuntaron.
     // Se devuelven por id, que es el orden de la lista units: los desempates salen igual que recorriendo todas las unidades

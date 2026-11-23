@@ -9,7 +9,11 @@ export const mixHex = (a, b, t) => { const ar = a >> 16 & 255, ag = a >> 8 & 255
 export const TP = { lush: 0x6ea653, grass: 0x7db45b, grass2: 0x8bbd61, dry: 0x9fc56c, sand: 0xdccb95, cliff: 0x8a7656, cliffS: 0xbfae7e,
   path: 0xcbb48a, road: 0xc4ad80, ford: 0xcdb98c, plaza: 0xd6cfba, wallbase: 0xb3a990, edge: 0x8ccbe0, shallow: 0x5fb0d4, deep: 0x4594c6,
   canopy: 0x3f7a45, canopy2: 0x4b874c, pine: 0x31683f, trunk: 0x6b4a2e, outside: 0x2c4430 };
-export const MW = 384, MD = 256, INK = 0x0f0f1b, N = MW * MD, idx = (x, z) => z * MW + x;
+// tamaño del mapa: se elige en el menú (pequeño, normal o grande) y lo fija setMapSize antes de generar cada mapa
+export let MW = 384, MD = 256, N = MW * MD;
+export const INK = 0x0f0f1b, idx = (x, z) => z * MW + x;
+export const MAP_SIZES = { p: { name: 'PEQUEÑO', w: 288, d: 192, towns: 12 }, n: { name: 'NORMAL', w: 384, d: 256, towns: 16 }, g: { name: 'GRANDE', w: 480, d: 320, towns: 22 } };
+export function setMapSize(k) { const m = MAP_SIZES[k] || MAP_SIZES.n; MW = m.w; MD = m.d; N = MW * MD; GAME.towns = m.towns; }
 export const TEAM = [{ c: 0x3a6ad8, d: 0x1e4a8a, l: 0x8ad8f0, css: '#3a6ad8', rgb: [58, 106, 216] }, { c: 0xd83a4a, d: 0x5a3a24, l: 0xe8c870, css: '#d83a4a', rgb: [216, 58, 74] },
   { c: 0x9a7a3a, d: 0x4a3a24, l: 0xd8c89a, css: '#9a7a3a', rgb: [154, 122, 58] }];   // 2 = neutrales de los campamentos
 export const UNITS = {
@@ -34,4 +38,4 @@ export const GAME = { startGold: 220, income: 1, townIncome: 1.3, townDecay: .08
 export const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, brain: 'simple', label: 'FÁCIL' }, normal: { inc: 1, attackAt: 6, hero: true, brain: 'smart', plan: 1, focus: false, label: 'NORMAL' }, hard: { inc: 1, attackAt: 5, hero: true, brain: 'smart', plan: .5, focus: true, label: 'DIFÍCIL' } };
 // sitios: fortalezas, cuarteles, salones de héroes (ALT) y templos (TEMP) de cada bando; después, los pueblos
 export const BASE0 = 0, BASE1 = 1, BARR0 = 2, BARR1 = 3, ALT0 = 4, ALT1 = 5, TEMP0 = 6, TEMP1 = 7, TOWN0 = 8;
-export const TOWN_NAMES = ['VILLAROCA', 'PINARES', 'ALBAMAR', 'ROBLEDO', 'FUENTEVIEJA', 'MONTEALTO', 'LAGUNILLA', 'PEÑASCO', 'VALDEORO', 'SALINAS', 'TORRENUEVA', 'ARENALES', 'CASTROVERDE', 'OLMEDA', 'MIRAFLORES', 'ROCAFRÍA', 'VADOHONDO', 'LOS LLANOS'];
+export const TOWN_NAMES = ['VILLAROCA', 'PINARES', 'ALBAMAR', 'ROBLEDO', 'FUENTEVIEJA', 'MONTEALTO', 'LAGUNILLA', 'PEÑASCO', 'VALDEORO', 'SALINAS', 'TORRENUEVA', 'ARENALES', 'CASTROVERDE', 'OLMEDA', 'MIRAFLORES', 'ROCAFRÍA', 'VADOHONDO', 'LOS LLANOS', 'PEÑAFIEL', 'ROBLEDAL', 'AGUAVIVA', 'CANTALOBOS', 'VILLAFRÍA', 'MONTERRUBIO', 'ENCINAR', 'VALDELAGUA'];

@@ -22,7 +22,7 @@ import { init as init_minimap } from './minimap.js';
 import { init as init_fog } from './fog.js';
 import { init as init_hud } from './hud.js';
 import { init as init_input } from './input.js';
-import { init as init_menu } from './menu.js';
+import { init as init_menu, setSize } from './menu.js';
 import { init as init_overlay } from './overlay.js';
 import { R, breakBridge, buildBridge, canBreak, startChop } from './rules.js';
 
@@ -85,6 +85,6 @@ window.__game = { S, gl, units, triggerEvent, ev, R, buildBridge, breakBridge, s
 makeThumbs();
 // ?mapa=RIO-48213 en la dirección abre ese mapa
 { let c = null; try { c = parseCode(new URLSearchParams(location.search).get('mapa')); } catch (e) {}
-  if (c) { S.wantScen = c.geo; S.codeSeed = c.seed; document.getElementById('mapCode').value = c.geo.toUpperCase() + '-' + c.seed; document.getElementById('mapCode').className = 'ok'; }
+  if (c) { S.wantScen = c.geo; S.codeSeed = c.seed; setSize(c.size, true); document.getElementById('mapCode').value = c.geo.toUpperCase() + '-' + c.seed; document.getElementById('mapCode').className = 'ok'; }
   newGame(c ? c.seed : 1 + Math.floor(Math.random() * 99999)); }
 requestAnimationFrame(frame);

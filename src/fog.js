@@ -12,9 +12,16 @@ import { visionBonus } from './rules.js';
 
 // ---------- Niebla de guerra ----------
 // resolución completa (una celda por casilla), borde de visión en degradado y desenfoque: 255 = a la vista, 120 = explorado, 0 = sin explorar
-export const FW = MW, FH = MD, fogData = new Uint8Array(FW * FH).fill(255), seen = new Uint8Array(FW * FH), explored = new Uint8Array(FW * FH);
-const visF = new Float32Array(FW * FH), expF = new Float32Array(FW * FH), fogTgt = new Float32Array(FW * FH), fogB = new Float32Array(FW * FH);
-const fogTex = new THREE.DataTexture(fogData, FW, FH, THREE.RedFormat);
+export let FW = 0, FH = 0, fogData = null, seen = null, explored = null;
+let visF = null, expF = null, fogTgt = null, fogB = null, fogTex = null;
+// la niebla tiene una celda por casilla: al cambiar el tamaño del mapa se rehacen sus búferes y su textura
+export function ensureFogSize() {
+  if (FW === MW && FH === MD) return;
+  FW = MW; FH = MD; const n = FW * FH;
+  fogData = new Uint8Array(n).fill(255); seen = new Uint8Array(n); explored = new Uint8Array(n);
+  visF = new Float32Array(n); expF = new Float32Array(n); fogTgt = new Float32Array(n); fogB = new Float32Array(n);
+  fogTex?.dispose(); fogTex = new THREE.DataTexture(fogData, FW, FH, THREE.RedFormat); fogTex.magFilter = fogTex.minFilter = THREE.LinearFilter; fogTex.needsUpdate = true; fogU.uFog.value = fogTex;
+}
 const VISION = { sword: 10, bow: 13, horse: 15, harcher: 15, hero: 14, titan: 10, god: 14 }, FOG_SOFT = 5;   // casillas de degradado en el borde de la visión
 export let fogOn = false;
 function revealAt(x, z, r) {
@@ -55,8 +62,8 @@ export function toggleFog() {
   else { fogData.fill(255); fogTex.needsUpdate = true; markMiniDirty(); for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; for (const u of units) u.g.visible = true; refreshKnownTowns(true); }
   toast(fogOn ? 'NIEBLA DE GUERRA: SÍ · N' : 'NIEBLA DE GUERRA: NO · N'); sfx('select');
 }
-export function resetFog(on) { fogOn = on; explored.fill(0); expF.fill(0); fogData.fill(255); if (on) updateFog(true); else { fogTex.needsUpdate = true; for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; } }
+export function resetFog(on) { ensureFogSize(); fogOn = on; explored.fill(0); expF.fill(0); fogData.fill(255); if (on) updateFog(true); else { fogTex.needsUpdate = true; for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; } }
 
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
-export function init() { fogTex.magFilter = fogTex.minFilter = THREE.LinearFilter; fogTex.needsUpdate = true; fogU.uFog.value = fogTex;
+export function init() { ensureFogSize();
 }

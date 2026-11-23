@@ -13,7 +13,7 @@ import { resetFog } from './fog.js';
 import { GEO } from './geo.js';
 import { refreshPanel, syncDiff, syncTools, updateCtx } from './hud.js';
 import { focusOn } from './input.js';
-import { fortPt, forts, generate, mapCode, paintRegion, regions, scen, spots, wallR } from './map.js';
+import { fortPt, forts, generate, geoR, mapCode, paintRegion, regions, scen, spots, wallR } from './map.js';
 import { showPortraits } from './menu.js';
 import { cellX, cellZ, fieldAround, nearestNode } from './nav.js';
 import { seed } from './noise.js';
@@ -121,7 +121,7 @@ export function newGame(s, keepCivs = false) {
   $('loading').hidden = false; $('end').hidden = true; $('start').hidden = true; $('menu').hidden = true; S.menuOpen = false; $('ui').classList.add('hidden-ui');
   requestAnimationFrame(() => setTimeout(() => {
     clearWorld(); resetFog(false); if (!keepCivs) resolveCivs(true);
-    generate(s);
+    generate(s); resetFog(false); UGRID.resize();
     const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, temple: buildTemple, town: buildTown };
     for (const sp of spots) B[sp.kind](sp);
     for (const f of forts) buildWalls(f);
@@ -139,7 +139,7 @@ export function newGame(s, keepCivs = false) {
     if (S.pendingStart) { S.pendingStart = false; startGame(); } else { $('start').hidden = false; showPortraits(); }
   }, 30));
 }
-export function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; toast('MAPA: ' + GEO.LIST[scen]); { const b = BONUS[civOf(0).id]; if (b) toast(`${civOf(0).name} · ${b.name}: ${b.text.toUpperCase()}`, 'good'); } resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
+export function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; toast('MAPA: ' + GEO.LIST[scen] + (geoR?.mix ? ': ' + geoR.mix.map(k => GEO.LIST[k]).join(' + ') : '')); { const b = BONUS[civOf(0).id]; if (b) toast(`${civOf(0).name} · ${b.name}: ${b.text.toUpperCase()}`, 'good'); } resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
 export function endGame(win, surrender = false) {
   state = 'end'; $('menu').hidden = true; S.menuOpen = false; $('ui').classList.add('hidden-ui'); $('toast').hidden = true; $('pause').hidden = true;
   const s = spots[win ? BASE1 : BASE0];

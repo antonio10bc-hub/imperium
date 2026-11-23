@@ -150,7 +150,15 @@ function setGeo(v, dir, keepCode = false) {
   sfx('select'); S.menuDirty = true; showGeo(dir);
 }
 
+// tamaño del mapa: pequeño, normal o grande
+export function setSize(k, quiet = false) {
+  S.mapSize = k; try { localStorage.setItem('imperium-size', k); } catch (e) {}
+  document.querySelectorAll('#start [data-size]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === k)));
+  if (!quiet) { sfx('select'); S.menuDirty = true; }
+}
 export function init() {
+  document.querySelectorAll('#start [data-size]').forEach(b => b.addEventListener('click', () => setSize(b.dataset.size)));
+  setSize(S.mapSize, true);
   document.querySelectorAll('#start .arr[data-side]').forEach(b => b.addEventListener('click', () => {
     const sd = +b.dataset.side, d = +b.dataset.d, o = civOpts(), i = o.indexOf(civPick[sd]);
     setCiv(sd, o[(i + d + o.length) % o.length], d);
@@ -159,7 +167,7 @@ export function init() {
   setTimeout(() => showGeo(), 0);
   $('mapCode').addEventListener('input', e => {   // código de mapa: elige su geografía y su semilla
     const el = e.target, c = parseCode(el.value);
-    if (c) { setGeo(c.geo, 1, true); S.codeSeed = c.seed; S.menuDirty = true; }
+    if (c) { setGeo(c.geo, 1, true); S.codeSeed = c.seed; setSize(c.size, true); S.menuDirty = true; }
     else S.codeSeed = null;
     el.className = !el.value.trim() ? '' : c ? 'ok' : 'bad';
   });

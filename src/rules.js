@@ -14,12 +14,12 @@ import { MD, MW, N, RANGED, idx } from './config.js';
 import { orderMove } from './behavior.js';
 import { burst, ping, plume, streak } from './effects.js';
 import { refreshFields, toast } from './game.js';
-import { GEOT, HM, bridgeSites, geoR, removeTrees, roadCell, scen, treeCell } from './map.js';
+import { GEOT, HM, bridgeSites, geoR, removeTrees, roadCell, scen, spots, treeCell } from './map.js';
 import { blocked, cellX, cellZ, nearestOpen, refreshCells } from './nav.js';
 import { bake, part, world } from './render.js';
 import { UGRID, sideState, units } from './units.js';
 
-export const R = { on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false };
+export const R = { half: {}, on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false };
 const _near = [];
 
 // ---------- preparación al empezar cada partida ----------
@@ -28,23 +28,27 @@ export function setupRules() {
   Object.assign(R, { on: {}, gates: [], bridges: [], jobs: [], cycle: null, hide: null, cover: null, wet: null, volcano: null, meshes: [], thirstTold: false, bombs: [], breaks: [], treasures: null });
   const on = R.on;
   on.bridges = bridgeSites.length > 0;
-  on.snow = scen === 'cordillera'; on.highVision = scen === 'cordillera';
-  on.tides = scen === 'archipielago'; on.floods = scen === 'afluentes';
-  on.canyon = scen === 'barrancos'; on.swamp = scen === 'delta';
-  on.chop = scen === 'bosque'; on.cover = scen === 'bosque';
-  on.thirst = scen === 'oasis'; on.volcano = scen === 'lago' && !!geoR?.volcano;
-  on.ice = scen === 'helado'; on.plains = scen === 'llanura'; on.treasures = scen === 'ruinas';
+  // en una mezcla, cada regla vale solo en la mitad de su geografía
+  const has = k => scen === k || !!geoR?.mix?.includes(k);
+  R.half = {}; for (const k of geoR?.mix || []) { const w = geoR.mix[0] === k; R.half[k] = (x, z) => (x < geoR.seam(z)) === w; }
+  const inK = (k, i) => !R.half[k] || R.half[k](i % MW + .5, ((i / MW) | 0) + .5);
+  on.snow = has('cordillera'); on.highVision = has('cordillera');
+  on.tides = has('archipielago'); on.floods = has('afluentes');
+  on.canyon = has('barrancos'); on.swamp = has('delta');
+  on.chop = has('bosque'); on.cover = has('bosque');
+  on.thirst = has('oasis'); on.volcano = has('lago') && !!geoR?.volcano;
+  on.ice = has('helado'); on.plains = has('llanura'); on.treasures = has('ruinas');
   // casillas donde las tropas se ocultan: el fondo de los barrancos y los pantanos del delta
-  if (on.canyon || on.swamp) { R.hide = new Uint8Array(N); for (let i = 0; i < N; i++) if (on.canyon ? HM[i] === 1 : GEOT[i] === 2) R.hide[i] = 1; }
+  if (on.canyon || on.swamp) { R.hide = new Uint8Array(N); for (let i = 0; i < N; i++) if ((on.canyon && HM[i] === 1 && inK('barrancos', i)) || (on.swamp && GEOT[i] === 2 && inK('delta', i))) R.hide[i] = 1; }
   // cobertura: junto al bosque denso o entre árboles
   if (on.cover) { R.cover = new Uint8Array(N); for (let z = 1; z < MD - 1; z++) for (let x = 1; x < MW - 1; x++) { const i = idx(x, z); if (treeCell[i] || [-1, 0, 1].some(dz => [-1, 0, 1].some(dx => GEOT[idx(x + dx, z + dz)] === 1))) R.cover[i] = 1; } }
   // agua en el desierto: a menos de 12 casillas de un oasis, del agua o de una fortaleza no hay sed
-  if (on.thirst) R.wet = wetMap(12);
+  if (on.thirst) { R.wet = wetMap(12); if (R.half.oasis) for (let i = 0; i < N; i++) if (!inK('oasis', i)) R.wet[i] = 1; }
   // mareas (bajíos del archipiélago) y crecidas (vados de los afluentes): grupos de casillas que se cierran a ratos
   if (on.tides || on.floods) {
     const cells = [];
     for (let z = 1; z < MD - 1; z++) for (let x = 1; x < MW - 1; x++) { const i = idx(x, z);
-      if (on.tides ? GEOT[i] === 2 && HM[i] === 1 : HM[i] === 1 && GEOT[i] === 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => HM[idx(x + a, z + b)] <= 0)) cells.push(i); }
+      if (on.tides ? GEOT[i] === 2 && HM[i] === 1 && inK('archipielago', i) : HM[i] === 1 && GEOT[i] === 0 && inK('afluentes', i) && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => HM[idx(x + a, z + b)] <= 0)) cells.push(i); }
     if (cells.length) { const g = { cells, open: true, layer: waterLayer(cells) }; R.gates.push(g); R.cycle = { phase: 'open', t: on.tides ? 100 : 140 }; }
   }
   for (const b of bridgeSites) { const br = makeBridge(b); R.bridges.push(br); if (b.built) { br.built = true; br.group.visible = true; } }
@@ -59,12 +63,12 @@ export function setupRules() {
 function wetMap(r) {
   const d = new Uint8Array(N).fill(255), q = [];
   for (let i = 0; i < N; i++) if (HM[i] <= 0 || GEOT[i] === 4) { d[i] = 0; q.push(i); }
-  for (const s of spots0()) for (let dz = -24; dz <= 24; dz++) for (let dx = -24; dx <= 24; dx++) { const x = Math.floor(s.x) + dx, z = Math.floor(s.z) + dz; if (x >= 0 && z >= 0 && x < MW && z < MD && dx * dx + dz * dz < 576) { const i = idx(x, z); if (d[i]) { d[i] = 0; q.push(i); } } }
+  for (const s of spots) { if (s.kind !== 'base' && s.kind !== 'town') continue; const R2 = s.kind === 'base' ? 24 : 12;   // fortalezas y pueblos tienen pozos
+    for (let dz = -R2; dz <= R2; dz++) for (let dx = -R2; dx <= R2; dx++) { const x = Math.floor(s.x) + dx, z = Math.floor(s.z) + dz; if (x >= 0 && z >= 0 && x < MW && z < MD && dx * dx + dz * dz < R2 * R2) { const i = idx(x, z); if (d[i]) { d[i] = 0; q.push(i); } } } }
   for (let h = 0; h < q.length; h++) { const v = q[h], x = v % MW, z = (v / MW) | 0; if (d[v] >= r) continue;
     for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + a, nz = z + b; if (nx < 0 || nz < 0 || nx >= MW || nz >= MD) continue; const j = idx(nx, nz); if (d[j] > d[v] + 1) { d[j] = d[v] + 1; q.push(j); } } }
   const w = new Uint8Array(N); for (let i = 0; i < N; i++) w[i] = d[i] <= r ? 1 : 0; return w;
 }
-const spots0 = () => geoR?.F ? geoR.F.map(([x, z]) => ({ x, z })) : [];
 // capa de agua sobre unas casillas (se ve cuando están cerradas)
 function waterLayer(cells, color = 0x5fb0d4) {
   const p = [], ix = [];
@@ -184,7 +188,7 @@ function updateTreasures() {
 }
 export const TREASURE = 80;
 // llanura abierta: los jinetes van un 15 % más rápido
-export const geoSpeed = u => R.on.plains && (u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.def.speed >= 4.5)) ? 1.15 : 1;
+export const geoSpeed = u => R.on.plains && (!R.half.llanura || R.half.llanura(u.pos.x, u.pos.z)) && (u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.def.speed >= 4.5)) ? 1.15 : 1;
 
 // ---------- tala del bosque denso ----------
 // clic derecho sobre el bosque con tropas: van al borde y, mientras alguna esté al lado, lo talan en unos segundos
@@ -218,7 +222,7 @@ function updateJobs(dt) {
 // multiplica el daño: emboscada desde lo alto en los barrancos; cobertura contra flechas en el bosque
 export function geoDmg(att, tgt) {
   let k = 1;
-  if (R.on.canyon && att.node != null && HM[att.node] - HM[tgt.node] >= 2) k *= 1.25;
+  if (R.on.canyon && att.node != null && HM[att.node] - HM[tgt.node] >= 2 && (!R.half.barrancos || R.half.barrancos(tgt.pos.x, tgt.pos.z))) k *= 1.25;
   if (R.cover && RANGED(att.type) && R.cover[tgt.node]) k *= .7;
   return k;
 }
@@ -227,7 +231,7 @@ export const geoSlow = u => R.on.snow && HM[u.node] >= 9 ? .7 : 1;
 // en el delta los jinetes se atascan aún más en el pantano
 export const swampMounted = () => R.on.swamp ? .32 : .45;
 // visión extra desde las alturas de la cordillera
-export const visionBonus = u => R.on.highVision && HM[u.node] >= 6 ? 6 : 0;
+export const visionBonus = u => R.on.highVision && HM[u.node] >= 6 && (!R.half.cordillera || R.half.cordillera(u.pos.x, u.pos.z)) ? 6 : 0;
 // ¿está oculta esta tropa para el bando sd? (fondo de barranco o pantano, sin tropas de sd a menos de 7 casillas)
 export const hiddenFrom = (u, sd) => !!(u.hid && u.hid[sd]);
 function updateHide() {

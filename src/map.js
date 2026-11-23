@@ -1,7 +1,7 @@
 // Datos del mapa (alturas, fortalezas, regiones) y su generación: terreno, pueblos, caminos y vóxeles.
 import * as THREE from 'three';
 import { civOf } from './civs.js';
-import { BASE0, BASE1, GAME, MD, MW, N, TOWN_NAMES, TP, idx, mixHex } from './config.js';
+import { BASE0, BASE1, GAME, MAP_SIZES, MD, MW, N, TOWN_NAMES, setMapSize, TP, idx, mixHex } from './config.js';
 import { GEO } from './geo.js';
 import { buildMinimap, markMiniDirty } from './minimap.js';
 import { NBO, bfs, buildNav, cellX, cellZ, inMain, mainList, nearestNode, stepMask } from './nav.js';
@@ -38,13 +38,13 @@ function riverGround(rng, el, rivx) {
 // vista previa de una geografía para el menú: un ejemplo con semilla fija (alturas, tipos de casilla y sitio de las fortalezas)
 const previews = new Map();
 export function previewMap(key) {
-  let p = previews.get(key); if (p) return p;
+  const pk = key + MW; let p = previews.get(pk); if (p) return p;
   if (key === 'rio') { const el = new Float32Array(N); riverGround(rngOf(4242), el, new Float32Array(MD)); p = { HM: el, TT: new Uint8Array(N), F: [[MW * .15, MD / 2], [MW * .85, MD / 2]] }; }
   else { const g = GEO.build(key, 4242); p = { HM: g.HM, TT: g.TT, F: g.F, snow: g.snow }; }
-  previews.set(key, p); return p;
+  previews.set(pk, p); return p;
 }
 // ---------- Mapa de alturas ----------
-const RIVX = new Float32Array(MD).fill(MW / 2);   // x del río en cada fila: separa las dos mitades del mapa
+let RIVX = new Float32Array(MD).fill(MW / 2);   // x del río en cada fila: separa las dos mitades del mapa
 export let EL = null, G = null, HM = null, flats = [], forts = [];
 function groundXZ(x, z) {
   let g = EL[idx(x, z)]; const cx = x + .5, cz = z + .5;
@@ -162,17 +162,18 @@ export function terrainColor(x, z) {
   const fc = featureAt(x, z, side, B); if (fc >= 0) return fc;
   const m = n2(cx, cz, .045, 3, 21 + side * 7) + (h - 2) * .05, tone = THREE.MathUtils.clamp(Math.floor((m - .34) / .09), 0, 3);
   const col = h >= 6 ? (h >= 9 ? 0xe4e2da : mixHex(B.ground[tone], 0x9a9488, Math.min(1, (h - 5) / 3))) : B.ground[tone];   // alturas: la hierba pasa a roca y, en las cumbres, a nieve
-  return geoR?.snow ? mixHex(col, 0xeef2f6, .62) : col;   // valle helado: todo nevado
+  return geoR?.snow && (geoR.snowSide == null || (cx < geoR.seam(cz)) === (geoR.snowSide === 0)) ? mixHex(col, 0xeef2f6, .62) : col;   // valle helado: todo nevado
 }
 export let meshes = [], spots = [], bridgeSites = [];
 // código de mapa para compartir: GEOGRAFÍA-SEMILLA (p. ej. RIO-48213). La misma geografía y semilla dan el mismo terreno y los mismos pueblos
-export const mapCode = () => `${scen.toUpperCase()}-${seed}`;
+export const mapCode = () => `${scen.toUpperCase()}-${seed}${sizeKey !== 'n' ? '-' + sizeKey.toUpperCase() : ''}`;   // -P o -G: tamaño pequeño o grande
 export function parseCode(t) {
-  const m = /^\s*([A-Za-z]+)\s*-\s*(\d{1,9})\s*$/.exec(t || ''), key = m && m[1].toLowerCase();
-  return m && GEO.LIST[key] ? { geo: key, seed: +m[2] } : null;
+  const m = /^\s*([A-Za-z]+)\s*-\s*(\d{1,9})\s*(?:-\s*([PNGpng]))?\s*$/.exec(t || ''), key = m && m[1].toLowerCase();
+  return m && GEO.LIST[key] ? { geo: key, seed: +m[2], size: (m[3] || 'n').toLowerCase() } : null;
 }
+export let sizeKey = 'n';
 export function generate(newSeed, tries = 0) {
-  setSeed(newSeed);
+  setSeed(newSeed); sizeKey = MAP_SIZES[S.mapSize] ? S.mapSize : 'n'; setMapSize(sizeKey); RIVX = new Float32Array(MD).fill(MW / 2); ocean.position.set(MW / 2, -3, MD / 2);
   meshes.forEach(m => { m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); }); meshes = [];
   EL = new Float32Array(N); G = new Float32Array(N); HM = new Int8Array(N);
   const rng = rngOf(seed);

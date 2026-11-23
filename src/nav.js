@@ -4,7 +4,8 @@ import { GEOT, HM, wallHit } from './map.js';
 
 // ---------- Navegación en rejilla ----------
 export let walk = null, inMain = null, mainList = [], stepMask = null;
-export const NB8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]], NBO = NB8.map(([dx, dz]) => dz * MW + dx);
+export const NB8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+export let NBO = NB8.map(([dx, dz]) => dz * MW + dx);   // desplazamiento de cada vecina en el array (depende del ancho del mapa)
 function canStep(x, z, nx, nz) {
   if (nx < 0 || nz < 0 || nx >= MW || nz >= MD) return false;
   const b = idx(nx, nz); if (!walk[b] || Math.abs(HM[idx(x, z)] - HM[b]) > 1) return false;
@@ -18,6 +19,7 @@ export let blocked = null;
 const baseWalk = (x, z) => { const i = idx(x, z); return HM[i] >= 1 && GEOT[i] !== 1 && !blocked[i] && !wallHit(x + .5, z + .5) ? 1 : 0; };
 export function buildNav() {
   walk = new Uint8Array(N); inMain = new Uint8Array(N); stepMask = new Uint8Array(N); blocked = new Uint8Array(N);
+  NBO = NB8.map(([dx, dz]) => dz * MW + dx); if (_q.length !== N) _q = new Int32Array(N);
   for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) walk[idx(x, z)] = baseWalk(x, z);
   for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) { const i = idx(x, z); if (!walk[i]) continue; let m = 0; for (let k = 0; k < 8; k++) if (canStep(x, z, x + NB8[k][0], z + NB8[k][1])) m |= 1 << k; stepMask[i] = m; }
   const comp = new Int32Array(N).fill(-1); let best = -1, bestN = 0, cid = 0, landN = 0;
@@ -48,7 +50,7 @@ export function nearestOpen(x, z, maxR = 10) {
   }
   return -1;
 }
-const _q = new Int32Array(N);
+let _q = new Int32Array(N);
 // campo de distancias por camino desde las casillas de origen. Con stop, para en cuanto llega a esa casilla:
 // las casillas del camino de vuelta ya tienen su distancia final, así que se puede seguir igual pero explorando mucho menos
 export function bfs(sources, stop = -1) {

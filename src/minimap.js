@@ -16,6 +16,7 @@ let miniRaw = null, miniImg = null, miniDirty = true;
 export const markMiniDirty = () => { miniDirty = true; };
 export function buildMinimap() {
   miniRaw = new Uint32Array(N); miniImg = bctx.createImageData(MW, MD);
+  if (mbuf.width !== MW || mbuf.height !== MD) { mini.width = MW * MS; mini.height = MD * MS; mbuf.width = MW; mbuf.height = MD; }
   for (let i = 0; i < N; i++) {
     const h = HM[i], g = G[i], x = i % MW, z = (i / MW) | 0;
     miniRaw[i] = h <= 0 ? (g > -2.2 ? TP.shallow : TP.deep) : treeCell[i] ? biomeAt(x + .5, z + .5).treeCol : terrainColor(x, z);

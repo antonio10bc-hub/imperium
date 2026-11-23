@@ -186,14 +186,31 @@ export const GEO = (() => {
   };
 
 
-  const LIST = { rio: 'RÍO', cordillera: 'CORDILLERA', istmo: 'ISTMO', archipielago: 'ARCHIPIÉLAGO', barrancos: 'BARRANCOS', meseta: 'MESETA', afluentes: 'AFLUENTES', delta: 'DELTA', bosque: 'BOSQUE', oasis: 'DESIERTO', lago: 'CALDERA', helado: 'VALLE HELADO', canon: 'CAÑÓN', costa: 'COSTA', llanura: 'LLANURA', ruinas: 'RUINAS' };
+  const LIST = { rio: 'RÍO', cordillera: 'CORDILLERA', istmo: 'ISTMO', archipielago: 'ARCHIPIÉLAGO', barrancos: 'BARRANCOS', meseta: 'MESETA', afluentes: 'AFLUENTES', delta: 'DELTA', bosque: 'BOSQUE', oasis: 'DESIERTO', lago: 'CALDERA', helado: 'VALLE HELADO', canon: 'CAÑÓN', costa: 'COSTA', llanura: 'LLANURA', ruinas: 'RUINAS', mezcla: 'MEZCLA' };
+  // mezcla: la mitad oeste de una geografía y la este de otra (elegidas con la semilla), con una franja de transición.
+  // Cada regla de geografía se aplica solo en su mitad. El cañón no entra: su garganta cae justo en la costura
+  const MIXABLE = ['cordillera', 'istmo', 'archipielago', 'barrancos', 'meseta', 'afluentes', 'delta', 'bosque', 'oasis', 'lago', 'helado', 'costa', 'llanura', 'ruinas'];
+  function mix(seed) {
+    const r = rngOf(seed), a = MIXABLE[r() * MIXABLE.length | 0]; let b = a; while (b === a) b = MIXABLE[r() * MIXABLE.length | 0];
+    const A = build(a, (seed * 7 + 11) % 2147483000 + 1), B = build(b, (seed * 13 + 5) % 2147483000 + 1), HMg = new Float32Array(MW * MD), TTg = new Uint8Array(MW * MD), sd = seed % 997;
+    const seam = z => MW / 2 + (fbm(3.7, z / MD * 4, sd + 9, 3) - .5) * MW * .12, band = MW * .035;
+    for (let gz = 0; gz < MD; gz++) { const sx = seam(gz + .5); for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, t = sm((gx + .5 - sx + band) / (2 * band));
+      HMg[i] = Math.round(A.HM[i] * (1 - t) + B.HM[i] * t); TTg[i] = t < .5 ? A.TT[i] : B.TT[i];
+      if ((TTg[i] === 9) || (HMg[i] > 0 && (A.HM[i] <= 0) !== (B.HM[i] <= 0) && t > .2 && t < .8 && TTg[i] !== 0)) TTg[i] = 0; } }
+    const west = p => p[0] < seam(p[1]), east = p => !west(p), pick = (la, lb) => [...(la || []).filter(west), ...(lb || []).filter(east)];
+    return { HM: HMg, TT: TTg, F: [A.F[0], B.F[1]], passes: [], special: pick(A.special, B.special), div: seam,
+      volcano: A.volcano && west(A.volcano) ? A.volcano : B.volcano && east(B.volcano) ? B.volcano : null, bridges: [], treasures: pick(A.treasures, B.treasures),
+      snow: a === 'helado' || b === 'helado', snowSide: a === 'helado' ? 0 : b === 'helado' ? 1 : null,
+      sea: A.sea || B.sea, river: A.river || B.river, goldTop: a === 'meseta' || b === 'meseta', oasis: false, mix: [a, b], seam };
+  }
   function build(id, seed) {
+    if (id === 'mezcla') return mix(seed);
     const r = rngOf(seed), s = seed % 997, F = fortsFor(r), HMg = new Float32Array(MW * MD), TTg = new Uint8Array(MW * MD);
-    const M = { each(fn) { for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, o = fn((gx + .5) / 2, (gz + .5) / 2, HMg[i], TTg[i]); if (o) { HMg[i] = Math.min(12, Math.round(o[0])); TTg[i] = o[1]; } } } };
+    const M = { each(fn) { for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, o = fn((gx + .5) * W / MW, (gz + .5) * H / MD, HMg[i], TTg[i]); if (o) { HMg[i] = Math.min(12, Math.round(o[0])); TTg[i] = o[1]; } } } };
     const passes = GEN[id](M, r, s, F) || [];
     for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 11 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
-    const up = p => [p[0] * 2, p[1] * 2];
-    return { HM: HMg, TT: TTg, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z / 2) * 2 : null,
+    const up = p => [p[0] * MW / W, p[1] * MD / H];
+    return { HM: HMg, TT: TTg, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z * H / MD) * MW / W : null,
       volcano: M.volcano ? up(M.volcano) : null, bridges: (M.bridges || []).map(up), treasures: (M.treasures || []).map(up), snow: !!M.snow,
       sea: id === 'istmo' || id === 'archipielago' || id === 'costa', river: id === 'afluentes', goldTop: id === 'meseta', oasis: id === 'oasis' };
   }
