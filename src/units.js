@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { orderMove } from './behavior.js';
 import { CIV_SLOT, civOf, defOf } from './civs.js';
-import { ALT0, BARR0, GAME, MD, MW, RANKS, TEAM, TEMP0, TYPES, mixHex } from './config.js';
+import { ALT0, BARR0, GAME, MD, MW, NEU, RANKS, TEAM, TEMP0, TYPES, mixHex } from './config.js';
 import { GEOT, HM, cellOf, roadCell, spots } from './map.js';
 import { NBO, cellX, cellZ, inMain, nearestNode, stepMask, walk } from './nav.js';
 import { BOX, FLASH, HULLMAT, VCMAT, basic, collectParts, discGeo, mergeBoxes, part, ring, ringGeo, world } from './render.js';
@@ -14,7 +14,7 @@ import { geoSlow, swampMounted } from './rules.js';
 // (geometría con color por vértice + contorno). Cada tropa reutiliza esas geometrías: 2 mallas en lugar de ~50.
 const UNIT_TPL = new Map();
 function unitModel(type, side, body) {   // construye las piezas del modelo en body; devuelve la altura de la cresta de rango
-  if (side < 2 && type in CIV_SLOT) {   // tropa de civilización
+  if (side < NEU && type in CIV_SLOT) {   // tropa de civilización
     civOf(side)[type](body, TEAM[side].c);
     body.updateMatrixWorld(true); return new THREE.Box3().setFromObject(body).max.y + .16;
   }
@@ -69,7 +69,7 @@ function unitModel(type, side, body) {   // construye las piezas del modelo en b
   return crestY;
 }
 function unitTemplate(type, side) {
-  const civ = side < 2 && type in CIV_SLOT ? civOf(side).id : '-', key = civ + '|' + type + '|' + side;
+  const civ = side < NEU && type in CIV_SLOT ? civOf(side).id : '-', key = civ + '|' + type + '|' + side;
   let t = UNIT_TPL.get(key); if (t) return t;
   const body = new THREE.Group(), crestY = unitModel(type, side, body), { fill, hull } = collectParts(body);
   t = { crestY, team: TEAM[side].c, base: fill.map(m => m.material.color.getHex()), geo: [mergeBoxes(fill, body, true)], hull: mergeBoxes(hull, body, false) };
@@ -91,14 +91,21 @@ function buildUnit(type, side, parent = world) {
   const crest = new THREE.Group(); part(crest, .18, .18, .18, 0xffffff, 0, t.crestY, 0); crest.visible = false; body.add(crest);
   const sh = new THREE.Mesh(discGeo(.62, 20), basic(0x0f0f1b, .28)); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; g.add(sh);
   const team = ring(g, .46, .66, TEAM[side].c, .05), selR = ring(g, .7, .86, 0xffe03a, .07); selR.visible = false;
+  // estandarte: el héroe lleva uno grande y una de cada cuatro tropas de su escolta, uno pequeño (color del bando con una franja del color de su civilización)
+  let banner = null;
+  if (side < NEU && (type === 'hero' || TYPES.includes(type))) {
+    const big = type === 'hero', H = big ? 3.4 : 2.3, fy = H - (big ? .45 : .3), fw = big ? 1 : .6, own = civOf(side).own ?? TEAM[side].l;
+    banner = new THREE.Group(); part(banner, .06, H, .06, 0x5a3a24, 0, H / 2, 0, false); part(banner, .05, big ? .7 : .45, fw, TEAM[side].c, 0, fy, fw / 2, false); part(banner, .056, big ? .22 : .14, fw, own, 0, fy - (big ? .12 : .08), fw / 2, false);
+    banner.position.set(-.26, 0, -.24); banner.visible = big; body.add(banner);
+  }
   let halo = null, aura = null, wave = null;
   if (type === 'god') {   // el dios: halo dorado tras la cabeza, aura de luz en el suelo y una onda que se expande al curar
     halo = new THREE.Mesh(ringGeo(.3, .4), basic(0xffe9a0, .9)); halo.position.set(0, t.crestY - .2, -.24); body.add(halo);
     aura = ring(g, .2, 1.15, 0xffe9a0, .04, .3);
     wave = new THREE.Mesh(ringGeo(.9, 1), new THREE.MeshBasicMaterial({ color: 0xb8f07a, transparent: true, opacity: 0, depthWrite: false })); wave.rotation.x = -Math.PI / 2; wave.position.y = .08; wave.visible = false; g.add(wave);
   }
-  g.scale.setScalar({ god: 2.1, titan: 1.7, cart: 1.25 }[type] ?? (type === 'hero' ? (side < 2 ? 1.8 : 1.95) : 1.3)); parent.add(g);
-  return { g, body, mesh, tpl: t, team, selR, crest, sh, halo, aura, wave };
+  g.scale.setScalar({ god: 2.1, titan: 1.7, cart: 1.25 }[type] ?? (type === 'hero' ? (side < NEU ? 1.8 : 1.95) : 1.3)); parent.add(g);
+  return { g, body, mesh, tpl: t, team, selR, crest, sh, halo, aura, wave, banner };
 }
 export const THUMB = {};
 // un solo renderer fuera de pantalla para miniaturas y retratos del menú (crear contextos WebGL en cada partida agota el límite del navegador)
@@ -179,12 +186,13 @@ export function place(u, dt = 0) {
   u.hitT = Math.max(0, (u.hitT || 0) - dt); u.body.rotation.x = u.lunge * .45 - u.hitT * 2.2;   // se inclina al golpear y retrocede al recibir
   if (u.capT > 0) { u.capT -= dt; u.body.position.y += Math.abs(Math.sin(performance.now() / 120 + u.id * 1.7)) * .5; }   // salto de conquista
   const fl = u.flash > 0; if (fl !== u.flashOn) { u.flashOn = fl; u.mesh.material = fl ? FLASH : VCMAT; }   // destello blanco al recibir daño
+  if (u.banner) { u.banner.visible = u.type === 'hero' || (!!u.leader && u.id % 4 === 0); if (u.banner.visible) u.banner.rotation.y = Math.sin(performance.now() / 400 + u.id) * .25; }   // estandartes de la escolta
   const s = sel.has(u); u.selR.visible = s; if (s) u.selR.scale.setScalar(1 + Math.sin(performance.now() / 120) * .06);
 }
 export const charging = u => (u.type === 'hero' ? u : u.leader)?.chargeT > 0;
 export const roadK = u => roadCell && roadCell[u.node] ? 1.35 : 1;   // los caminos dan velocidad
 const FOOT_HERO = new Set(['mexica', 'vikingos']);   // civilizaciones cuyo héroe va a pie
-const MOUNTED = u => u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.side < 2 && !FOOT_HERO.has(civOf(u.side).id));
+const MOUNTED = u => u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.side < NEU && !FOOT_HERO.has(civOf(u.side).id));
 export const slowK = u => (GEOT && GEOT[u.node] === 2 ? (MOUNTED(u) ? swampMounted() : .6) : GEOT && GEOT[u.node] === 11 ? .8 : 1) * geoSlow(u);   // las dunas también frenan   // pantano y bajío: más lentos, sobre todo a caballo
 export const spd = u => (u.leader ? Math.max(u.def.speed, u.leader.def.speed) : u.def.speed) * (charging(u) ? 1.6 : 1) * roadK(u) * slowK(u);
 export function stepToward(u, tx, tz, s, dt) {

@@ -1,7 +1,7 @@
 // Combate: daño, rangos, muertes, disparos y asedio.
 import { sfx } from './audio.js';
 import { spotPos } from './buildings.js';
-import { GAME, RANGED, RANKS, TEAM } from './config.js';
+import { GAME, NEU, RANGED, RANKS, TEAM } from './config.js';
 import { burst, floatText, ping, seenAt, takeBox } from './effects.js';
 import { elapsed, fields, toast } from './game.js';
 import { updateCtx } from './hud.js';
@@ -55,7 +55,7 @@ export function assign(u, h) {
   unassign(u); u.leader = h; h.escort.push(u); h.formKey = null; u.order = null; setMax(u);
   return true;
 }
-function kill(u, by) {
+export function kill(u, by) {
   u.dead = true; units.splice(units.indexOf(u), 1); sel.delete(u);
   // el caído se queda en el suelo un rato y luego se hunde
   u.mesh.material = VCMAT; u.team.visible = false; u.selR.visible = false; u.crest.visible = false;
@@ -72,7 +72,7 @@ function kill(u, by) {
   ping(u.pos, TEAM[u.side].css);
   if (by?.side != null) {
     const b = u.bounty ?? (u.type === 'hero' ? 60 : GAME.bounty); if (sideState[by.side]) sideState[by.side].gold += b;
-    if (u.caravan && by.side < 2) toast(by.side === 0 ? `¡CARRO DE LA CARAVANA SAQUEADO! +${b} ORO` : 'EL RIVAL HA SAQUEADO UN CARRO DE LA CARAVANA', by.side === 0 ? 'good' : 'bad', u.pos);
+    if (u.caravan && by.side < NEU) toast(by.side === 0 ? `¡CARRO DE LA CARAVANA SAQUEADO! +${b} ORO` : 'EL RIVAL HA SAQUEADO UN CARRO DE LA CARAVANA', by.side === 0 ? 'good' : 'bad', u.pos);
     if (by.side === 0) floatText(u.pos.clone().setY(u.pos.y + 2.8), '+' + b + ' ORO', '#e8c870', 9);
     if (by.kills != null && !by.dead) { by.kills += u.type === 'hero' ? 3 : 1; promote(by); }
   }

@@ -16,6 +16,7 @@ export const S = {
 // preferencias guardadas en el navegador
 try { S.wantScen = localStorage.getItem('imperium-geo') || 'random'; } catch (e) {}
 S.mapSize = 'n'; try { S.mapSize = localStorage.getItem('imperium-size') || 'n'; } catch (e) {}
+S.players = 2; try { S.players = +localStorage.getItem('imperium-players') || 2; } catch (e) {}
 try { S.diff = localStorage.getItem('imperium-diff') || 'easy'; } catch (e) {}
 try { S.soundOn = localStorage.getItem('imperium-sound') === '1'; } catch (e) {}   // por defecto, sin sonido
 export const $ = id => document.getElementById(id);

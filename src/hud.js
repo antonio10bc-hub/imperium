@@ -3,7 +3,7 @@ import { ac, audio, master, sfx, startMusic } from './audio.js';
 import { SHAPES } from './behavior.js';
 import { uname } from './civs.js';
 import { assign } from './combat.js';
-import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, RANKS, TEAM, TEMP0, TYPES, UNITS } from './config.js';
+import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, NP, RANKS, TEAM, TEMP0, TYPES, UNITS, players } from './config.js';
 import { ping } from './effects.js';
 import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, townIncNow, popOf, state, summonHero, toast, towerDmg, towerRange, upgradeTown } from './game.js';
 import { focusOn, heroButton } from './input.js';
@@ -15,6 +15,7 @@ import { THUMB, alive, sel, sideState, units } from './units.js';
 import { BRIDGE_COST, buildBridge } from './rules.js';
 import { ruleTimer } from './rules.js';
 import { GEO } from './geo.js';
+import { targetBase } from './ai.js';
 
 // ---------- HUD ----------
 // Grupos con F1–F5 (sin barra visible: la barra inferior queda libre para la selección)
@@ -37,10 +38,11 @@ export function updateHud() {
   $('pop').textContent = popOf(0); $('cap').textContent = capOf(0);
   const m = ev.merc, showM = !!m && !m.hired[0]; $('merc').hidden = !showM;   // oferta de mercenarios
   if (showM) { $('mercT').textContent = `MERCENARIOS VETERANOS · ${Math.ceil(m.t)} S`; const b = $('mercBtn'), room = mercRoom(0); b.textContent = room ? `CONTRATAR · ${MERC.cost}` : 'SIN SITIO'; b.disabled = !room || sideState[0].gold < MERC.cost; }
-  const n0 = 1 + owned(0), n1 = 1 + spots.filter(s => s.kind === 'town' && s.known === 1).length, NR = regions.length, key = n0 + ',' + n1 + ',' + NR;
+  const n0 = 1 + owned(0), n1 = NP - 1 + spots.filter(s => s.kind === 'town' && s.known > 0).length, NR = regions.length, key = n0 + ',' + n1 + ',' + NR;
   if (key !== terrKey) { terrKey = key; $('terr').innerHTML = '<i class="b"></i>'.repeat(n0) + '<i></i>'.repeat(Math.max(0, NR - n0 - n1)) + '<i class="r"></i>'.repeat(n1); }
   $('hp0').textContent = Math.max(0, Math.round(spots[BASE0].hp / GAME.baseHp * 100)) + ' %';
-  $('hp1').textContent = Math.max(0, Math.round(spots[BASE1].hp / GAME.baseHp * 100)) + ' %';
+  $('hp1').textContent = NP === 2 ? Math.max(0, Math.round(spots[BASE1].hp / GAME.baseHp * 100)) + ' %' : `${players().filter(sd => sd > 0 && !sideState[sd]?.dead).length}/${NP - 1} EN PIE`;   // con varios rivales: cuántos quedan
+  $('t1').textContent = NP === 2 ? 'RIVAL' : 'RIVALES';
   renderHeroes(); renderPanel();
 }
 const hpCol = k => k > .5 ? '#7ed957' : k > .25 ? '#e8c870' : '#d83a4a';
@@ -222,7 +224,7 @@ export function init() {
     UI_IC[el.dataset.ic].forEach((row, j) => [...row].forEach((v, i) => { if (v === '1') x.fillRect(i, j, 1, 1); })); el.src = c.toDataURL();
   });
   $('fBase').addEventListener('click', () => focusOn(spots[BASE0].x, spots[BASE0].z));
-  $('fEnemy').addEventListener('click', () => focusOn(spots[BASE1].x, spots[BASE1].z));
+  $('fEnemy').addEventListener('click', () => { const t = spots[targetBase(0, spots[0])]; focusOn(t.x, t.z); });   // la fortaleza rival más cercana que siga en pie
   $('fBarr').addEventListener('click', () => { selectBuilding('barracks'); focusOn(spots[BARR0].x, spots[BARR0].z); });
   $('fHero').addEventListener('click', heroButton);
   $('spd').addEventListener('click', () => { S.speed = S.speed === 1 ? 2 : 1; syncTools(); });

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { spotPos } from './buildings.js';
 import { nearestEnemy, siege, strike } from './combat.js';
-import { BASE1, GAME, MD, MW, idx } from './config.js';
+import { BASE1, GAME, MD, MW, NEU, idx } from './config.js';
 import { burst, floatText, ping, plume, streak } from './effects.js';
 import { aiUnit } from './ai.js';
 import { bonusOf } from './civs.js';
@@ -126,7 +126,7 @@ function playerUnit(u, dt) {
   if (o?.type === 'capture') {
     const s = spots[o.k]; if (s.owner === 0) { u.order = null; return; }
     spreadTo(u, s.x, s.z, fields[o.k], 0, 0, dt, capR(s) - .8);   // repartidas, pero siempre dentro del círculo de conquista
-  } else if (o?.type === 'siege') siege(u, spots[BASE1], dt);
+  } else if (o?.type === 'siege') siege(u, o.s || spots[BASE1], dt);
 }
 // guardianes de los campamentos: defienden su zona y vuelven a ella
 function guardUnit(u, dt) {
@@ -194,13 +194,13 @@ export function updateUnit(u, dt) {
       if (u.vis) { floatText(u.pos.clone().setY(u.pos.y + 4.4), '¡CARGA!', '#e8c870', 11); sfx('charge', u.side); }
     }
   }
-  if (u.side < 2 && sideState[u.side].ai) aiUnit(u, dt); else if (u.side === 0) playerUnit(u, dt);
+  if (u.side < NEU && sideState[u.side]?.ai) aiUnit(u, dt); else if (u.side === 0) playerUnit(u, dt);
   else if (u.raid != null) raiderUnit(u, dt); else if (u.caravan) { caravanUnit(u, dt); if (u.dead) return; } else guardUnit(u, dt);
   for (const o of UGRID.near(u.pos.x, u.pos.z, 1.7, _nearSep)) if (o !== u) {   // separación: solo vecinos cercanos
     const dx = u.pos.x - o.pos.x, dz = u.pos.z - o.pos.z, d = Math.hypot(dx, dz), min = (u.type === 'hero' || o.type === 'hero') ? 1.7 : 1.05;
     if (d < min && d > 1e-4) { const k = (u.moving ? .8 : 1.4) * dt / d, nx = u.pos.x + dx * k, nz = u.pos.z + dz * k, b = cellOf(nx, nz); if (b === u.node || (walk[b] && inMain[b] && Math.abs(HM[b] - HM[u.node]) <= 1)) { u.pos.x = nx; u.pos.z = nz; u.node = b; } }
   }
-  if (u.hp < u.maxHp && elapsed - u.lastHit > 3 && (regionOwner(regionCell[u.node]) === u.side || (u.side === 2 && elapsed - u.lastHit > 6))) {
+  if (u.hp < u.maxHp && elapsed - u.lastHit > 3 && (regionOwner(regionCell[u.node]) === u.side || (u.side === NEU && elapsed - u.lastHit > 6))) {
     u.hp = Math.min(u.maxHp, u.hp + GAME.regen * (u.type === 'hero' ? 3 : 1) * dt);
     if ((u.healT -= dt) <= 0) { u.healT = 1.2; if (u.vis) floatText(u.pos.clone().setY(u.pos.y + 2), '+', '#9ad86a', 9); }
   }

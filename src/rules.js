@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { damage, shoot } from './combat.js';
-import { MD, MW, N, RANGED, TEAM, idx } from './config.js';
+import { MD, MW, N, NEU, NP, RANGED, TEAM, idx, players } from './config.js';
 import { orderMove } from './behavior.js';
 import { burst, dropBox, ping, plume, takeBox } from './effects.js';
 import { refreshFields, toast } from './game.js';
@@ -100,7 +100,7 @@ function evict(cells, drown = false) {
   const set = new Set(cells);
   for (const u of [...units]) if (!u.dead && set.has(u.node)) {
     const o = drown ? -1 : nearestOpen(u.pos.x, u.pos.z, 12);
-    if (o < 0) { damage({ side: 2, vis: u.vis, def: {} }, u, u.hp + 1); continue; }
+    if (o < 0) { damage({ side: NEU, vis: u.vis, def: {} }, u, u.hp + 1); continue; }
     u.pos.set(cellX(o), HM[o], cellZ(o)); u.node = o; u.chase = null;
   }
 }
@@ -125,7 +125,7 @@ const BRIDGE_HP = { stone: 900, fort: 650, rope: 280, wood: 450 };
 function makeBridge(site) {
   const xs = site.cells.map(c => c % MW), zs = site.cells.map(c => (c / MW) | 0), x0 = Math.min(...xs), x1 = Math.max(...xs) + 1, z0 = Math.min(...zs), z1 = Math.max(...zs) + 1;
   const style = site.style || 'wood', hb = site.h ?? 1, b = { kind: 'bridge', style, x: (x0 + x1) / 2, z: (z0 + z1) / 2, y: hb, hb, x0, x1, z0, z1, cells: site.cells, h0: site.cells.map(c => site.h0 ?? HM[c]), built: false, breakable: !!site.breakable,
-    name: { stone: 'PUENTE DE PIEDRA', fort: 'PUENTE FORTIFICADO', rope: 'PUENTE COLGANTE', wood: 'PUENTE' }[style], hp: BRIDGE_HP[style], maxHp: BRIDGE_HP[style], owner: -1, cap: [0, 0], towerCd: 0, roofs: [], group: new THREE.Group() };
+    name: { stone: 'PUENTE DE PIEDRA', fort: 'PUENTE FORTIFICADO', rope: 'PUENTE COLGANTE', wood: 'PUENTE' }[style], hp: BRIDGE_HP[style], maxHp: BRIDGE_HP[style], owner: -1, cap: [0, 0, 0, 0, 0], towerCd: 0, roofs: [], group: new THREE.Group() };
   const g = b.group, L = site.axis === 'x' ? x1 - x0 + .4 : z1 - z0 + .4, W = site.axis === 'x' ? z1 - z0 : x1 - x0, wood = 0x8a5a34, wood2 = 0x6a4224, stone = 0xb0aca0, stone2 = 0x8e8a80, rope = 0xc8b080;
   const P = (w, h, d, c, x, y, z, hull = true) => site.axis === 'x' ? part(g, w, h, d, c, x, y, z, hull) : part(g, d, h, w, c, z, y, x, hull);
   const deep = 1.8 + hb;
@@ -198,9 +198,10 @@ export function breakBridge(side, b) {
 }
 // puente fortificado: se conquista quedándose en el tablero sin enemigos; sus torres disparan a los enemigos de su dueño
 function updateFortBridge(b, dt) {
-  const here = [0, 0];
-  for (const u of UGRID.near(b.x, b.z, 6, _near)) if (u.side < 2 && Math.hypot(u.pos.x - b.x, u.pos.z - b.z) < 6) here[u.side]++;
-  for (const sd of [0, 1]) if (here[sd] && !here[1 - sd] && b.owner !== sd) { b.cap[sd] += dt / 5; if (b.cap[sd] >= 1) { b.cap = [0, 0]; b.owner = sd; for (const m of b.roofs) m.material = mat(TEAM[sd].c);
+  const here = players().map(() => 0);
+  for (const u of UGRID.near(b.x, b.z, 6, _near)) if (u.side < NP && Math.hypot(u.pos.x - b.x, u.pos.z - b.z) < 6) here[u.side]++;
+  const alone = here.filter(Boolean).length === 1;
+  for (const sd of players()) if (here[sd] && alone && b.owner !== sd) { b.cap[sd] += dt / 5; if (b.cap[sd] >= 1) { b.cap = [0, 0, 0, 0, 0]; b.owner = sd; for (const m of b.roofs) m.material = mat(TEAM[sd].c);
       burst(b.tower, [TEAM[sd].c, 0xffffff], 20, 3, 4, 1, .22); toast(sd === 0 ? '¡EL PUENTE FORTIFICADO ES TUYO! SUS TORRES DISPARAN' : 'EL RIVAL HA TOMADO EL PUENTE FORTIFICADO', sd === 0 ? 'good' : 'bad', b); sfx(sd === 0 ? 'capture' : 'deny'); } }
     else if (!here[sd]) b.cap[sd] = Math.max(0, b.cap[sd] - dt / 10);
   if (b.owner < 0 || (b.towerCd -= dt) > 0) return;
@@ -250,7 +251,7 @@ function updateTreasures() {
   for (const t of R.treasures) {
     if (t.taken) continue;
     if ((t.fx = (t.fx ?? 0) - .25) <= 0) { t.fx = 1.2; plume(new THREE.Vector3(t.x, t.y + 1, t.z), 0xffe9a0, .18, .9, 1.4, -.6); }   // brillo
-    const u = UGRID.near(t.x, t.z, 1.8, _near).find(o => o.side < 2 && Math.hypot(o.pos.x - t.x, o.pos.z - t.z) < 1.8); if (!u) continue;
+    const u = UGRID.near(t.x, t.z, 1.8, _near).find(o => o.side < NEU && Math.hypot(o.pos.x - t.x, o.pos.z - t.z) < 1.8); if (!u) continue;
     t.taken = true; t.g.visible = false; sideState[u.side].gold += t.value || TREASURE;
     burst(new THREE.Vector3(t.x, t.y + .5, t.z), [0xffd23f, 0xffffff, 0xe8c870], 24, 3, 5, 1, .22);
     toast(u.side === 0 ? `¡TESORO ENCONTRADO! +${t.value || TREASURE} ORO` : 'EL RIVAL HA ENCONTRADO UN TESORO', u.side === 0 ? 'good' : 'bad', t); if (u.side === 0) sfx('capture');
@@ -305,14 +306,14 @@ export const hiddenFrom = (u, sd) => !!(u.hid && u.hid[sd]);
 function updateHide() {
   for (const u of units) {
     if (u.dead || !R.hide[u.node]) { u.hid = null; continue; }
-    const seen = [false, false];
-    for (const o of UGRID.near(u.pos.x, u.pos.z, 7, _near)) if (o.side < 2 && o.side !== u.side && Math.hypot(o.pos.x - u.pos.x, o.pos.z - u.pos.z) < 7) seen[o.side] = true;
-    u.hid = [!seen[0] && u.side !== 0, !seen[1] && u.side !== 1];
+    const seen = [false, false, false, false, false];
+    for (const o of UGRID.near(u.pos.x, u.pos.z, 7, _near)) if (o.side < NEU && o.side !== u.side && Math.hypot(o.pos.x - u.pos.x, o.pos.z - u.pos.z) < 7) seen[o.side] = true;
+    u.hid = seen.map((v, sd) => !v && u.side !== sd);
   }
 }
 function updateThirst() {
   for (const u of units) {
-    if (u.dead || u.side > 1 || u.type === 'god' || R.wet[u.node] || (roadCell && roadCell[u.node])) continue;
+    if (u.dead || u.side >= NEU || u.type === 'god' || R.wet[u.node] || (roadCell && roadCell[u.node])) continue;
     if (u.hp > u.maxHp * .3) { u.hp = Math.max(u.maxHp * .3, u.hp - 1.5); if ((u.thirstFx = (u.thirstFx ?? 0) - 1) <= 0) { u.thirstFx = 3; plume(u.pos.clone().setY(u.pos.y + 2), 0xe8d8a0, .18, .8, 1.2, -.4); } }
     if (u.side === 0 && !R.thirstTold) { R.thirstTold = true; toast('TUS TROPAS PASAN SED LEJOS DEL AGUA: PIERDEN VIDA', 'bad', u.pos); }
   }
@@ -337,7 +338,7 @@ function updateVolcano(dt) {
     if (b.m) { b.v.y -= 9 * dt; b.m.position.addScaledVector(b.v, dt); b.m.rotation.x += dt * 6; if ((b.tr = (b.tr ?? 0) - dt) <= 0) { b.tr = .06; plume(b.m.position.clone(), 0x4a4448, .45, .8, .6, -.2, true); } }
     if ((b.t -= dt) > 0) continue; R.bombs.splice(k, 1); if (b.m) dropBox(b.m);
     burst(b.to, [0xff7a1a, 0xffc83a, 0x3a3034], 12, 4, 5, .8, .3, true); plume(b.to, 0x56565c, 1.4, 1.8, 1.4, -.6, true);
-    for (const u of UGRID.near(b.to.x, b.to.z, 2.8, _near)) if (Math.hypot(u.pos.x - b.to.x, u.pos.z - b.to.z) < 2.8) damage({ side: 2, vis: u.vis, def: {} }, u, 40);
+    for (const u of UGRID.near(b.to.x, b.to.z, 2.8, _near)) if (Math.hypot(u.pos.x - b.to.x, u.pos.z - b.to.z) < 2.8) damage({ side: NEU, vis: u.vis, def: {} }, u, 40);
   }
   if (v.t > 0) return;
   if (v.phase === 'calm') { v.phase = 'warn'; v.t = 8; toast('¡EL VOLCÁN RUGE! VA A ENTRAR EN ERUPCIÓN', 'bad', v); sfx('rumble'); }

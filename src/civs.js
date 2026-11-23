@@ -1,6 +1,6 @@
 // Civilizaciones: modelos de tropas y edificios, murallas, biomas y elección de civilización.
 import * as THREE from 'three';
-import { UNITS } from './config.js';
+import { NEU, NP, UNITS } from './config.js';
 import { BOX, HULLMAT, mat, part } from './render.js';
 
 // ---------- Civilizaciones ----------
@@ -422,14 +422,15 @@ export let civPick = ['random', 'random'], civIdx = [0, 1];
 try { civPick = JSON.parse(localStorage.getItem('imperium-civs')) || civPick; } catch (e) {}
 export const civOf = side => CIVS[civIdx[side] ?? 0];
 export const CIV_SLOT = { sword: 0, bow: 1, horse: 2, hero: 3, god: 4 };
-export const uname = (side, type) => side < 2 && type in CIV_SLOT ? civOf(side).names[CIV_SLOT[type]] : UNITS[type].name;
-// elige las civilizaciones: "aleatoria" evita repetir la del otro bando si se puede
+export const uname = (side, type) => side < NEU && type in CIV_SLOT ? civOf(side).names[CIV_SLOT[type]] : UNITS[type].name;
+// elige las civilizaciones de cada jugador: las fijadas en el menú (tú y el primer rival) y, el resto, al azar sin repetir si se puede
 export function resolveCivs(final) {
-  const fixed = civPick.map(v => v === 'random' ? -1 : CIVS.findIndex(c => c.id === v));
-  for (const sd of [0, 1]) {
+  const fixed = Array.from({ length: NP }, (_, sd) => { const v = civPick[sd] ?? 'random'; return v === 'random' ? -1 : CIVS.findIndex(c => c.id === v); });
+  civIdx.length = Math.max(civIdx.length, NP); const used = new Set(fixed.filter(i => i >= 0));
+  for (let sd = 0; sd < NP; sd++) {
     if (fixed[sd] >= 0) { civIdx[sd] = fixed[sd]; continue; }
-    if (!final) { civIdx[sd] = civIdx[sd] ?? sd; continue; }
-    const other = fixed[1 - sd] >= 0 ? fixed[1 - sd] : sd === 1 ? civIdx[0] : -1, pool = CIVS.map((_, i) => i).filter(i => i !== other);
-    civIdx[sd] = pool[Math.random() * pool.length | 0];
+    if (!final) { civIdx[sd] = civIdx[sd] ?? sd % CIVS.length; continue; }
+    const pool = CIVS.map((_, i) => i).filter(i => !used.has(i)), pick = pool.length ? pool[Math.random() * pool.length | 0] : Math.random() * CIVS.length | 0;
+    civIdx[sd] = pick; used.add(pick);
   }
 }

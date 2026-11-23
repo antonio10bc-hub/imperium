@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { BONUS, CIV, CIVS, civPick } from './civs.js';
-import { MD, MW, TEAM, TP, idx, mixHex } from './config.js';
+import { MAX_PLAYERS, MD, MW, TEAM, TP, idx, mixHex } from './config.js';
 import { newGame } from './game.js';
 import { GEO } from './geo.js';
 import { syncDiff } from './hud.js';
@@ -154,9 +154,17 @@ function setGeo(v, dir, keepCode = false) {
 export function setSize(k, quiet = false) {
   S.mapSize = k; try { localStorage.setItem('imperium-size', k); } catch (e) {}
   document.querySelectorAll('#start [data-size]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === k)));
+  setPlayersPick(Math.min(S.players || 2, MAX_PLAYERS[k] || 2), true);   // pequeño: 2 · normal: hasta 3 · grande: hasta 5
+  if (!quiet) { sfx('select'); S.menuDirty = true; }
+}
+// jugadores en la partida (todos contra todos); los que no caben en el tamaño elegido salen desactivados
+export function setPlayersPick(n, quiet = false) {
+  const max = MAX_PLAYERS[S.mapSize] || 2; n = Math.max(2, Math.min(n, max)); S.players = n; try { localStorage.setItem('imperium-players', n); } catch (e) {}
+  document.querySelectorAll('#start [data-players]').forEach(b => { const v = +b.dataset.players; b.setAttribute('aria-pressed', String(v === n)); b.disabled = v > max; b.title = v > max ? 'Necesita un mapa más grande' : ''; });
   if (!quiet) { sfx('select'); S.menuDirty = true; }
 }
 export function init() {
+  document.querySelectorAll('#start [data-players]').forEach(b => b.addEventListener('click', () => setPlayersPick(+b.dataset.players)));
   document.querySelectorAll('#start [data-size]').forEach(b => b.addEventListener('click', () => setSize(b.dataset.size)));
   setSize(S.mapSize, true);
   document.querySelectorAll('#start .arr[data-side]').forEach(b => b.addEventListener('click', () => {
@@ -167,7 +175,7 @@ export function init() {
   setTimeout(() => showGeo(), 0);
   $('mapCode').addEventListener('input', e => {   // código de mapa: elige su geografía y su semilla
     const el = e.target, c = parseCode(el.value);
-    if (c) { setGeo(c.geo, 1, true); S.codeSeed = c.seed; setSize(c.size, true); S.menuDirty = true; }
+    if (c) { setGeo(c.geo, 1, true); S.codeSeed = c.seed; setSize(c.size, true); setPlayersPick(c.players, true); S.menuDirty = true; }
     else S.codeSeed = null;
     el.className = !el.value.trim() ? '' : c ? 'ok' : 'bad';
   });

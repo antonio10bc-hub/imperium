@@ -84,7 +84,7 @@ function orderLines() {
     if (o.type === 'move') { x = o.tx; z = o.tz; c = o.attack ? '#d83a4a' : '#9ad86a'; }
     else if (o.type === 'attack') { if (!o.target || o.target.dead) continue; x = o.target.pos.x; z = o.target.pos.z; c = '#d83a4a'; }
     else if (o.type === 'capture') { const t = spots[o.k]; x = t.x; z = t.z; c = '#e8c870'; }
-    else if (o.type === 'siege') { const t = spots[BASE1]; x = t.x; z = t.z; c = '#d83a4a'; }
+    else if (o.type === 'siege') { const t = o.s || spots[BASE1]; x = t.x; z = t.z; c = '#d83a4a'; }
     else continue;
     if (!scr(u.pos.x, u.pos.y + .3, u.pos.z, LA) || !scr(x, surfY(x, z) + .1, z, LB)) continue;
     dashLine(LA.x, LA.y, LB.x, LB.y, c); ends.set(Math.round(LB.x / 4) + ',' + Math.round(LB.y / 4), [LB.x, LB.y, c]);

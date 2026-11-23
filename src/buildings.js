@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { CIV, civOf } from './civs.js';
-import { GAME, TEAM, mixHex } from './config.js';
+import { GAME, NEU, TEAM, mixHex } from './config.js';
 import { burst, floatText, fxRand, ping, plume, seenAt } from './effects.js';
 import { visibleAt } from './fog.js';
 import { campSpawn, keepSpawn, toast, townIncNow } from './game.js';
@@ -78,11 +78,11 @@ function buildCamp(s) {
   tent(-1.1, .7, 1.4, 1.2, 1.6); tent(1.1, .9, 1.2, 1.1, 1.4); tent(.6, -1.1, 1.3, 1.2, 1.5);
   part(g, .5, .15, .5, 0x5a4a3a, -.4, .05, -.4); part(g, .25, .35, .25, 0xffa03a, -.4, .3, -.4, false);   // hoguera
   for (const [a, b] of [[1.6, -.2], [1.8, .3]]) part(g, .12, 1.1, .12, 0x8a5a34, a, .5, b, false);   // armero
-  part(g, .1, 2.8, .1, 0x5a3a24, -1.6, 1.4, -1.4); s.flag = part(g, .8, .5, .08, TEAM[2].c, -1.2, 2.5, -1.4, false);
+  part(g, .1, 2.8, .1, 0x5a3a24, -1.6, 1.4, -1.4); s.flag = part(g, .8, .5, .08, TEAM[NEU].c, -1.2, 2.5, -1.4, false);
   for (let k = 0; k < 26; k++) { const a = k / 26 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .2 && Math.cos(a) > 0) continue; part(g, .16, 1 + (k % 2) * .25, .16, 0x7a5a34, Math.cos(a) * 3, .4, Math.sin(a) * 3); }   // empalizada
   s.zone = ring(g, 3.5, 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.visible = false; g.add(s.beacon);
-  s.roofs = roofs; bake(g, new Set([...roofs, s.flag])); placeSpot(s, g, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.campGen; addFlag(s, s.flag);
+  s.roofs = roofs; bake(g, new Set([...roofs, s.flag])); placeSpot(s, g, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0, 0, 0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.campGen; addFlag(s, s.flag);
   s.tower = local(s, -1.6, 2.6, -1.4);
 }
 // final común de los sitios conquistables: funde el modelo (menos tejados y bandera, que cambian de color) y deja el sitio neutral
@@ -90,7 +90,7 @@ function finishSite(s, g, roofs, towerAt, beam = 14) {
   s.zone = ring(g, s.keep ? 5.3 : 3.5, s.keep ? 5.6 : 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.scale.set(.5, beam, .5); s.beacon.position.y = beam / 2 + 2; s.beacon.visible = false; g.add(s.beacon);
   s.roofs = roofs; bake(g, new Set([...roofs, s.flag])); placeSpot(s, g, camFace(s, .5));
-  s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.keepGen; addFlag(s, s.flag);
+  s.owner = -1; s.known = -1; s.prog = [0, 0, 0, 0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.keepGen; addFlag(s, s.flag);
   s.tower = local(s, ...towerAt);
 }
 // atalaya: torre alta de piedra con plataforma de madera y brasero; da visión lejana y dispara más lejos que un pueblo
@@ -138,7 +138,7 @@ export function buildTown(s) {
   for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .25 && Math.cos(a) > 0) continue; part(g, .12, .9, .12, cv.id === 'galos' ? 0x7a5a34 : wc2, Math.cos(a) * 2.9, .05, Math.sin(a) * 2.9, false); }
   s.zone = ring(g, 3.5, 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.scale.set(.5, 14, .5); s.beacon.position.y = 9; s.beacon.visible = false; g.add(s.beacon);
-  s.roofs = roofs; s.townG = g; s.townCiv = cv; s.lvlG = null; bake(g0, new Set([...roofs, s.flag])); placeSpot(s, g0, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
+  s.roofs = roofs; s.townG = g; s.townCiv = cv; s.lvlG = null; bake(g0, new Set([...roofs, s.flag])); placeSpot(s, g0, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0, 0, 0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
   s.tower = local(s, -1.5 * big, 3.6 * big, -1.5 * big);
 }
 // cada nivel de mejora se ve en el pueblo: nivel 2, una casa más; nivel 3, otra casa y remates dorados en la torre
@@ -207,7 +207,7 @@ export function buildWalls(f) {
 function townLook(s) {
   const sd = s.known, col = sd < 0 ? null : TEAM[sd];
   for (const m of s.roofs) m.material = mat(col ? (s.camp ? mixHex(0xd8c89a, col.c, .55) : col.c) : s.camp ? 0xd8c89a : s.keep ? 0x7a6a9a : civOf(sideAt(s.x, s.z)).wall[1]);
-  s.flag.material = mat(col ? col.c : s.camp ? TEAM[2].c : s.keep ? 0x7a6a9a : 0xffffff);
+  s.flag.material = mat(col ? col.c : s.camp ? TEAM[NEU].c : s.keep ? 0x7a6a9a : 0xffffff);
   s.zone.material = basic(col ? col.c : 0xfff4d6, .85);
   s.beacon.visible = false;
   paintRegion(s.region);

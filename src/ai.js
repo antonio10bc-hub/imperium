@@ -6,7 +6,7 @@
 import { escortUnit, spreadTo } from './behavior.js';
 import { spotPos } from './buildings.js';
 import { assign, nearestEnemy, siege, strike } from './combat.js';
-import { DIFF, GAME, TOWN0, TYPES, UNITS } from './config.js';
+import { DIFF, GAME, NEU, NP, TOWN0, TYPES, UNITS, players } from './config.js';
 import { capR, elapsed, noGold, enqueue, fields, hasGod, heroCount, heroesOf, startRitual, summonGod, summonHero, townInc, upgradeTown } from './game.js';
 import { spots } from './map.js';
 import { MERC, ev, hireMercs } from './events.js';
@@ -17,6 +17,12 @@ import { BRIDGE_COST, R, buildBridge, hitBridge, lastBridge, startChop } from '.
 import { GEOT, cellOf } from './map.js';
 import { bfs, nearestNode } from './nav.js';
 
+// fortaleza rival a la que atacar: la más cercana por camino de las que siguen en pie
+export function targetBase(side, from) {
+  const node = from.node ?? spots[side].node; let best = side === 0 ? 1 : 0, bd = 1e9;
+  for (let sd = 0; sd < NP; sd++) if (sd !== side && !sideState[sd]?.dead && fields[sd][node] < bd) { bd = fields[sd][node]; best = sd; }
+  return best;
+}
 // valor aproximado de cada tropa para medir fuerzas (coste, con algo de peso al héroe)
 const WORTH = { sword: 40, bow: 55, horse: 80, harcher: 70, titan: 150, hero: 260, god: 400, cart: 0 };
 const worth = u => WORTH[u.type] * (.35 + .65 * u.hp / u.maxHp) * (1 + u.rank * .15);
@@ -29,13 +35,13 @@ export function makeAI(side, diff, brain) {
   return { side, brain: brain || Df.brain, inc: Df.inc, Df, stance: 'defend', next: 'sword', planT: 0, phase: 'gather', target: -1, targetT: 0, retreatT: 0, mem: new Map(), roles: new Map(), blocked: new Set() };
 }
 export function updateAIs(dt) {
-  for (const sd of [0, 1]) { const A = sideState[sd].ai; if (!A) continue; if (A.brain === 'simple') simplePlan(A); else if ((A.planT -= dt) <= 0) { A.planT = A.Df.plan; smartPlan(A); } }
+  for (const sd of players()) { const A = sideState[sd]?.ai; if (!A) continue; if (A.brain === 'simple') simplePlan(A); else if ((A.planT -= dt) <= 0) { A.planT = A.Df.plan; smartPlan(A); } }
 }
 export function aiUnit(u, dt) { const A = sideState[u.side].ai; return A.brain === 'simple' ? simpleUnit(u, dt, A) : smartUnit(u, dt, A); }
 
 // ================= cerebro simple (la IA original) =================
 function simplePlan(A) {
-  const side = A.side, Df = A.Df, mine = units.filter(u => u.side === side && u.type !== 'hero'), theirs = units.filter(u => u.side === 1 - side);
+  const side = A.side, Df = A.Df, mine = units.filter(u => u.side === side && u.type !== 'hero'), theirs = units.filter(u => u.side !== side && u.side < NEU);
   const count = t => theirs.filter(u => u.type === t).length, st = sideState[side];
   const wantH = Df.hero ? Math.min(GAME.maxHeroes, 1 + Math.floor(mine.length / 10)) : 0, hc = heroCount(side);
   const saving = hc < wantH && mine.length >= 4;   // ahorra para el siguiente héroe
@@ -75,7 +81,7 @@ function simpleUnit(u, dt, A) {
   }
   const bs = spots[u.aiT];
   if (bs && (u.aiV < 90 || u.type !== 'hero')) spreadTo(u, bs.x, bs.z, fields[u.aiT], 0, 0, dt, capR(bs) - .8);   // dentro del círculo de conquista, sin amontonarse
-  else siege(u, spots[1 - side], dt);
+  else siege(u, spots[targetBase(side, u)], dt);
 }
 
 // ================= cerebro smart =================
@@ -83,9 +89,9 @@ const _seen = [];
 const near = (a, x, z, r) => Math.hypot(a.x - x, a.z - z) < r;
 // lo que sabe del enemigo: lo que ve ahora (cerca de sus tropas, pueblos o fortaleza) más lo visto en los últimos AI_MEMORY segundos
 function observe(A) {
-  const side = A.side, foe = 1 - side, places = spots.filter(s => (s.kind === 'base' && s.side === side) || (s.kind === 'town' && s.owner === side));
+  const side = A.side, places = spots.filter(s => (s.kind === 'base' && s.side === side) || (s.kind === 'town' && s.owner === side));
   for (const e of units) {
-    if (e.side !== foe && !(e.side === 2 && e.raid === side)) continue;   // el rival y los bandidos que vienen a por él
+    if ((e.side === side || e.side >= NEU) && !(e.side === NEU && e.raid === side)) continue;   // los rivales y los bandidos que vienen a por él
     const seen = places.some(s => near(s, e.pos.x, e.pos.z, s.kind === 'base' ? 28 : s.watch ? GAME.watchVision : 14)) || UGRID.near(e.pos.x, e.pos.z, AI_VISION, _seen).some(o => o.side === side && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < AI_VISION * weatherVis());
     if (seen && !hiddenFrom(e, side)) A.mem.set(e.id, { type: e.type, x: e.pos.x, z: e.pos.z, w: worth(e), t: elapsed });
   }
@@ -97,7 +103,7 @@ const memNear = (A, x, z, r, fresh = AI_MEMORY) => { let w = 0; for (const m of 
 // off (solo pruebas): lista de mejoras desactivadas, para medir qué aporta cada una
 const off = (A, f) => A.Df.off?.includes(f);
 function smartPlan(A) {
-  const side = A.side, foe = 1 - side, st = sideState[side], Df = A.Df;
+  const side = A.side, st = sideState[side], Df = A.Df;
   observe(A);
   const mine = units.filter(u => u.side === side && u.type !== 'hero'), heroes = heroesOf(side);
   const myW = mine.reduce((a, u) => a + worth(u), 0) + heroes.reduce((a, u) => a + worth(u), 0);
@@ -147,7 +153,7 @@ function smartPlan(A) {
   }
   // --- objetivos que evita: donde ha visto más defensa de la que su ejército puede romper
   A.blocked = new Set();
-  for (let t = TOWN0; t < spots.length; t++) { const s = spots[t]; if (s.owner === side) continue; const d = memNear(A, s.x, s.z, 14) + (s.owner === foe ? 60 * s.lvl : 0); if (d > myW * .7 && !off(A, 'block')) A.blocked.add(t); }
+  for (let t = TOWN0; t < spots.length; t++) { const s = spots[t]; if (s.owner === side) continue; const d = memNear(A, s.x, s.z, 14) + (s.owner >= 0 && s.owner !== side ? 60 * s.lvl : 0); if (d > myW * .7 && !off(A, 'block')) A.blocked.add(t); }
   // postura: defender si la fortaleza está en peligro; si no, atacar con lo que haya (como la IA original)
   A.concentrate = !off(A, 'conc') && foeW > myW * .4;   // con un ejército rival a la vista, todos al mismo objetivo en vez de repartirse
   const baseThreat = memNear(A, spots[side].x, spots[side].z, 18, 6);
@@ -171,7 +177,7 @@ function geoTasks(A, mine, myW, foeW) {
   }
   // puentes: si va perdiendo, derriba el puente por el que llega el enemigo; si va ganando y tiene oro, repara los caídos
   for (const b of R.bridges) {
-    if (b.built && foeW > myW * 1.3 && !lastBridge(b) && memNear(A, b.x, b.z, 30, 20) > 0 && Math.hypot(b.x - base.x, b.z - base.z) < Math.hypot(b.x - spots[1 - side].x, b.z - spots[1 - side].z)) {
+    if (b.built && foeW > myW * 1.3 && !lastBridge(b) && memNear(A, b.x, b.z, 30, 20) > 0 && Math.hypot(b.x - base.x, b.z - base.z) < Math.hypot(b.x - spots[targetBase(side, base)].x, b.z - spots[targetBase(side, base)].z)) {
       for (const u of freeUnits(A, mine, b.x, b.z, 4)) u.aiJob = { type: 'demolish', b, until: elapsed + 60, done: () => !b.built }; break; }
     if (!b.built && myW > foeW && st.gold > BRIDGE_COST + 200) { buildBridge(side, b); break; }
   }
@@ -227,5 +233,5 @@ function smartUnit(u, dt, A) {
   }
   const bs = spots[u.aiT];
   if (bs && (u.aiV < 90 || u.type !== 'hero')) spreadTo(u, bs.x, bs.z, fields[u.aiT], 0, 0, dt, capR(bs) - .8);
-  else siege(u, spots[1 - side], dt);   // sin pueblo que tomar (o el héroe, si el pueblo queda lejos): a la fortaleza rival
+  else siege(u, spots[targetBase(side, u)], dt);   // sin pueblo que tomar (o el héroe, si el pueblo queda lejos): a la fortaleza rival
 }

@@ -15,7 +15,10 @@ export const INK = 0x0f0f1b, idx = (x, z) => z * MW + x;
 export const MAP_SIZES = { p: { name: 'PEQUEÑO', w: 288, d: 192, towns: 12 }, n: { name: 'NORMAL', w: 384, d: 256, towns: 16 }, g: { name: 'GRANDE', w: 480, d: 320, towns: 22 } };
 export function setMapSize(k) { const m = MAP_SIZES[k] || MAP_SIZES.n; MW = m.w; MD = m.d; N = MW * MD; GAME.towns = m.towns; }
 export const TEAM = [{ c: 0x3a6ad8, d: 0x1e4a8a, l: 0x8ad8f0, css: '#3a6ad8', rgb: [58, 106, 216] }, { c: 0xd83a4a, d: 0x5a3a24, l: 0xe8c870, css: '#d83a4a', rgb: [216, 58, 74] },
-  { c: 0x9a7a3a, d: 0x4a3a24, l: 0xd8c89a, css: '#9a7a3a', rgb: [154, 122, 58] }];   // 2 = neutrales de los campamentos
+  { c: 0x3aa860, d: 0x1e5a34, l: 0x9ae8a8, css: '#3aa860', rgb: [58, 168, 96] }, { c: 0xe89a20, d: 0x7a4a10, l: 0xf8d880, css: '#e89a20', rgb: [232, 154, 32] },
+  { c: 0x9a4ad8, d: 0x4a2a7a, l: 0xd8a8f8, css: '#9a4ad8', rgb: [154, 74, 216] },
+  { c: 0x9a7a3a, d: 0x4a3a24, l: 0xd8c89a, css: '#9a7a3a', rgb: [154, 122, 58] }];   // 0–4 = jugadores (azul, rojo, verde, ámbar, morado) · 5 = neutrales
+export const NEU = 5;   // bando de los neutrales: guardianes, bandidos y caravanas
 export const UNITS = {
   sword: { name: 'ESPADA', cost: 40, time: 4, hp: 120, dmg: 14, range: 1.5, cd: .8, speed: 3.2, aggro: 7, vs: { horse: 1.6 } },
   bow:   { name: 'ARCO',   cost: 55, time: 5, hp: 70,  dmg: 11, range: 8,   cd: 1.3, speed: 3, aggro: 9, vs: { sword: 1.4 } },
@@ -37,5 +40,10 @@ export const GAME = { startGold: 220, income: 1, townIncome: 1.3, townDecay: .08
 // plan: segundos entre decisiones de la IA smart · focus: cada tropa elige objetivo en vez de atacar al más cercano
 export const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, brain: 'simple', label: 'FÁCIL' }, normal: { inc: 1, attackAt: 6, hero: true, brain: 'smart', plan: 1, focus: false, label: 'NORMAL' }, hard: { inc: 1, attackAt: 5, hero: true, brain: 'smart', plan: .5, focus: true, label: 'DIFÍCIL' } };
 // sitios: fortalezas, cuarteles, salones de héroes (ALT) y templos (TEMP) de cada bando; después, los pueblos
-export const BASE0 = 0, BASE1 = 1, BARR0 = 2, BARR1 = 3, ALT0 = 4, ALT1 = 5, TEMP0 = 6, TEMP1 = 7, TOWN0 = 8;
+// jugadores en la partida (2 a 5) y posición de cada edificio en spots: castillos, cuarteles, salones de héroes y templos (uno por jugador), y después los pueblos
+export let NP = 2;
+export let BASE0 = 0, BASE1 = 1, BARR0 = 2, BARR1 = 3, ALT0 = 4, ALT1 = 5, TEMP0 = 6, TEMP1 = 7, TOWN0 = 8;
+export function setPlayers(n) { NP = n; BARR0 = n; BARR1 = n + 1; ALT0 = 2 * n; ALT1 = 2 * n + 1; TEMP0 = 3 * n; TEMP1 = 3 * n + 1; TOWN0 = 4 * n; }
+export const MAX_PLAYERS = { p: 2, n: 3, g: 5 };   // jugadores como máximo según el tamaño del mapa
+export const players = () => Array.from({ length: NP }, (_, i) => i);
 export const TOWN_NAMES = ['VILLAROCA', 'PINARES', 'ALBAMAR', 'ROBLEDO', 'FUENTEVIEJA', 'MONTEALTO', 'LAGUNILLA', 'PEÑASCO', 'VALDEORO', 'SALINAS', 'TORRENUEVA', 'ARENALES', 'CASTROVERDE', 'OLMEDA', 'MIRAFLORES', 'ROCAFRÍA', 'VADOHONDO', 'LOS LLANOS', 'PEÑAFIEL', 'ROBLEDAL', 'AGUAVIVA', 'CANTALOBOS', 'VILLAFRÍA', 'MONTERRUBIO', 'ENCINAR', 'VALDELAGUA'];

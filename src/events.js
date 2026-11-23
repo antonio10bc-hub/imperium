@@ -4,7 +4,7 @@
 // · Caravana: cruza el mapa de norte a sur por el centro; quien la destruya se lleva su oro.
 import { orderMove, spreadTo } from './behavior.js';
 import { applyRank, nearestEnemy, strike } from './combat.js';
-import { MD, MW, TOWN0 } from './config.js';
+import { MD, MW, NEU, NP, TOWN0, players } from './config.js';
 import { ping } from './effects.js';
 import { capOf, capR, elapsed, fields, popOf, toast } from './game.js';
 import { spots } from './map.js';
@@ -30,18 +30,18 @@ export function updateEvents(dt) {
 // ---------- bandidos ----------
 const ownTowns = sd => spots.filter(s => s.kind === 'town' && s.owner === sd);
 function bandits() {
-  const a = ownTowns(0).length, b = ownTowns(1).length; if (!a && !b) return false;
-  const victim = a === b ? (Math.random() < .5 ? 0 : 1) : a > b ? 0 : 1, list = ownTowns(victim), town = list[Math.random() * list.length | 0];
+  const cnt = players().map(sd => sideState[sd]?.dead ? 0 : ownTowns(sd).length), top = Math.max(...cnt); if (!top) return false;
+  const tops = players().filter(sd => cnt[sd] === top), victim = tops[Math.random() * tops.length | 0], list = ownTowns(victim), town = list[Math.random() * list.length | 0];   // el que más territorio tiene
   // aparecen a unas 26 casillas del pueblo, lejos de las dos fortalezas
   let at = -1;
   for (let k = 0; k < 24 && at < 0; k++) {
     const ang = Math.random() * Math.PI * 2, n = nearestNode(town.x + Math.cos(ang) * 26, town.z + Math.sin(ang) * 26);
-    if (spots.slice(0, 2).every(f => Math.hypot(cellX(n) - f.x, cellZ(n) - f.z) > 40) && fields[spots.indexOf(town)][n] < 80) at = n;
+    if (spots.slice(0, NP).every(f => Math.hypot(cellX(n) - f.x, cellZ(n) - f.z) > 40) && fields[spots.indexOf(town)][n] < 80) at = n;
   }
   if (at < 0) return false;
   const n = Math.min(9, 4 + Math.floor(elapsed / 240)), T = ['sword', 'bow', 'horse', 'sword', 'bow'];
   for (let k = 0; k < n; k++) {
-    const u = spawnAt(2, T[k % T.length], cellX(at) + (k % 3) - 1, cellZ(at) + (k / 3 | 0) - 1);
+    const u = spawnAt(NEU, T[k % T.length], cellX(at) + (k % 3) - 1, cellZ(at) + (k / 3 | 0) - 1);
     u.raid = victim; u.raidAt = spots.indexOf(town);
     if (k % 3 === 0) { u.rank = 1; setMax(u); u.hp = u.maxHp; applyRank(u); }
   }
@@ -61,11 +61,11 @@ export function raiderUnit(u, dt) {
   if (s) spreadTo(u, s.x, s.z, fields[u.raidAt], 0, 0, dt, capR(s) - .8);
 }
 // bandidos dentro del círculo de un pueblo que asaltan (los cuenta updateTowns como atacantes)
-export const raidersAt = (s, inside) => inside.some(u => u.side === 2 && u.raid === s.owner);
+export const raidersAt = (s, inside) => inside.some(u => u.side === NEU && u.raid === s.owner);
 
 // ---------- mercenarios ----------
 function mercs() {
-  ev.merc = { t: MERC.time, hired: [false, false] };
+  ev.merc = { t: MERC.time, hired: players().map(() => false) };
   toast(`MERCENARIOS: ${MERC.types.length} VETERANOS POR ${MERC.cost} DE ORO (${MERC.time} S)`, 'good');
   return true;
 }
@@ -107,7 +107,7 @@ function caravan() {
   return true;
 }
 function spawnCart(from, f, lead) {
-  const u = spawnAt(2, 'cart', cellX(from), cellZ(from), Math.PI / 2);
+  const u = spawnAt(NEU, 'cart', cellX(from), cellZ(from), Math.PI / 2);
   u.caravan = f; u.bounty = Math.round(CARAVAN_GOLD / CARAVAN_CARTS); u.lead = lead;
 }
 // la caravana no pelea: sigue su camino y desaparece al salir por el otro lado
