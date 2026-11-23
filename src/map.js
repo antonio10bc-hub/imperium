@@ -1,7 +1,7 @@
 // Datos del mapa (alturas, fortalezas, regiones) y su generación: terreno, pueblos, caminos y vóxeles.
 import * as THREE from 'three';
 import { civOf } from './civs.js';
-import { BASE0, BASE1, GAME, MD, MW, N, TEAM, TOWN_NAMES, TP, idx, mixHex } from './config.js';
+import { BASE0, BASE1, GAME, MD, MW, N, TOWN_NAMES, TP, idx, mixHex } from './config.js';
 import { GEO } from './geo.js';
 import { buildMinimap, markMiniDirty } from './minimap.js';
 import { NBO, bfs, buildNav, cellX, cellZ, inMain, mainList, nearestNode, stepMask } from './nav.js';
@@ -74,19 +74,10 @@ export let regions = [], regionCell = null;
 function regionAt(x, z) { let b = 0, bd = 1e9; for (let r = 0; r < regions.length; r++) { const s = regions[r], d = (s.x - x) ** 2 + (s.z - z) ** 2; if (d < bd) { bd = d; b = r; } } return b; }
 export const regionOwner = r => { const s = regions[r]; return s.kind === 'base' ? s.side : s.owner; };
 export const regionShown = r => { const s = regions[r]; return s.kind === 'base' ? s.side : (s.known ?? s.owner); };   // lo que sabes de quién es
-export let landBase = [], regionLand = [], treeCell = null, roadCell = null, chunks = [], tileCh = null, tileV = null;
-// sin líneas de frontera entre regiones (daban demasiadas pistas): solo un tinte muy suave del dueño conocido
-const tintLand = (h, own) => own >= 0 ? mixHex(h, TEAM[own].c, .07) : h;
-export function paintRegion(r) {
-  const own = regionShown(r);
-  for (const i of regionLand[r]) {
-    const c = tintLand(landBase[i], own), ch = chunks[tileCh[i]], a = ch.col.array, v0 = tileV[i] * 3;
-    for (let k = 0; k < 12; k += 3) { a[v0 + k] = c >> 16 & 255; a[v0 + k + 1] = c >> 8 & 255; a[v0 + k + 2] = c & 255; }
-    ch.dirty = true;
-  }
-  for (const ch of chunks) if (ch.dirty) { ch.col.needsUpdate = true; ch.dirty = false; }
-  markMiniDirty();
-}
+export let treeCell = null, roadCell = null;
+// el terreno no se tiñe con el dueño de cada región (ni líneas de frontera ni sombra de color: daban demasiadas pistas);
+// el dueño se ve en el pueblo, en su bandera y en el minimapa, que es lo único que hay que repintar
+export function paintRegion() { markMiniDirty(); }
 // ---------- Terreno fusionado: una malla por trozo de 64×64, solo caras visibles ----------
 // Material del terreno: colores por vértice + niebla de guerra (textura por posición) + brillo del agua
 function terrainMat(water) {
@@ -116,7 +107,7 @@ class Chunk {
     const g = new THREE.BufferGeometry(), ix = new Uint32Array(this.nv / 4 * 6);
     for (let q = 0, v = 0; v < this.nv; v += 4) { ix[q++] = v; ix[q++] = v + 1; ix[q++] = v + 2; ix[q++] = v; ix[q++] = v + 2; ix[q++] = v + 3; }
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
-    this.col = new THREE.BufferAttribute(Uint8Array.from(this.c), 3, true); g.setAttribute('color', this.col); g.setIndex(new THREE.BufferAttribute(ix, 1));
+    g.setAttribute('color', new THREE.BufferAttribute(Uint8Array.from(this.c), 3, true)); g.setIndex(new THREE.BufferAttribute(ix, 1));
     g.computeBoundingSphere(); this.p = this.n = this.c = null;
     const m = new THREE.Mesh(g, mat); parent.add(m); return m;
   }
@@ -297,7 +288,6 @@ function treeBoxes(L, type, cx, h, cz, r2) {
   }
 }
 function buildVoxels() {
-  landBase = []; regionLand = regions.map(() => []); chunks = []; tileCh = new Uint8Array(N); tileV = new Int32Array(N);
   const H4 = [[1, 0, 0], [-1, 0, 1], [0, 1, 4], [0, -1, 5]];   // dx, dz, cara
   const hAt = (x, z) => (x < 0 || z < 0 || x >= MW || z >= MD) ? 0 : HM[idx(x, z)];
   const nearFlat = (x, z, m = 1) => flats.some(f => Math.hypot(x - f.x, z - f.z) < f.r1 + m);
@@ -332,9 +322,7 @@ function buildVoxels() {
       continue;
     }
     let col = terrainColor(x, z); if (shadow[i]) col = mixHex(col, 0x10203a, shadow[i]);
-    const reg = regionCell[i], t = landBase.length;
-    regionLand[reg].push(t); landBase[t] = col; tileCh[t] = ck;
-    tileV[t] = L.quad(2, x, x + 1, h, h, z, z + 1, col);
+    L.quad(2, x, x + 1, h, h, z, z + 1, col);
     const sc = h <= 1 ? TP.cliffS : TP.cliff, lip = mixHex(col, 0x10203a, .14);   // escalón de 1: color del suelo; más hondo: ladera
     for (const [a, b, f] of H4) { const hn = Math.max(0, hAt(x + a, z + b)); if (hn >= h) continue; L.quad(f, x, x + 1, h - 1, h, z, z + 1, h <= 1 ? sc : lip); if (hn < h - 1) L.quad(f, x, x + 1, hn, h - 1, z, z + 1, sc); }
     if (treeCell[i] === 2) { const B = biomeAt(cx, cz), r2 = hash(x * 5, 7, z * 3); L.box(cx, h + .5 + r2 * .15, cz, 1.6, .9 + r2 * .3, 1.6, B.treeCol); L.box(cx + .2, h + 1.1 + r2 * .3, cz - .2, .8, .4, .8, mixHex(B.treeCol, 0x9ad86a, .18)); }
@@ -346,7 +334,7 @@ function buildVoxels() {
     }
   }
   const lmat = terrainMat(false), wmat = terrainMat(true);
-  landC.forEach(L => { if (L.nv) { meshes.push(L.build(lmat)); chunks.push(L); } else chunks.push(L); });
+  landC.forEach(L => { if (L.nv) meshes.push(L.build(lmat)); });
   waterC.forEach(W => { if (W.nv) meshes.push(W.build(wmat)); });
 }
 
