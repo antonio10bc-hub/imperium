@@ -47,8 +47,8 @@ Todas las civilizaciones comparten la misma lógica (estadísticas, costes, coun
 - [ ] **Minimapa y niebla**: los colores del bioma se distinguen en el minimapa y bajo la niebla de guerra.
 
 ## Sonido e interfaz
-- [ ] **Música**: escala y uno o dos instrumentos propios (pendiente: ahora la música es común).
-- [ ] **Efectos**: cuerno o llamada de ataque y fanfarria de conquista (pendiente: ahora son comunes).
+- [ ] **Música** (`SOUND` en `src/audio.js`): escala, bordón, dos instrumentos de melodía (`LEADS`), percusión (`PERC`) y tempo propios.
+- [ ] **Efectos**: timbre de cuerno (`HORNS`) y notas de la carga y de la fanfarria de conquista en `SOUND`.
 - [ ] **Selector e instrucciones**: aparece en los dos selectores del menú (sale solo de `CIVS`) y se menciona en la pantalla de instrucciones si tiene algo especial.
 
 ## Pruebas

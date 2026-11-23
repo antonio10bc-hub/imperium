@@ -158,7 +158,7 @@ export function updateUnit(u, dt) {
       u.chargeCd = bonusOf(u.side).chargeCd ?? GAME.chargeCd; u.chargeT = GAME.chargeTime;
       burst(u.pos, [0xe6d6b0, 0xffffff, 0xffd23f], 16, 3, 2, .6, .25);
       for (const e of u.escort) burst(e.pos, [0xe6d6b0], 4, 2, 1.5, .4, .18);
-      if (u.vis) { floatText(u.pos.clone().setY(u.pos.y + 4.4), '¡CARGA!', '#e8c870', 11); sfx('charge'); }
+      if (u.vis) { floatText(u.pos.clone().setY(u.pos.y + 4.4), '¡CARGA!', '#e8c870', 11); sfx('charge', u.side); }
     }
   }
   if (u.side < 2 && sideState[u.side].ai) aiUnit(u, dt); else if (u.side === 0) playerUnit(u, dt);
