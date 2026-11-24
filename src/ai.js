@@ -5,16 +5,17 @@
 //   y, en difícil, cada tropa elige a quién atacar.
 import { escortUnit, spreadTo } from './behavior.js';
 import { spotPos } from './buildings.js';
-import { assign, nearestEnemy, siege, strike } from './combat.js';
-import { DIFF, GAME, NEU, NP, TOWN0, TYPES, UNITS, players } from './config.js';
-import { capR, elapsed, noGold, enqueue, fields, hasGod, heroCount, heroesOf, startRitual, summonGod, summonHero, townInc, upgradeTown } from './game.js';
+import { assign, nearestEnemy, repairGates, siege, strike } from './combat.js';
+import { civOf } from './civs.js';
+import { DIFF, GAME, NEU, NP, TOWN0, TYPES, UNITS, WALL_LV, players } from './config.js';
+import { capR, elapsed, noGold, enqueue, fields, hasGod, heroCount, heroesOf, startRitual, summonGod, summonHero, townInc, upgradeTown, upgradeWall } from './game.js';
 import { spots } from './map.js';
 import { MERC, ev, hireMercs } from './events.js';
 import { UGRID, alive, followField, sideState, stepToward, units } from './units.js';
 import { hiddenFrom } from './rules.js';
 import { weatherVis } from './ambient.js';
 import { BRIDGE_COST, R, buildBridge, hitBridge, lastBridge, startChop } from './rules.js';
-import { GEOT, cellOf } from './map.js';
+import { GEOT, cellOf, gateList } from './map.js';
 import { bfs, nearestNode } from './nav.js';
 
 // fortaleza rival a la que atacar: la más cercana por camino de las que siguen en pie
@@ -29,10 +30,19 @@ const worth = u => WORTH[u.type] * (.35 + .65 * u.hp / u.maxHp) * (1 + u.rank * 
 const COUNTER = { sword: 'bow', bow: 'horse', horse: 'sword', harcher: 'horse', titan: 'bow' };   // qué tropa vence a cada una
 const AI_VISION = 15, AI_MEMORY = 45;   // casillas a las que ve la IA y segundos que recuerda lo visto
 
+// personalidad del líder rival (al azar en cada partida): cuándo ataca, cuánto invierte en pueblos y murallas, si deja guarnición y cuándo trae asedio
+export const PERSONAS = {
+  agresivo: { name: 'AGRESIVO', attack: -1, up: 1.5, siegeAt: 240, garrison: 0, horse: 0, wall: 600 },   // wall: a partir de qué segundo ahorra para mejorar la muralla
+  mercader: { name: 'MERCADER', attack: 3, up: .55, siegeAt: 480, garrison: .15, horse: 0, wall: 300 },
+  defensivo: { name: 'DEFENSIVO', attack: 2, up: 1, siegeAt: 560, garrison: .35, horse: 0, wall: 100 },
+  relampago: { name: 'RELÁMPAGO', attack: -2, up: 1.7, siegeAt: 360, garrison: 0, horse: .45, wall: 720 },
+};
+const LEADERS = { roma: 'ESCIPIÓN', cartago: 'ANÍBAL', china: 'LIU BANG', mexica: 'MOCTEZUMA', egipto: 'RAMSÉS', galos: 'VERCINGETÓRIX', grecia: 'LEÓNIDAS', vikingos: 'RAGNAR', persia: 'CIRO', mongoles: 'GENGIS', japon: 'NOBUNAGA' };
+export const leaderOf = sd => LEADERS[civOf(sd).id] || 'EL CAUDILLO';
 // estado de la IA de un bando según la dificultad (o el cerebro pedido para pruebas)
-export function makeAI(side, diff, brain) {
-  const Df = DIFF[diff];
-  return { side, brain: brain || Df.brain, inc: Df.inc, Df, stance: 'defend', next: 'sword', planT: 0, phase: 'gather', target: -1, targetT: 0, retreatT: 0, mem: new Map(), roles: new Map(), blocked: new Set() };
+export function makeAI(side, diff, brain, persona) {
+  const Df = DIFF[diff], keys = Object.keys(PERSONAS), pk = persona || keys[Math.random() * keys.length | 0];
+  return { side, brain: brain || Df.brain, inc: Df.inc, Df, pk, P: PERSONAS[pk], stance: 'defend', next: 'sword', planT: 0, phase: 'gather', target: -1, targetT: 0, retreatT: 0, mem: new Map(), roles: new Map(), blocked: new Set() };
 }
 export function updateAIs(dt) {
   for (const sd of players()) { const A = sideState[sd]?.ai; if (!A) continue; if (A.brain === 'simple') simplePlan(A); else if ((A.planT -= dt) <= 0) { A.planT = A.Df.plan; smartPlan(A); } }
@@ -58,7 +68,7 @@ function simplePlan(A) {
   if (!saving && st.gold > 320) { const t = spots.filter(s => s.kind === 'town' && !noGold(s) && s.owner === side && s.lvl < 3).sort((a, b) => a.lvl - b.lvl)[0]; if (t) upgradeTown(side, t); }
   const bp = spotPos(spots[side]), threat = theirs.filter(u => u.pos.distanceTo(bp) < 16).length;
   if (threat > mine.length * .7 && threat > 0) A.stance = 'defend';
-  else if (mine.length >= Df.attackAt || (mine.length >= 2 && spots.some(s => s.kind === 'town' && s.owner === -1))) A.stance = 'attack';
+  else if (mine.length >= Math.max(3, Df.attackAt + (A.P?.attack || 0)) || (mine.length >= 2 && spots.some(s => s.kind === 'town' && s.owner === -1))) A.stance = 'attack';
   else if (mine.length <= 1) A.stance = 'defend';
 }
 function simpleUnit(u, dt, A) {
@@ -117,12 +127,20 @@ function smartPlan(A) {
   const wantRitual = st.ritual?.state === 'none' && towns >= 4 && elapsed > 240 && mine.length >= 8 && foeW < myW * 1.2;
   const wantGod = st.ritual?.state === 'done' && !hasGod(side);   // con el templo consagrado, el dios va antes que más tropas
   const saving = (hc < wantH && mine.length >= 4) || wantRitual || wantGod;
+  const own = t => mine.filter(u => u.type === t).length + st.queue.filter(q => q.type === t).length, P = A.P;
+  const wantSiege = elapsed > P.siegeAt && towns >= 3 && mine.length >= 8 ? (own('ram') < 1 ? 'ram' : elapsed > P.siegeAt + 90 && own('catapult') < 2 ? 'catapult' : null) : null;   // asedio para romper puertas y castillo
+  const lv = spots[side].wallLvl || 0, nearW = memNear(A, spots[side].x, spots[side].z, 22, 6);
+  const wantWall = lv < 3 && nearW === 0 && towns >= 2 && elapsed > P.wall * (1 + lv * .6);   // ahorra para la muralla (el defensivo, pronto)
+  const hold = (wantSiege || wantWall) && mine.length >= 6 && nearW === 0;   // sin amenaza encima, deja de reclutar mientras ahorra
   if (hc < wantH && mine.length >= 3 && st.gold >= UNITS.hero.cost) summonHero(side);
-  else if (!saving && st.queue.length < 2 && st.gold >= UNITS[A.next].cost && enqueue(side, A.next)) {
-    const own = t => mine.filter(u => u.type === t).length + st.queue.filter(q => q.type === t).length;
+  else if (wantWall && !saving && st.gold >= WALL_LV.cost[lv + 1]) upgradeWall(side);
+  else if (wantSiege && !saving && st.queue.length < 2 && st.gold >= UNITS[wantSiege].cost) enqueue(side, wantSiege);
+  else if (!saving && !hold && st.queue.length < 2 && st.gold >= UNITS[A.next].cost && enqueue(side, A.next)) {
     const top = ['sword', 'bow', 'horse', 'harcher', 'titan'].sort((a, b) => foeCount[b] - foeCount[a])[0];
-    A.next = off(A, 'counter') ? TYPES[Math.random() * 3 | 0] : foeCount[top] > 0 && Math.random() < .7 ? COUNTER[top] : TYPES.slice().sort((a, b) => own(a) - own(b))[0];
+    A.next = off(A, 'counter') ? TYPES[Math.random() * 3 | 0] : P.horse && Math.random() < P.horse ? 'horse' : foeCount[top] > 0 && Math.random() < .7 ? COUNTER[top] : TYPES.slice().sort((a, b) => own(a) - own(b))[0];
   }
+  // muralla y puertas: el defensivo mejora pronto; todos reparan las puertas rotas cuando no hay enemigos encima
+  if (nearW === 0 && st.gold > 150 && gateList.some(g => g.f.side === side && g.hp < g.max * .5)) repairGates(side);
   for (const h of heroes) {   // escolta en formación para cada héroe: cuña al atacar, bloque al defender
     h.formShape = A.stance === 'attack' ? 'wedge' : 'block';
     if (h.escort.length < 20) { const free = mine.filter(u => !u.leader && !u.retreat && !A.roles.has(u)).sort((a, b) => a.pos.distanceTo(h.pos) - b.pos.distanceTo(h.pos)); if (free.length > 1) assign(free[0], h); }
@@ -135,7 +153,7 @@ function smartPlan(A) {
   // --- mercenarios: si hay oferta y le sobra oro, los contrata
   if (ev.merc && !ev.merc.hired[side] && st.gold >= MERC.cost + 60 && !saving) hireMercs(side);
   // --- mejoras: con oro de sobra, primero los pueblos que más rinden y sin enemigos cerca
-  const upAt = off(A, 'eco') ? (foeW > myW ? 420 : 320) : foeW > myW * 1.2 ? 400 : 140;   // una mejora se amortiza en ~80 s: si no va por detrás, mejora pronto
+  const upAt = (off(A, 'eco') ? (foeW > myW ? 420 : 320) : foeW > myW * 1.2 ? 400 : 140) * P.up;   // una mejora se amortiza en ~80 s: si no va por detrás, mejora pronto
   if (!saving && st.gold > upAt) {
     const t = spots.filter(s => s.kind === 'town' && !noGold(s) && s.owner === side && s.lvl < 3 && memNear(A, s.x, s.z, 16, 10) === 0).sort((a, b) => townInc(b) - townInc(a) || a.lvl - b.lvl)[0];
     if (t) upgradeTown(side, t);
@@ -158,7 +176,7 @@ function smartPlan(A) {
   A.concentrate = !off(A, 'conc') && foeW > myW * .4;   // con un ejército rival a la vista, todos al mismo objetivo en vez de repartirse
   const baseThreat = memNear(A, spots[side].x, spots[side].z, 18, 6);
   if (baseThreat > myW * .7 && baseThreat > 0) A.stance = 'defend';
-  else if (mine.length >= Df.attackAt || (mine.length >= 2 && spots.some(s => s.kind === 'town' && s.owner === -1))) A.stance = 'attack';
+  else if (mine.length >= Math.max(3, Df.attackAt + P.attack) || (mine.length >= 2 && spots.some(s => s.kind === 'town' && s.owner === -1))) A.stance = 'attack';
   else if (mine.length <= 1) A.stance = 'defend';
 }
 // tareas de la IA con las reglas de cada geografía. Cada tarea la hacen unas pocas tropas libres (u.aiJob)
@@ -222,7 +240,9 @@ function smartUnit(u, dt, A) {
   const def = A.roles.get(u);
   if (def != null) { const s = spots[def]; spreadTo(u, s.x, s.z, fields[def], 2.5, 1, dt); return; }
   const home = spots[side];
-  if (A.stance === 'defend') { spreadTo(u, home.x, home.z, fields[side], 3.5, 1.15, dt); return; }
+  if (A.stance === 'defend' || (A.P.garrison && u.type !== 'hero' && !u.def.siege && (u.id % 100) / 100 < A.P.garrison)) { spreadTo(u, home.x, home.z, fields[side], 3.5, 1.15, dt); return; }   // guarnición del defensivo
+  if (u.def.siege) { const n = units.filter(o => o.side === side && !o.def.siege && o.type !== 'hero').length;   // el asedio va a la fortaleza rival con el ejército; si no, espera en casa
+    if (n >= 8) siege(u, spots[targetBase(side, u)], dt); else spreadTo(u, home.x, home.z, fields[side], 3.5, 1.15, dt); return; }
   // como la IA original: la mitad al objetivo más cercano y la otra mitad al segundo, pero sin meterse donde sabe que no puede ganar
   const valid = t => t >= TOWN0 && spots[t] && spots[t].owner !== side && !A.blocked?.has(t) && !(spots[t].guards > 0 && ((spots[t].fortified && u.armyN < 24) || (spots[t].keep && u.armyN < 14)));
   if ((u.aiReT = (u.aiReT ?? 0) - dt) <= 0 || !valid(u.aiT)) {

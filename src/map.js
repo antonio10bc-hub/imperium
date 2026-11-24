@@ -46,6 +46,7 @@ export function previewMap(key) {
 // ---------- Mapa de alturas ----------
 let RIVX = new Float32Array(MD).fill(MW / 2);   // x del río en cada fila: separa las dos mitades del mapa
 export let EL = null, G = null, HM = null, flats = [], forts = [];
+export const FORT_K = 1.25;   // tamaño de las fortalezas de los jugadores (recinto y murallas) respecto al original
 function groundXZ(x, z) {
   let g = EL[idx(x, z)]; const cx = x + .5, cz = z + .5;
   for (const f of flats) { const r = Math.hypot(cx - f.x, cz - f.z); if (r < f.r1 && (f.kind !== 'town' || EL[idx(x, z)] > .5)) g += (f.h - g) * (1 - smooth01((r - f.r0) / (f.r1 - f.r0))); }   // la explanada de un pueblo no rellena el agua (dejaba círculos en la costa)
@@ -56,7 +57,7 @@ function computeHM() { for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++)
 export const cellOf = (x, z) => idx(THREE.MathUtils.clamp(Math.floor(x), 0, MW - 1), THREE.MathUtils.clamp(Math.floor(z), 0, MD - 1));
 export const surfY = (x, z) => HM[cellOf(x, z)];
 // ---------- Fortalezas ----------
-function polar(f, x, z) { const dx = x - f.x, dz = z - f.z, r = Math.hypot(dx, dz); return r > 26 ? null : [r, Math.atan2(dz, dx)]; }
+function polar(f, x, z) { const dx = x - f.x, dz = z - f.z, r = Math.hypot(dx, dz); return r > 34 ? null : [r, Math.atan2(dz, dx)]; }
 const angDiff = (a, b) => { let d = Math.abs(a - b) % (Math.PI * 2); return d > Math.PI ? Math.PI * 2 - d : d; };
 // distancia desde el centro hasta el borde de un polígono (coordenadas locales: +z = frente) en el ángulo dado
 function shapeRadius(pts, ang) {
@@ -195,7 +196,7 @@ export function terrainColor(x, z) {
   if (roadCell && (roadCell[i + 1] === 1 || roadCell[i - 1] === 1 || roadCell[i + MW] === 1 || roadCell[i - MW] === 1)) col = mixHex(col, 0x3a4a2a, .09);   // cuneta junto al camino
   return geoR?.snow && (geoR.snowSide == null || (cx < geoR.seam(cz)) === (geoR.snowSide === 0)) ? mixHex(col, 0xeef2f6, .62) : col;   // valle helado: todo nevado
 }
-export let meshes = [], spots = [], bridgeSites = [], signs = [];
+export let meshes = [], spots = [], bridgeSites = [], signs = [], gateList = [], gateCell = null;
 const STRATA = [0xb85a3a, 0xd08a4a, 0xc87850, 0xa04a30, 0xd8a060];
 // código de mapa para compartir: GEOGRAFÍA-SEMILLA (p. ej. RIO-48213). La misma geografía y semilla dan el mismo terreno y los mismos pueblos
 export const mapCode = () => `${scen.toUpperCase()}-${seed}${sizeKey !== 'n' ? '-' + sizeKey.toUpperCase() : ''}${NP > 2 ? '-J' + NP : ''}`;   // -J3…-J5: jugadores   // -P o -G: tamaño pequeño o grande
@@ -222,7 +223,7 @@ export function generate(newSeed, tries = 0) {
     for (let t = 0; t < 500; t++) {
       const x = Math.floor(MW * (x0 + (x1 - x0) * rng())), z = Math.floor(MD * (.3 + .4 * rng())), i = idx(x, z);
       if (!inMain[i] || HM[i] > 5) continue;
-      let sc = 0; for (let dz = -12; dz <= 12; dz += 3) for (let dx = -12; dx <= 12; dx += 3) { const cx = x + dx, cz = z + dz; if (cx < 0 || cz < 0 || cx >= MW || cz >= MD) { sc -= 3; continue; } const j = idx(cx, cz); sc += HM[j] >= 1 ? 1 - Math.abs(HM[j] - HM[i]) * .3 : -2; }
+      let sc = 0; for (let dz = -15; dz <= 15; dz += 3) for (let dx = -15; dx <= 15; dx += 3) { const cx = x + dx, cz = z + dz; if (cx < 0 || cz < 0 || cx >= MW || cz >= MD) { sc -= 3; continue; } const j = idx(cx, cz); sc += HM[j] >= 1 ? 1 - Math.abs(HM[j] - HM[i]) * .3 : -2; }
       if (sc > bs) { bs = sc; best = i; }
     }
     return best;
@@ -233,27 +234,27 @@ export function generate(newSeed, tries = 0) {
   if ((A < 0 || B < 0) && tries < 45) return generate(newSeed + 104729, tries + 1);   // sin sitio para las fortalezas: otra semilla (y desde el intento 20, el río clásico, que siempre vale)
   const mkFort = (i, side) => {
     const x = cellX(i), z = cellZ(i), tb = Math.atan2(MD / 2 - z, MW / 2 - x), M = civOf(side).map, pts = M.shape();
-    const maxR = Math.max(...pts.map(([a, b]) => Math.hypot(a, b))), k = 12.3 / maxR, n = 96;
+    const maxR = Math.max(...pts.map(([a, b]) => Math.hypot(a, b))), k = 12.3 * FORT_K / maxR, n = 96;
     const rw = Array.from({ length: n }, (_, j) => shapeRadius(pts, j / n * Math.PI * 2 - tb + Math.PI / 2) * k);
-    return { side, x, z, tb, rw, k, rings: M.rings || [1], moat: !!M.moat, gates: [tb, tb + 2.1, tb - 2.1], h: plateau(x, z, 13) };
+    return { side, x, z, tb, rw, k, rings: M.rings || [1], moat: !!M.moat, gates: [tb, tb + 2.1, tb - 2.1], h: plateau(x, z, 16) };
   };
   // con 3 a 5 jugadores, las fortalezas se reparten alrededor del mapa (la tuya, al oeste)
   const at = [A, B];
   if (NP > 2) for (let k = 1; k < NP; k++) {
     const th = Math.PI + k * Math.PI * 2 / NP, tx = MW / 2 + Math.cos(th) * MW * .37, tz = MD / 2 + Math.sin(th) * MD * .34;
     let best = -1, bs = -1e9;
-    for (let t = 0; t < 600; t++) { const x = Math.floor(tx + (rng() - .5) * 60), z = Math.floor(tz + (rng() - .5) * 50); if (x < 14 || z < 14 || x >= MW - 14 || z >= MD - 14) continue; const i = idx(x, z);
+    for (let t = 0; t < 600; t++) { const x = Math.floor(tx + (rng() - .5) * 60), z = Math.floor(tz + (rng() - .5) * 50); if (x < 24 || z < 24 || x >= MW - 24 || z >= MD - 24) continue; const i = idx(x, z);
       if (!inMain[i] || HM[i] > 5 || at.slice(0, k).some(o => o >= 0 && Math.hypot(cellX(o) - x, cellZ(o) - z) < 70)) continue;
-      let sc = -Math.hypot(x - tx, z - tz) * .2; for (let dz = -12; dz <= 12; dz += 3) for (let dx = -12; dx <= 12; dx += 3) { const cx = x + dx, cz = z + dz; if (cx < 0 || cz < 0 || cx >= MW || cz >= MD) { sc -= 3; continue; } const j = idx(cx, cz); sc += HM[j] >= 1 ? 1 - Math.abs(HM[j] - HM[i]) * .3 : -2; }
+      let sc = -Math.hypot(x - tx, z - tz) * .2; for (let dz = -15; dz <= 15; dz += 3) for (let dx = -15; dx <= 15; dx += 3) { const cx = x + dx, cz = z + dz; if (cx < 0 || cz < 0 || cx >= MW || cz >= MD) { sc -= 3; continue; } const j = idx(cx, cz); sc += HM[j] >= 1 ? 1 - Math.abs(HM[j] - HM[i]) * .3 : -2; }
       if (sc > bs) { bs = sc; best = i; } }
     if (best < 0 && tries < 45) return generate(newSeed + 104729, tries + 1);
     at[k] = best;
   }
   forts = at.slice(0, NP).map((i, sd) => mkFort(i, sd));
-  for (const f of forts) flats.push({ kind: 'fort', x: f.x, z: f.z, r0: 15, r1: 21, h: f.h });
+  for (const f of forts) flats.push({ kind: 'fort', x: f.x, z: f.z, r0: 19, r1: 26, h: f.h });
   // cada civilización coloca castillo, cuartel y altar a su manera (coordenadas locales del recinto, +z hacia el centro del mapa)
-  const lay = (sd, kind) => { const f = forts[sd], [lx, lz, ry, sc] = civOf(sd).map.layout[kind], a = f.tb - Math.PI / 2;
-    return { kind: kind === 'castle' ? 'base' : kind, side: sd, x: f.x + lx * Math.cos(a) - lz * Math.sin(a), z: f.z + lx * Math.sin(a) + lz * Math.cos(a), ry, sc }; };
+  const lay = (sd, kind) => { const f = forts[sd], [lx0, lz0, ry, sc] = civOf(sd).map.layout[kind], lx = lx0 * FORT_K, lz = lz0 * FORT_K, a = f.tb - Math.PI / 2;   // recinto y edificios más grandes (el castillo, más todavía)
+    return { kind: kind === 'castle' ? 'base' : kind, side: sd, x: f.x + lx * Math.cos(a) - lz * Math.sin(a), z: f.z + lx * Math.sin(a) + lz * Math.cos(a), ry, sc: sc * (kind === 'castle' ? 1.35 : 1.1) }; };
   spots = ['castle', 'barracks', 'altar', 'temple'].flatMap(k => players().map(sd => lay(sd, k)));   // mismo orden que BASE0, BARR0, ALT0 y TEMP0 en config (uno por jugador)
   const names = [...TOWN_NAMES].sort(() => rng() - .5);
   // pueblos lejos de los bordes del mapa (en las esquinas quedaban apartados del juego)
@@ -274,7 +275,7 @@ export function generate(newSeed, tries = 0) {
   const inside = i => HM[i] <= 7 && ![6, 7, 9, 10, 11, 13, 15].includes(GEOT[i]) && dry(i) && cellX(i) > 26 && cellX(i) < MW - 26 && cellZ(i) > 22 && cellZ(i) < MD - 22;
   let pool = mainList.filter(i => inside(i) && siteOK(cellX(i), cellZ(i), 8.5));
   if (pool.length < GAME.towns * 40) pool = mainList.filter(i => inside(i) && siteOK(cellX(i), cellZ(i), 5));   // geografía muy accidentada: basta con que la plaza quede limpia
-  const addTown = (x, z, extra = {}) => { const small = extra.watch || extra.keep && scen !== 'canon'; spots.push({ kind: 'town', x, z, name: names[spots.length % names.length], owner: -1, ...extra });
+  const addTown = (x, z, extra = {}) => { const small = extra.watch || extra.keep && scen !== 'canon'; spots.push({ kind: 'town', x, z, name: names[spots.length % names.length], owner: -1, ...extra, ...(extra.keep && small ? { narrow: true } : {}) });
     flats.push({ kind: 'town', x, z, r0: small ? 3.5 : 4.8, r1: small ? 6 : 8.5, h: plateau(x, z, 4, small ? 4 : 8) }); };   // atalayas de los puertos y ciudadelas de los pasos: explanada pequeña para no ensanchar el paso
   // sitio propio de la geografía (ciudadela de la confluencia, atalaya de un puerto…): el punto más cercano donde el edificio cabe entero en tierra firme
   const findSite = (x, z, r, maxD) => { let best = -1, bd = 1e9; for (let dz = -maxD; dz <= maxD; dz++) for (let dx = -maxD; dx <= maxD; dx++) { const d = dx * dx + dz * dz, xx = Math.floor(x) + dx, zz = Math.floor(z) + dz; if (d >= bd || d > maxD * maxD || xx < 0 || zz < 0 || xx >= MW || zz >= MD) continue; const i = idx(xx, zz); if (inMain[i] && siteOK(xx, zz, r, false)) { bd = d; best = i; } } return best; };
@@ -325,6 +326,14 @@ export function generate(newSeed, tries = 0) {
   for (const c of spots) if (c.kind === 'town' && (geoR?.fumaroles || []).some(([fx, fz]) => Math.hypot(fx - c.x, fz - c.z) < 26)) c.fumarole = true;   // caldera: los pueblos junto a una fumarola dan más oro
   for (const c of spots) if ((c.fortified || c.keep) && !(c.keep && (scen === 'istmo' || (geoR?.confluence && scen !== 'canon')))) { const fl = flats.find(q => q.kind === 'town' && q.x === c.x && q.z === c.z); if (fl) { fl.r0 = c.keep ? 10 : 8; fl.r1 = c.keep ? 14 : 12; } }   // los grandes, sobre una explanada mayor (salvo la ciudadela de un paso o de una confluencia, que no lo ensancha)
   computeHM(); buildNav();
+  // puertas de las fortalezas: una por ángulo (sirve para todos los anillos de muralla). Solo dejan pasar a su dueño hasta que se derriban
+  gateList = []; gateCell = new Int16Array(N).fill(-1);
+  for (const f of forts) f.gates.forEach((ga, gi) => {
+    const p = fortPt(f, wallR(f, ga), ga), g = { id: gateList.length, f, gi, x: p.x, z: p.z, hp: GAME.gateHp, max: GAME.gateHp, doors: [] }; gateList.push(g);
+    for (const q of f.rings) { const c = fortPt(f, wallR(f, ga) * q, ga);
+      for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { const x = Math.floor(c.x) + dx, z = Math.floor(c.z) + dz; if (x < 0 || z < 0 || x >= MW || z >= MD) continue;
+        const pp = polar(f, x + .5, z + .5); if (pp && Math.abs(pp[0] - wallR(f, pp[1]) * q) < 1.2 && angDiff(pp[1], ga) * pp[0] < 2.2) gateCell[idx(x, z)] = g.id; } }
+  });
   for (const s of spots) s.node = nearestNode(s.x, s.z);
   // equilibrio: distancia por camino de cada fortaleza a sus 3 pueblos más cercanos de su mitad; si difiere más de un 18 %, otra semilla
   if (geoR && tries < 8 && NP === 2) {

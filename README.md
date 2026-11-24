@@ -12,6 +12,8 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 - De 2 a 5 jugadores, todos contra todos (hasta 3 en el mapa normal y 5 en el grande): las fortalezas se reparten alrededor del mapa, cada una con el suelo de su civilización, y un rival cuya fortaleza cae queda eliminado.
 - Tres tamaños de mapa (288×192, 384×256 y 480×320, con 12, 16 o 22 pueblos) y código de mapa (`GEOGRAFÍA-SEMILLA[-P|-G]`, también como `?mapa=` en la dirección) para repetir o compartir un mapa.
 - Mapas con catorce geografías (cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto, caldera, valle helado, cañón, costa y ruinas), elegibles en el menú o al azar. El generador descarta las semillas desequilibradas (mismos pueblos por mitad y distancias por camino parecidas).
+- Los pueblos respetan la geografía: su explanada nunca cae sobre un río, un vado, una rampa, un puerto, un puente ni el borde de la meseta (todo el suelo que cubre está a la misma altura).
+- Aspecto: luz propia de cada geografía, sombras largas de laderas y árboles, agua más oscura cuanto más honda, alrededores del mapa (lomas o islotes que se pierden en la bruma), transición suave entre los suelos de las civilizaciones, matas, flores y piedras, cunetas y rodadas en los caminos, postes con el nombre del pueblo, patio de la fortaleza con pozo, carros y estandartes, y un gran hito único en cada geografía (cascada, coloso, arco de roca, crómlech, acueducto, zigurat, árbol gigante, esqueleto, obelisco, agujas de hielo, rostro tallado, galeón y cabeza de estatua).
 - Cada geografía tiene una regla propia (`src/rules.js`): nieve y atalayas en los puertos de la cordillera, ciudadela en el istmo, mareas en el archipiélago, emboscadas en los barrancos, rampas estrechas en la meseta, crecidas en los afluentes, pantanos que ocultan en el delta, tala en el bosque, sed en el desierto, volcán en la caldera, hielo que se rompe en el valle helado, tres puentes distintos en el cañón (se derriban con tropas; el fortificado se conquista) y tesoros en las ruinas.
 - Ambiente (`src/ambient.js`): clima por geografía que reduce un poco la visión mientras dura, pájaros, humo en los pueblos, espuma en la costa, peces y elementos propios de cada geografía (faros, barcas, molinos, menhires, pirámides, estatuas, palafitos…), que no se atraviesan.
 - Terreno con reglas: pantanos y bajíos frenan (más a los jinetes), el bosque denso no se atraviesa, los tiradores desde dos niveles por encima ganan alcance y daño, y la cima de la meseta da oro doble. Caminos entre pueblos y niebla de guerra.
@@ -27,9 +29,14 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 - El límite de tropas crece con el territorio: 30 de base y 6 por cada pueblo o campamento (hasta 100).
 - Las tropas seleccionadas muestran una línea hasta su destino (verde: mover, roja: atacar o asediar, amarilla: conquistar).
 - Las fortalezas dañadas echan humo y fuego, y los pueblos mejorados ganan construcciones.
+- Fortalezas grandes, con muralla cerrada y tres puertas que solo se abren a su dueño: los enemigos tienen que derribarlas (el **ariete** lo hace rápido) o bombardear el castillo desde fuera con **catapultas** (daño en área). Ambos se reclutan en el cuartel (teclas 4 y 5). Las puertas se reparan desde la fortaleza (H).
+- La muralla se mejora tres veces desde la fortaleza: sus doce arqueros, visibles en las almenas, pasan a bronce, plata y oro (más daño, alcance y cadencia) y las puertas aguantan más.
 - Cada fortaleza tiene castillo, cuartel, salón de héroes y templo. En el templo, un ritual (400 de oro, 1 minuto) permite invocar al dios de la civilización (uno por bando): flota, golpea cuerpo a cuerpo y, asignado a un héroe, va detrás de él curando a su escolta.
 - Cuartel, salón de héroes y templo tienen cada uno su punto de reunión (clic derecho con el edificio seleccionado).
 - Eventos neutrales cada ~2 minutos: bandidos que asaltan al líder en territorio, mercenarios veteranos a la venta y caravanas de tres carros con oro.
+- Cada líder rival tiene nombre (Aníbal, Escipión, Gengis…) y una personalidad al azar que se anuncia al empezar: **agresivo**, **mercader**, **defensivo** (guarnición y muralla pronto) o **relámpago** (ataca muy pronto, con jinetes). Cambia cuándo ataca, cuánto invierte y cuándo trae asedio.
+- La ciudadela central es más grande (con más colosos alrededor) y su círculo de conquista también.
+- Interfaz: presentación de la partida (duelo de civilizaciones con viaje de cámara; un clic la salta), pantalla final con gráfica de pueblos y tropas, tabla por bando, héroe más valioso, momentos clave y **revancha**; cajas de ayuda en botones y edificios; flechas en el borde hacia los ataques fuera de la vista (se pueden pulsar); barra de territorio con el color de cada rival y destellos al ganar o perder pueblos; rótulos flotantes que no se pisan.
 - IA rival: en fácil, la IA simple con menos oro; en normal y difícil, una IA sin trampas (mismo oro que tú, solo sabe lo que ven sus tropas) que contrarresta tu ejército, defiende sus pueblos, cura a sus heridos y concentra fuerzas. En difícil decide más a menudo y concentra el fuego.
 - **ESC** (o el botón ☰) abre el menú de pausa: continuar, reiniciar el mismo mapa, rendirse o volver al menú principal.
 - El héroe aparece a la izquierda con sus tropas asignadas (hasta 50), que forman delante de él en bloque, línea o cuña.
@@ -69,6 +76,7 @@ Tras `npm install` (solo herramientas de desarrollo) y `npm run build`:
 | `ambient.js` | Clima, vida en el paisaje y elementos propios de cada geografía |
 | `rules.js` | Reglas propias de cada geografía (puentes, mareas, crecidas, tala, sed, volcán, tropas ocultas) |
 | `combat.js`, `behavior.js` | Daño, rangos y muertes; formaciones, órdenes, escolta e IA de cada tropa |
+| `stats.js` | Estadísticas de la partida y pantalla final |
 | `game.js` | Partida: producción, héroes, pueblos, defensas, IA del rival y paso de simulación |
 | `hud.js`, `input.js`, `menu.js`, `overlay.js` | Interfaz, ratón/teclado/cámara, menú principal y capa 2D |
 | `main.js` | Arranque y bucle principal |

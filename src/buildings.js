@@ -6,8 +6,8 @@ import { GAME, NEU, TEAM, mixHex } from './config.js';
 import { burst, floatText, fxRand, ping, plume, seenAt } from './effects.js';
 import { visibleAt } from './fog.js';
 import { campSpawn, keepSpawn, toast, townIncNow } from './game.js';
-import { sideState } from './units.js';
-import { fortPt, forts, inGate, paintRegion, sideAt, spots, surfY, wallR } from './map.js';
+import { sideState, wallArcher } from './units.js';
+import { fortPt, forts, gateList, inGate, paintRegion, sideAt, spots, surfY, wallR } from './map.js';
 import { hash } from './noise.js';
 import { BOX, bake, basic, discGeo, mat, part, ring, world } from './render.js';
 import { S, track } from './state.js';
@@ -18,7 +18,7 @@ export const spotPos = (s, lift = 0) => new THREE.Vector3(s.x, s.y + lift, s.z);
 function placeSpot(s, g, face) {
   let m = 1; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) m = Math.max(m, surfY(s.x + dx, s.z + dz));
   s.y = m; g.position.set(s.x, s.y, s.z); g.rotation.y = face; world.add(g); s.group = g; s.base = g.position.clone(); g.updateMatrixWorld();
-  const r = ({ base: 4.4, barracks: 2.9, altar: 2.9, temple: 3, town: 3.3 }[s.kind] || 3) * (s.fortified || s.keep ? 1.5 : 1);   // sombra suave desplazada hacia donde cae la luz
+  const r = ({ base: 4.4, barracks: 2.9, altar: 2.9, temple: 3, town: 3.3 }[s.kind] || 3) * (s.kind !== 'town' ? s.sc || 1 : 1) * (s.keep ? (s.narrow ? 1.8 : 2.3) : s.fortified ? 1.5 : 1);   // sombra suave desplazada hacia donde cae la luz
   const sh = new THREE.Mesh(discGeo(r), basic(0x0f1a2a, .22)); sh.rotation.x = -Math.PI / 2; sh.position.set(s.x + r * .18, s.y + .04, s.z - r * .22); world.add(sh); decos.push(sh); s.shadow = sh;
   s.flags = [];
 }
@@ -88,7 +88,7 @@ function buildCamp(s) {
 }
 // final común de los sitios conquistables: funde el modelo (menos tejados y bandera, que cambian de color) y deja el sitio neutral
 function finishSite(s, g, roofs, towerAt, beam = 14) {
-  s.zone = ring(g, s.keep ? 5.3 : 3.5, s.keep ? 5.6 : 3.8, 0xfff4d6, .12, .85);
+  s.zone = ring(g, s.keep ? 5.3 / g.scale.x * keepR(s) / 5.7 : 3.5, s.keep ? 5.6 / g.scale.x * keepR(s) / 5.7 : 3.8, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.scale.set(.5, beam, .5); s.beacon.position.y = beam / 2 + 2; s.beacon.visible = false; g.add(s.beacon);
   s.roofs = roofs; bake(g, new Set([...roofs, s.flag])); placeSpot(s, g, camFace(s, .5));
   s.owner = -1; s.known = -1; s.prog = [0, 0, 0, 0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; s.genT = GAME.keepGen; addFlag(s, s.flag);
@@ -108,6 +108,8 @@ function buildWatch(s) {
   for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .3 && Math.cos(a) > 0) continue; part(g, .14, 1, .14, cv.id === 'galos' ? wood : wc2, Math.cos(a) * 2.8, .1, Math.sin(a) * 2.8, false); }
   finishSite(s, g, roofs, [0, 7.6, 0], 18);
 }
+// radio del círculo de conquista de la ciudadela (mayor que el de un pueblo fortificado)
+export const keepR = s => s.narrow ? 6.6 : 8.2;
 // ciudadela: torreón neutral (sin civilización) con cuatro torres y muralla; quien la conquista recibe colosos
 function buildKeep(s) {
   const g = new THREE.Group(), roofs = [], st = 0x8c8a92, st2 = 0x6c6a74, dark = 0x2a2a34;
@@ -121,6 +123,8 @@ function buildKeep(s) {
   for (const [x, z, w, d] of [[0, -3.3, 5.1, .6], [-3.3, 0, .6, 5.1], [3.3, 0, .6, 5.1], [-2.1, 3.3, 1.9, .6], [2.1, 3.3, 1.9, .6]]) { part(g, w, 2, d, st, x, 1, z); part(g, w + .1, .3, d + .1, st2, x, 2.1, z); }   // muralla con puerta al frente
   part(g, .14, 2.2, .14, 0x5a3a24, 0, 7.2, 0); s.flag = part(g, 1.2, .7, .08, 0x7a6a9a, .6, 7.9, 0, false);
   part(g, .5, 1.6, .5, 0x9a9488, 1.6, .8, 4.4); part(g, .8, .7, .5, 0x9a9488, 1.6, 1.9, 4.4); part(g, .4, .4, .4, 0x9a9488, 1.6, 2.45, 4.4);   // estatua del coloso
+  for (const sx of [-1, 1]) { part(g, 1, .8, 1, st2, sx * 1.8, .4, 3.4); part(g, .5, .6, .5, 0x9a9488, sx * 1.8, 1.1, 3.4); }   // pedestales a los lados de la puerta
+  g.scale.setScalar(s.narrow ? 1.2 : 1.55);   // la ciudadela es grande (algo menos en un paso estrecho, para no taparlo)
   finishSite(s, g, roofs, [0, 6, 0], 20);
 }
 export function buildTown(s) {
@@ -202,7 +206,27 @@ export function buildWalls(f) {
       const p = fortPt(f, wallR(f, ga) * q, ga), g = new THREE.Group(); g.position.set(p.x, hr, p.z); g.rotation.y = Math.atan2(-Math.cos(ga), -Math.sin(ga));
       S.gate(g, T.c, gi === 0 && !ri); if (ri) g.scale.setScalar(.8); add(g);
     });
+    f.gates.forEach((ga, gi) => {   // hojas de la puerta (se derriban): madera con herrajes y el color del bando
+      const p = fortPt(f, wallR(f, ga) * q, ga), d = new THREE.Group(), hd = Math.min(H * .85, 2.4); d.position.set(p.x, hr, p.z); d.rotation.y = Math.atan2(-Math.cos(ga), -Math.sin(ga));
+      part(d, 3.5, hd, .3, 0x6a4224, 0, hd / 2 - 1.05, 0); for (const y of [.3, .7]) part(d, 3.56, .14, .36, 0x3a3a44, 0, hd * y - 1.05, 0); part(d, .08, hd, .34, 0x3a2414, 0, hd / 2 - 1.05, 0); part(d, .7, .5, .36, T.c, 0, hd * .5 - 1.05, 0);
+      add(d); const gt = gateList.find(o => o.f === f && o.gi === gi); if (gt) gt.doors.push(d);
+    });
   });
+}
+// arqueros de las almenas: uno por cada tirador de la muralla, de pie sobre ella; con el nivel de la muralla se tiñen de bronce, plata u oro
+export function buildWallArchers(f) {
+  const S = civOf(f.side).map.wall, top = Math.round(f.h) + (S.h || 2) * (S.rampart ? .5 : S.carts ? .2 : 1) - 1.05 + (S.palisade ? -.35 : 0);
+  f.shooters = [];
+  for (let k = 0; k < GAME.wallShooters; k++) {
+    let th = k / GAME.wallShooters * Math.PI * 2 + .13; if (inGate(f, th, wallR(f, th))) th += .3;
+    const p = fortPt(f, wallR(f, th) - .05, th), a = wallArcher(f.side); a.g.position.set(p.x, top, p.z); a.g.rotation.y = Math.atan2(Math.cos(th), Math.sin(th));
+    world.add(a.g); decos.push(a.g); f.shooters.push({ x: p.x, z: p.z, cd: Math.random() * GAME.wallCd, arch: a, th });
+  }
+}
+// muralla de un bando al nivel lv: tiñe a los arqueros y endurece las puertas
+export function wallLevelLook(f, lv) {
+  for (const sh of f.shooters || []) sh.arch.setRank(lv);
+  for (const g of gateList) if (g.f === f) { const m = GAME.gateHp + GAME.gateLvlHp * lv, add = m - g.max; g.max = m; if (g.hp > 0) g.hp += add; }
 }
 // vida en el patio de la fortaleza: pozo, carros, cajas y toneles, almiar, estafermo de prácticas y estandartes del bando.
 // Van en los huecos libres (lejos de los edificios, de la muralla y del paso de las puertas); solo decoran, no estorban

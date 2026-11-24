@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { spotPos } from './buildings.js';
-import { nearestEnemy, siege, strike } from './combat.js';
+import { bashGate, nearestEnemy, siege, strike } from './combat.js';
 import { BASE1, GAME, MD, MW, NEU, idx } from './config.js';
 import { burst, floatText, ping, plume, streak } from './effects.js';
 import { aiUnit } from './ai.js';
@@ -194,7 +194,10 @@ export function updateUnit(u, dt) {
       if (u.vis) { floatText(u.pos.clone().setY(u.pos.y + 4.4), '¡CARGA!', '#e8c870', 11); sfx('charge', u.side); }
     }
   }
-  if (u.side < NEU && sideState[u.side]?.ai) aiUnit(u, dt); else if (u.side === 0) playerUnit(u, dt);
+  // ante una puerta cerrada de otra fortaleza: la golpea mientras siga cerca (salvo que tenga un enemigo al alcance)
+  const atGate = u.gateHitT > 0 && u.gateHit?.hp > 0 && Math.hypot(u.gateHit.x - u.pos.x, u.gateHit.z - u.pos.z) < 3.4 && !(alive(u.enemy) && u.pos.distanceTo(u.enemy.pos) < u.def.range + .6);
+  if (atGate) { u.gateHitT = .5; bashGate(u, u.gateHit, dt); } else u.gateHitT = 0;
+  if (atGate) {} else if (u.side < NEU && sideState[u.side]?.ai) aiUnit(u, dt); else if (u.side === 0) playerUnit(u, dt);
   else if (u.raid != null) raiderUnit(u, dt); else if (u.caravan) { caravanUnit(u, dt); if (u.dead) return; } else guardUnit(u, dt);
   for (const o of UGRID.near(u.pos.x, u.pos.z, 1.7, _nearSep)) if (o !== u) {   // separación: solo vecinos cercanos
     const dx = u.pos.x - o.pos.x, dz = u.pos.z - o.pos.z, d = Math.hypot(dx, dz), min = (u.type === 'hero' || o.type === 'hero') ? 1.7 : 1.05;

@@ -228,7 +228,7 @@ export const GEO = (() => {
     const r = rngOf(seed), s = seed % 997, F = fortsFor(r), HMg = new Float32Array(MW * MD), TTg = new Uint8Array(MW * MD);
     const M = { each(fn) { for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, o = fn((gx + .5) * W / MW, (gz + .5) * H / MD, HMg[i], TTg[i]); if (o) { HMg[i] = Math.min(12, Math.round(o[0])); TTg[i] = o[1]; } } } };
     const passes = GEN[id](M, r, s, F) || [];
-    for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 11 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
+    for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 13 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
     const up = p => [p[0] * MW / W, p[1] * MD / H];
     return { HM: HMg, TT: TTg, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z * H / MD) * MW / W : null,
       volcano: M.volcano ? up(M.volcano) : null, lavaEnds: (M.lavaEnds || []).map(up), fumaroles: (M.fumaroles || []).map(up), confluence: M.confluence ? up(M.confluence) : null, bridgeStyles: M.bridgeStyles || [], bridges: (M.bridges || []).map(b => [...up(b), (b[2] || 13) * MW / W]), treasures: (M.treasures || []).map(up), snow: !!M.snow,

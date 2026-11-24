@@ -173,7 +173,7 @@ export function setupAmbient() {
       const x = 2 + (r() * (MW - 4) | 0), z = 2 + (r() * (MD - 4) | 0), i = idx(x, z);
       if (geoR?.mix && (x < geoR.seam(z)) !== (key === geoR.mix[0])) continue;
       if (!WHERE[where](x, z, i) || (roadCell && roadCell[i])) continue;
-      if (forts.some(f => Math.hypot(f.x - x, f.z - z) < 28) || spots.some(s => Math.hypot(s.x - x, s.z - z) < 13) || placed.some(p => Math.hypot(p[0] - x, p[1] - z) < 18)) continue;
+      if (forts.some(f => Math.hypot(f.x - x, f.z - z) < 34) || spots.some(s => Math.hypot(s.x - x, s.z - z) < 13) || placed.some(p => Math.hypot(p[0] - x, p[1] - z) < 18)) continue;
       const g = new THREE.Group(); LM[model](g); bake(g);
       g.position.set(x + .5, where === 'water' ? -.15 : HM[i], z + .5); g.rotation.y = r() * 6.28; if (model === 'pyramid') g.rotation.y = 0;
       world.add(g); decos.push(g); placed.push([x, z, model]); k++;
@@ -185,7 +185,7 @@ export function setupAmbient() {
       const x = 6 + (r() * (MW - 12) | 0), z = 6 + (r() * (MD - 12) | 0), i = idx(x, z);
       if (Math.abs(x - MW / 2) > MW * (.2 + tries / 12000) || !WHERE[where](x, z, i) || !wide(x, z)) continue;
       let road = false; for (let dz = -4; dz <= 4 && !road; dz++) for (let dx = -4; dx <= 4; dx++) if (roadCell?.[idx(x + dx, z + dz)]) { road = true; break; } if (road) continue;
-      if (forts.some(f => Math.hypot(f.x - x, f.z - z) < 30) || spots.some(s => Math.hypot(s.x - x, s.z - z) < 15) || placed.some(p => Math.hypot(p[0] - x, p[1] - z) < 12)) continue;
+      if (forts.some(f => Math.hypot(f.x - x, f.z - z) < 36) || spots.some(s => Math.hypot(s.x - x, s.z - z) < 15) || placed.some(p => Math.hypot(p[0] - x, p[1] - z) < 12)) continue;
       const g = new THREE.Group(); GRAND_LM[model](g); bake(g); g.position.set(x + .5, where === 'water' ? -.6 : HM[i], z + .5); g.rotation.y = (r() * 4 | 0) * Math.PI / 2; world.add(g); decos.push(g); placed.push([x, z, model]);
       if (where !== 'water') for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { const j = idx(x + dx, z + dz); if (walk[j]) { blocked[j] = 1; blockCells.push(j); } }
       break;

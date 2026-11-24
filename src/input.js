@@ -4,7 +4,7 @@ import { sfx } from './audio.js';
 import { orderMove } from './behavior.js';
 import { spotPos } from './buildings.js';
 import { alarm, assign, unassign } from './combat.js';
-import { ALT0, BARR0, BASE0, GAME, MD, MW, TEMP0, TYPES } from './config.js';
+import { ALT0, BARR0, BASE0, GAME, MD, MW, SIEGE, TEMP0, TYPES } from './config.js';
 import { ping } from './effects.js';
 import { exploredAt, toggleFog } from './fog.js';
 import { enqueue, heroesOf, newGame, startGame, state, toast } from './game.js';
@@ -86,7 +86,7 @@ export function commandAt(x, z, attack = false) {
   if (S.selBld in RALLY_BLD) { setRally({ x, z }); return true; }
   if (!sel.size) return false;
   const list = commandList(); for (const u of list) unassign(u);
-  const sp = spots.find(s => (s.kind === 'town' || (s.kind === 'base' && s.side === 1)) && exploredAt(s.x, s.z) && Math.hypot(s.x - x, s.z - z) < (s.kind === 'base' ? 10 : 7));
+  const sp = spots.find(s => (s.kind === 'town' || (s.kind === 'base' && s.side === 1)) && exploredAt(s.x, s.z) && Math.hypot(s.x - x, s.z - z) < (s.kind === 'base' ? 13 : 7));
   orderTo(list, sp, sp ? { x: sp.x, z: sp.z } : { x, z }, attack); return true;
 }
 // ---------- Cámara ----------
@@ -185,10 +185,11 @@ export function init() {
     if (S.menuOpen) { if (k === 'escape') closeMenu(); return; }   // con el menú abierto, el juego no recibe teclas
     if (/^f[1-5]$/.test(k)) { e.preventDefault(); pickGroup(+k[1] - 1); }
     else if (k === '1' || k === '2' || k === '3') enqueue(0, TYPES[+k - 1]);
+    else if (k === '4' || k === '5') enqueue(0, SIEGE[+k - 4]);
     else if (k === 'b') { selectBuilding('barracks'); focusOn(spots[BARR0].x, spots[BARR0].z); }
     else if (k === 'g') heroButton();
     else if (k === 't') { selectBuilding('temple'); focusOn(spots[TEMP0].x, spots[TEMP0].z); }
-    else if (k === 'h') focusOn(spots[BASE0].x, spots[BASE0].z);
+    else if (k === 'h') { focusOn(spots[BASE0].x, spots[BASE0].z); selectSpot(spots[BASE0]); }   // tu fortaleza: muralla y puertas
     else if (k === 'p') { S.paused = !S.paused; syncTools(); }
     else if (k === 'v') { S.speed = S.speed === 1 ? 2 : 1; syncTools(); }
     else if (k === ' ') { e.preventDefault(); if (alarm.pos) focusOn(alarm.pos.x, alarm.pos.z); }

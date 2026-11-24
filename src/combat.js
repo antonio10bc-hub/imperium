@@ -5,8 +5,9 @@ import { GAME, NEU, RANGED, RANKS, TEAM } from './config.js';
 import { burst, floatText, ping, seenAt, takeBox } from './effects.js';
 import { elapsed, fields, toast } from './game.js';
 import { updateCtx } from './hud.js';
-import { HM } from './map.js';
-import { bfs } from './nav.js';
+import * as THREE from 'three';
+import { HM, gateList } from './map.js';
+import { bfs, nearestNode } from './nav.js';
 import { VCMAT, mat } from './render.js';
 import { $ } from './state.js';
 import { UGRID, _nearEn, alive, arrows, charging, followField, sel, setMax, sideState, spd, stepToward, unitGeo, units } from './units.js';
@@ -51,7 +52,7 @@ export function unassign(u) {
   h.escort.splice(h.escort.indexOf(u), 1); h.formKey = null; u.leader = null; setMax(u);
 }
 export function assign(u, h) {
-  if (u === h || u.type === 'hero' || u.leader === h) return false;
+  if (u === h || u.type === 'hero' || u.leader === h || u.def.siege) return false;   // el asedio no va en la escolta
   if (h.escort.length >= GAME.escortMax) return false;
   unassign(u); u.leader = h; h.escort.push(u); h.formKey = null; u.order = null; setMax(u);
   return true;
@@ -82,14 +83,41 @@ export function kill(u, by) {
   updateCtx();
 }
 function hitBase(att, s) {
-  const dmg = att.def.dmg * (RANGED(att.type) ? .6 : 1) * (att.leader ? GAME.escortBonus : 1) * RANKS[att.rank].mul;
+  const dmg = att.def.dmg * (att.def.bld || (RANGED(att.type) ? .6 : 1)) * (att.leader ? GAME.escortBonus : 1) * RANKS[att.rank].mul;
   s.hp -= dmg; s.shake = .18;
   if (s.vis) floatText(spotPos(s, 7), '-' + Math.round(dmg), s.side === 0 ? '#d83a4a' : '#ffffff', 9);
   if (s.side === 0) raiseAlarm(spotPos(s), '¡TU CASTILLO ESTÁ BAJO ATAQUE!');
 }
-export function shoot(from, toPos, lift = 1.1) {
-  const m = takeBox(0xfff1c4); m.scale.set(.07, .07, .6); m.visible = seenAt(from) || seenAt(toPos);
-  arrows.push({ m, a: from.clone().setY(from.y + lift), b: toPos.clone().setY(toPos.y + .7), t: 0 });
+export function shoot(from, toPos, lift = 1.1, stone = false) {   // stone: piedra de catapulta (más grande, más alta y más lenta)
+  const m = takeBox(stone ? 0x6a6266 : 0xfff1c4); if (stone) m.scale.setScalar(.42); else m.scale.set(.07, .07, .6); m.visible = seenAt(from) || seenAt(toPos);
+  arrows.push({ m, a: from.clone().setY(from.y + lift), b: toPos.clone().setY(toPos.y + .7), t: 0, arc: stone ? 5 : 1.2, sp: stone ? 1.6 : 4, stone });
+}
+// puertas: los enemigos que llegan a una puerta cerrada la golpean hasta derribarla (el ariete, mucho más fuerte)
+export function bashGate(u, g, dt) {
+  u.fwd.set(g.x - u.pos.x, 0, g.z - u.pos.z).normalize(); u.combatT = 2;
+  if (u.cd > 0) return; u.cd = u.def.cd;
+  if (RANGED(u.type)) shoot(u.pos, new THREE.Vector3(g.x, HM[u.node] + 1, g.z), 1.1, u.type === 'catapult'); else u.lunge = 1;
+  const dmg = u.def.dmg * (u.def.gate || (RANGED(u.type) ? .25 : .7)) * RANKS[u.rank].mul;
+  g.hp -= dmg; g.shake = .2; if (g.f.side === 0) raiseAlarm(new THREE.Vector3(g.x, 0, g.z), '¡ESTÁN DERRIBANDO UNA PUERTA!');
+  if (seenAt({ x: g.x, z: g.z })) { floatText(new THREE.Vector3(g.x, HM[u.node] + 3, g.z), '-' + Math.round(dmg), g.f.side === 0 ? '#d83a4a' : '#ffffff', 8); sfx('hit'); }
+  if (g.hp <= 0) breakGate(g);
+}
+export function breakGate(g) {
+  g.hp = 0; for (const d of g.doors) d.visible = false;
+  const p = new THREE.Vector3(g.x, HM[nearestNode(g.x, g.z)] + 1, g.z); burst(p, [0x6a4224, 0x8a5a34, 0x3a2a1a], 22, 4, 5, 1.1, .3, true);
+  toast(g.f.side === 0 ? '¡HAN DERRIBADO UNA PUERTA DE TU FORTALEZA!' : 'PUERTA ENEMIGA DERRIBADA', g.f.side === 0 ? 'bad' : 'good', p); addMoment(g.f.side === 0 ? 'DERRIBAN UNA PUERTA TUYA' : 'DERRIBAS UNA PUERTA');
+}
+export function repairGates(side) {
+  const st = sideState[side], broken = gateList.filter(g => g.f.side === side && g.hp < g.max);
+  if (!broken.length || st.gold < GAME.gateRepair) { if (side === 0) sfx('deny'); return false; }
+  st.gold -= GAME.gateRepair; for (const g of broken) { g.hp = g.max; for (const d of g.doors) d.visible = true; }
+  if (side === 0) { sfx('capture'); toast('PUERTAS REPARADAS', 'good'); }
+  return true;
+}
+// catapulta: la piedra cae en un área y hiere a todos los enemigos cercanos
+function splashHit(u, tgt, dmg) {
+  for (const o of UGRID.near(tgt.pos.x, tgt.pos.z, u.def.splash, _nearEn)) if (o !== tgt && o.side !== u.side && !o.dead && o.pos.distanceTo(tgt.pos) < u.def.splash) damage(u, o, dmg * .6);
+  burst(tgt.pos, [0x8a7a68, 0x6a6266, 0xc8b898], 10, 3, 3, .6, .22);
 }
 export function strike(u, tgt, dt) {
   if (!alive(tgt)) return false;
@@ -103,18 +131,20 @@ export function strike(u, tgt, dt) {
   } else {
     u.fwd.set(tgt.pos.x - u.pos.x, 0, tgt.pos.z - u.pos.z).normalize(); u.combatT = 2;
     if (u.cd <= 0) {
-      u.cd = u.def.cd; if (RANGED(u.type)) { shoot(u.pos, tgt.pos); if (u.vis) sfx('arrow'); } else u.lunge = 1;
-      const k = (u.def.vs[tgt.type] || 1) * (u.leader ? GAME.escortBonus : 1) * (charging(u) ? 1.5 : 1) * RANKS[u.rank].mul * (high ? 1.25 : 1) * geoDmg(u, tgt);
-      damage(u, tgt, u.def.dmg * k * (.85 + Math.random() * .3));
+      u.cd = u.def.cd; if (RANGED(u.type)) { shoot(u.pos, tgt.pos, 1.1, u.type === 'catapult'); if (u.vis) sfx('arrow'); } else u.lunge = 1;
+      const k = (u.def.vs[tgt.type] || 1) * (u.leader ? GAME.escortBonus : 1) * (charging(u) ? 1.5 : 1) * RANKS[u.rank].mul * (high ? 1.25 : 1) * geoDmg(u, tgt) * (tgt.def.siege && !u.def.siege ? 1.3 : 1);   // el asedio es frágil de cerca
+      const dmg = u.def.dmg * k * (.85 + Math.random() * .3);
+      if (u.def.splash) splashHit(u, tgt, dmg);
+      damage(u, tgt, dmg);
     }
   }
   return true;
 }
 export function siege(u, s, dt) {
   const c = spotPos(s), d = Math.hypot(u.pos.x - c.x, u.pos.z - c.z);
-  if (d < 3.8 + u.def.range) {
+  if (d < 4.9 + u.def.range) {
     u.fwd.set(c.x - u.pos.x, 0, c.z - u.pos.z).normalize(); u.combatT = 2;
-    if (u.cd <= 0) { u.cd = u.def.cd; if (RANGED(u.type)) shoot(u.pos, spotPos(s, 2)); else u.lunge = 1; hitBase(u, s); }
+    if (u.cd <= 0) { u.cd = u.def.cd; if (RANGED(u.type)) shoot(u.pos, spotPos(s, 2), 1.1, u.type === 'catapult'); else u.lunge = 1; hitBase(u, s); }
   } else followField(u, fields[s.side], dt);
 }
 export function nearestEnemy(u, range) {

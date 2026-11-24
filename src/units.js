@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { orderMove } from './behavior.js';
 import { CIV_SLOT, civOf, defOf } from './civs.js';
 import { ALT0, BARR0, GAME, MD, MW, NEU, RANKS, TEAM, TEMP0, TYPES, mixHex } from './config.js';
-import { GEOT, HM, cellOf, roadCell, spots } from './map.js';
+import { GEOT, HM, cellOf, gateCell, gateList, roadCell, spots } from './map.js';
 import { NBO, cellX, cellZ, inMain, nearestNode, stepMask, walk } from './nav.js';
 import { BOX, FLASH, HULLMAT, VCMAT, basic, collectParts, discGeo, mergeBoxes, part, ring, ringGeo, world } from './render.js';
 import { S } from './state.js';
@@ -41,6 +41,18 @@ function unitModel(type, side, body) {   // construye las piezas del modelo en b
     P(.5, .4, .4, 0x7a4a24, -.25, .94, -1.15); P(.44, .12, .34, 0xffc83a, -.25, 1.18, -1.15); P(.34, .3, .34, 0xa87a4a, .3, .9, -1.1);   // cofre de oro y fardos
     P(.3, .36, .26, 0x5a7a9a, 0, 1.04, .26); P(.22, .22, .22, 0xffd2a0, 0, 1.36, .26); P(.32, .08, .32, 0xd8c89a, 0, 1.5, .26);   // carretero
     crestY = 2;
+  } else if (type === 'ram') {   // ariete: tejadillo de madera sobre ruedas con un tronco de punta de hierro
+    const w = 0x8a5a34, w2 = 0x6a4224;
+    P(1.1, .25, 2, w2, 0, .45, 0); for (const z of [-.7, .7]) for (const x of [-.62, .62]) P(.14, .5, .5, 0x3a2a1a, x, .3, z);
+    for (const z of [-.8, .8]) for (const x of [-.45, .45]) P(.12, 1.1, .12, w, x, 1.05, z);
+    P(1.2, .14, 2.1, T.c, 0, 1.66, 0); P(.8, .14, 2.1, T.d, 0, 1.8, 0); P(.3, .3, 2.4, 0x6a4a2e, 0, 1.05, .2); P(.38, .38, .3, 0x5a5e6a, 0, 1.05, 1.45);
+    crestY = 2.1;
+  } else if (type === 'catapult') {   // catapulta: bastidor, brazo inclinado con cazo y contrapeso
+    const w = 0x8a5a34, w2 = 0x6a4224;
+    P(1.1, .22, 1.8, w2, 0, .4, 0); for (const z of [-.6, .6]) for (const x of [-.62, .62]) P(.14, .46, .46, 0x3a2a1a, x, .28, z);
+    for (const x of [-.4, .4]) P(.14, 1, .14, w, x, .95, -.1); P(.94, .14, .14, w, 0, 1.4, -.1);
+    const arm = P(.16, .16, 1.9, w, 0, 1.6, .2); arm.rotation.x = -.5; P(.4, .2, .4, w2, 0, 2.05, 1.05); P(.5, .5, .5, 0x5a5e6a, 0, 1.15, -.65); P(.5, .1, .4, T.c, 0, .56, .9);
+    crestY = 2.3;
   } else if (type === 'horse' || type === 'hero' || type === 'harcher') {
     const hero = type === 'hero', hc = hero ? 0xffffff : 0x8a5a34, hc2 = hero ? 0xf0ecff : 0x7a4824;
     P(.5, .45, 1.05, hc, 0, .72, 0); P(.3, .42, .38, hc2, 0, 1.02, .58); P(.16, .18, .2, hero ? 0xd8d0e8 : 0x2a1a10, 0, 1.2, .38);
@@ -107,6 +119,11 @@ function buildUnit(type, side, parent = world) {
   g.scale.setScalar({ god: 2.1, titan: 1.7, cart: 1.25 }[type] ?? (type === 'hero' ? (side < NEU ? 1.8 : 1.95) : 1.3)); parent.add(g);
   return { g, body, mesh, tpl: t, team, selR, crest, sh, halo, aura, wave, banner };
 }
+// arquero de las almenas: el modelo del arquero de la civilización, sin anillo ni sombra; se tiñe de bronce, plata u oro con el nivel de la muralla
+export function wallArcher(side) {
+  const t = unitTemplate('bow', side), g = new THREE.Group(), mesh = new THREE.Mesh(t.geo[0], VCMAT); g.add(mesh, new THREE.Mesh(t.hull, HULLMAT)); g.scale.setScalar(1.3);
+  return { g, mesh, tpl: t, setRank(r) { mesh.geometry = unitGeo(t, r); } };
+}
 export const THUMB = {};
 // un solo renderer fuera de pantalla para miniaturas y retratos del menú (crear contextos WebGL en cada partida agota el límite del navegador)
 let offR = null;
@@ -123,7 +140,7 @@ export function makeThumbs() {
     const r = offscreen(); r.setSize(72, 72, false);
     const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, .1, 50);
     const l = new THREE.DirectionalLight(0xfff6e8, 2.2); l.position.set(3, 5, 4); sc.add(l, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25));
-    for (const t of [...TYPES, 'hero', 'harcher', 'god', 'titan']) {
+    for (const t of [...TYPES, 'hero', 'harcher', 'god', 'titan', 'ram', 'catapult']) {
       const u = buildUnit(t, 0, sc); u.team.visible = false; u.sh.visible = false;
       const box = new THREE.Box3().setFromObject(u.g), c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3()).length();
       cam.position.copy(c).add(new THREE.Vector3(1.1, .6, 1.2).normalize().multiplyScalar(s * 1.25)); cam.lookAt(c);
@@ -199,6 +216,7 @@ export function stepToward(u, tx, tz, s, dt) {
   const dx = tx - u.pos.x, dz = tz - u.pos.z, L = Math.hypot(dx, dz); if (L < 1e-4) return false;
   const st = Math.min(s * dt, L), nx = u.pos.x + dx / L * st, nz = u.pos.z + dz / L * st, b = cellOf(nx, nz), a = u.node;
   if (b !== a && !(walk[b] && inMain[b] && Math.abs(HM[a] - HM[b]) <= 1)) { u.block = 1; return false; }
+  if (b !== a && gateCell[b] >= 0) { const g = gateList[gateCell[b]]; if (g.hp > 0 && g.f.side !== u.side) { u.block = 1; u.gateHit = g; u.gateHitT = .5; return false; } }   // puerta cerrada de una fortaleza ajena: hay que derribarla
   u.pos.x = nx; u.pos.z = nz; u.node = b;
   u.fwd.x += (dx / L - u.fwd.x) * .35; u.fwd.z += (dz / L - u.fwd.z) * .35; u.fwd.normalize(); u.moving = true; return true;
 }

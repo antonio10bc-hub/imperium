@@ -1,19 +1,19 @@
 // Partida: producción, héroes, pueblos, campamentos, defensas, IA del rival y paso de simulación.
 import * as THREE from 'three';
-import { makeAI, updateAIs } from './ai.js';
+import { leaderOf, makeAI, updateAIs } from './ai.js';
 import { raidersAt, resetEvents, updateEvents } from './events.js';
 import { sfx, startMusic } from './audio.js';
 import { updateUnit } from './behavior.js';
-import { buildAltar, buildBarracks, buildCastle, buildFortDeco, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
+import { buildAltar, buildBarracks, buildCastle, buildFortDeco, buildWallArchers, keepR, wallLevelLook, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
 import { BONUS, bonusOf, civOf, resolveCivs, uname } from './civs.js';
 import { alarm, applyRank, corpses, damage, kill, raiseAlarm, shoot } from './combat.js';
-import { ALT0, BARR0, BASE0, BASE1, DIFF, GAME, MAP_SIZES, MAX_PLAYERS, NEU, NP, TEAM, TEMP0, TOWN0, UNITS, players, setPlayers } from './config.js';
+import { RANKS, WALL_LV, ALT0, BARR0, BASE0, BASE1, DIFF, GAME, MAP_SIZES, MAX_PLAYERS, NEU, NP, TEAM, TEMP0, TOWN0, UNITS, players, setPlayers } from './config.js';
 import { burst, dropBox, floatText, ping, seenAt } from './effects.js';
 import { resetFog } from './fog.js';
 import { GEO } from './geo.js';
 import { refreshPanel, syncDiff, syncTools, updateCtx } from './hud.js';
 import { focusOn } from './input.js';
-import { fortPt, forts, generate, geoR, mapCode, paintRegion, regions, scen, spots, wallR } from './map.js';
+import { forts, generate, geoR, mapCode, paintRegion, regions, scen, spots } from './map.js';
 import { showPortraits } from './menu.js';
 import { cellX, cellZ, fieldAround, nearestNode } from './nav.js';
 import { seed } from './noise.js';
@@ -140,11 +140,11 @@ function buildGame(s, keepCivs) {
     generate(s); resetFog(false); UGRID.resize();
     const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, temple: buildTemple, town: buildTown };
     for (const sp of spots) B[sp.kind](sp);
-    for (const f of forts) { buildWalls(f); buildFortDeco(f); }
+    for (const f of forts) { buildWalls(f); buildFortDeco(f); buildWallArchers(f); }
     setupRules(); setupAmbient();
     spawnGuards(); makeThumbs();
     regions.forEach((_, r) => paintRegion(r));
-    fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2));
+    fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 5.6 : sp.kind === 'town' ? 2.6 : 3.2));
     sideState.length = 0; for (const sd of players()) sideState.push({ gold: GAME.startGold, queue: [], heroQ: [], ritual: { state: 'none', t: 0 }, godQ: null, dead: false });
     sideState[0].ai = S.aiPlayer ? makeAI(0, S.aiPlayer.diff, S.aiPlayer.brain) : null; for (let sd = 1; sd < NP; sd++) sideState[sd].ai = makeAI(sd, S.diff, S.aiRival);   // el bando 0 lo juega la IA solo en pruebas
     elapsed = 0; resetStats(); resetEvents(); S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
@@ -160,7 +160,8 @@ function buildGame(s, keepCivs) {
 function startIntro() {
   const me = spots[BASE0], foe = spots[NP === 2 ? BASE1 : 1], d = S.camDist;
   S.intro = { t: 0, dur: 3.4, a: { x: foe.x, z: foe.z, d: Math.max(90, d * 1.6) }, b: { x: me.x, z: me.z, d } };
-  const v = $('vs'); v.innerHTML = `<b style="color:${TEAM[0].css}">${civOf(0).name}</b><i>CONTRA</i><b style="color:${TEAM[1].css}">${players().slice(1).map(sd => civOf(sd).name).join(' · ')}</b><small>${GEO.NAME[scen]}</small>`;
+  const v = $('vs'); v.innerHTML = `<b style="color:${TEAM[0].css}">${civOf(0).name}</b><i>CONTRA</i><b style="color:${TEAM[1].css}">${players().slice(1).map(sd => civOf(sd).name).join(' · ')}</b><small>${GEO.NAME[scen]}</small>${players().slice(1).map(sd => sideState[sd]?.ai ? `<em style="color:${TEAM[sd].css}">${leaderOf(sd)} · ${sideState[sd].ai.P?.name || ''}</em>` : '').join('')}`;
+  for (const sd of players().slice(1)) if (sideState[sd]?.ai?.P) toast(`LÍDER RIVAL: ${leaderOf(sd)} (${civOf(sd).name}) · ${sideState[sd].ai.P.name}`, 'bad');
   v.hidden = false; v.classList.remove('go'); void v.offsetWidth; v.classList.add('go'); S.fade = 0;
 }
 export function endIntro() { if (!S.intro) return; const b = S.intro.b; S.intro = null; focusOn(b.x, b.z, true); S.camGoal = S.camDist = b.d; $('vs').hidden = true; }
@@ -213,7 +214,7 @@ export function campSpawn(s) {   // el campamento da jinetes arqueros a su dueñ
 export function keepSpawn(s) {   // la ciudadela da colosos a su dueño, hasta 10 vivos, alrededor del edificio
   const own = s.owner; if (own < 0) return;
   if (units.filter(u => u.keepOf === s && u.side === own).length >= GAME.keepMax || popOf(own) >= capOf(own)) return;
-  const a = Math.random() * 6.28, u = spawnAt(own, 'titan', s.x + Math.cos(a) * 6.5, s.z + Math.sin(a) * 6.5, a); u.keepOf = s;
+  const a = Math.random() * 6.28, u = spawnAt(own, 'titan', s.x + Math.cos(a) * (keepR(s) + 1.5), s.z + Math.sin(a) * (keepR(s) + 1.5), a); u.keepOf = s;
   burst(u.pos, [0xffffff, 0xb8b0a0, TEAM[own].l], 10, 2, 2.5, .5, .2);
   if (own === 0) { floatText(spotPos(s, 6), 'COLOSO', '#8ad8f0', 10); refreshPanel(); }
 }
@@ -221,28 +222,39 @@ function spawnGuards() {
   const post = (s, x, z, type, a) => { const n = nearestNode(x, z), u = spawnAt(NEU, type, cellX(n), cellZ(n), a); u.home = s; u.post = [cellX(n), cellZ(n)]; s.guards = (s.guards || 0) + 1; return u; };
   for (const s of spots) {
     if (s.camp) for (let k = 0; k < GAME.campGuards; k++) { const a = k / GAME.campGuards * 6.28; post(s, s.x + Math.cos(a) * 2.2, s.z + Math.sin(a) * 2.2, k % 2 ? 'harcher' : 'sword', a); }
-    if (s.keep) for (let k = 0; k < GAME.keepGuards; k++) { const a = k / GAME.keepGuards * 6.28 + .3; post(s, s.x + Math.cos(a) * 4.2, s.z + Math.sin(a) * 4.2, 'titan', a); }
+    if (s.keep) for (let k = 0; k < GAME.keepGuards; k++) { const a = k / GAME.keepGuards * 6.28 + .3, r = keepR(s) - (s.narrow ? .8 : .4); post(s, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, 'titan', a); }
     if (s.fortified) { const T = ['sword', 'bow', 'sword', 'horse', 'bow'];   // seis dentro y el resto en dos corros alrededor; muchos son veteranos
       for (let k = 0; k < GAME.fortGuards; k++) { const ring = k < 6 ? 0 : k < 14 ? 1 : 2, n = [6, 8, GAME.fortGuards - 14][ring], j = k - [0, 6, 14][ring], a = j / n * 6.28 + ring * .4, r = [2.6, 6.6, 9.2][ring];
         const u = post(s, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, T[k % 5], a); u.rank = k % 4 === 0 ? 2 : k % 2 ? 1 : 0; if (u.rank) { setMax(u); u.hp = u.maxHp; applyRank(u); } } }
   }
 }
 // campos de camino hacia cada sitio: se rehacen cuando una regla de la geografía abre o cierra casillas
-export function refreshFields() { fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2)); }
-export const capR = s => s.fortified || s.keep ? 5.7 : 3.9;   // radio del círculo de conquista
+export function refreshFields() { fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 5.6 : sp.kind === 'town' ? 2.6 : 3.2)); }
+export const capR = s => s.keep ? keepR(s) : s.fortified ? 5.7 : 3.9;   // radio del círculo de conquista
 // arqueros en las murallas: varios puntos del recinto disparan a los enemigos que se acercan
 function castleDefense(dt) {
   for (const f of forts) {
-    if (!f.shooters) { f.shooters = []; for (let k = 0; k < GAME.wallShooters; k++) { const th = k / GAME.wallShooters * Math.PI * 2, p = fortPt(f, wallR(f, th), th); f.shooters.push({ x: p.x, z: p.z, cd: Math.random() * GAME.wallCd }); } }
-    for (const sh of f.shooters) {
+    if (sideState[f.side]?.dead) continue;
+    const lv = spots[f.side].wallLvl || 0, R = GAME.wallRange + WALL_LV.range[lv];
+    for (const sh of f.shooters || []) {
       if ((sh.cd -= dt) > 0) continue;
-      let best = null, bd = GAME.wallRange;
+      let best = null, bd = R;
       for (const u of UGRID.near(sh.x, sh.z, bd, _nearWall)) if (u.side !== f.side) { const d = Math.hypot(u.pos.x - sh.x, u.pos.z - sh.z); if (d < bd) { bd = d; best = u; } }
-      if (!best) { sh.cd = .35; continue; }
-      sh.cd = GAME.wallCd; const from = new THREE.Vector3(sh.x, Math.round(f.h) + 2.2, sh.z);
-      shoot(from, best.pos, 0); damage({ side: f.side, vis: seenAt(from), def: {} }, best, GAME.wallDmg);
+      if (!best) { sh.cd = .35; sh.arch.g.rotation.y += (Math.atan2(Math.cos(sh.th), Math.sin(sh.th)) - sh.arch.g.rotation.y) * .3; continue; }
+      sh.cd = GAME.wallCd * WALL_LV.cd[lv]; const from = new THREE.Vector3(sh.x, sh.arch.g.position.y + 1, sh.z);
+      sh.arch.g.rotation.y = Math.atan2(best.pos.x - sh.x, best.pos.z - sh.z);   // el arquero se gira hacia su blanco
+      shoot(from, best.pos, 0); damage({ side: f.side, vis: seenAt(from), def: {} }, best, GAME.wallDmg * WALL_LV.dmg[lv]);
     }
   }
+}
+// mejora la muralla de la fortaleza: bronce, plata y oro
+export function upgradeWall(side) {
+  const st = sideState[side], b = spots[side], lv = b.wallLvl || 0;
+  if (state !== 'play' || lv >= 3 || st.gold < WALL_LV.cost[lv + 1]) { if (side === 0) sfx('deny'); return false; }
+  st.gold -= WALL_LV.cost[lv + 1]; b.wallLvl = lv + 1; const f = forts[side]; wallLevelLook(f, b.wallLvl);
+  for (const sh of f.shooters || []) burst(new THREE.Vector3(sh.x, sh.arch.g.position.y + 1, sh.z), [RANKS[b.wallLvl].hex, 0xffffff], 5, 2, 3, .6, .18);
+  if (side === 0) { sfx('rank'); toast(`MURALLA DE ${RANKS[b.wallLvl].name}: SUS ARQUEROS DISPARAN MÁS FUERTE Y MÁS LEJOS`, 'good', b); addMoment('MURALLA DE ' + RANKS[b.wallLvl].name); refreshPanel(); }
+  return true;
 }
 function updateTowns(dt) {
   for (let k = TOWN0; k < spots.length; k++) {
@@ -281,10 +293,10 @@ export function updateGame(dt) {
   for (const u of [...units]) if (!u.dead) updateUnit(u, dt);
   updateTowns(dt); castleDefense(dt);
   for (let i = arrows.length - 1; i >= 0; i--) {
-    const a = arrows[i]; a.t += dt * 4; const k = Math.min(1, a.t);
-    a.m.position.copy(a.a).lerp(a.b, k); a.m.position.y += Math.sin(k * Math.PI) * 1.2;
-    a.m.lookAt(a.b);
-    if (a.t >= 1) { dropBox(a.m); arrows.splice(i, 1); }
+    const a = arrows[i]; a.t += dt * (a.sp || 4); const k = Math.min(1, a.t);
+    a.m.position.copy(a.a).lerp(a.b, k); a.m.position.y += Math.sin(k * Math.PI) * (a.arc || 1.2);
+    if (a.stone) a.m.rotation.x += dt * 6; else a.m.lookAt(a.b);
+    if (a.t >= 1) { if (a.stone && a.m.visible) burst(a.b, [0x8a7a68, 0x6a6266], 6, 2.5, 3, .5, .2); dropBox(a.m); arrows.splice(i, 1); }
   }
   alarm.cool -= dt;
   if (spots[BASE0].hp <= 0) { endGame(false); return; }

@@ -6,7 +6,7 @@ import { uname } from './civs.js';
 import { exploredAt, visibleAt } from './fog.js';
 import { edgeMarks, state } from './game.js';
 import { RALLY_BLD, drag, groundAt, mouse, pickEnemy, pickSpot, pickUnit, project } from './input.js';
-import { GEOT, cellOf, signs, spots, surfY } from './map.js';
+import { GEOT, cellOf, gateList, signs, spots, surfY } from './map.js';
 import { camera, canvas, gl, target } from './render.js';
 import { $, S } from './state.js';
 import { showTip, uiTipOn } from './hud.js';
@@ -53,20 +53,22 @@ const ICONS = {
   bridge: ['0000000', '2000002', '2222222', '2202022', '2000002', '2000002', '0000000'],
   titan: ['0222200', '0222220', '2222222', '2022202', '0222200', '0220220', '0220220'],
   god:   ['2002002', '0222220', '0200020', '2202022', '0200020', '0222220', '2002002'],
+  ram:   ['0000000', '0222220', '2222222', '0002222', '0222220', '2020202', '0000000'],
+  catapult: ['0000022', '0000220', '0002200', '0222000', '2222222', '2020202', '0000000'],
   shield: ['2222222', '2000002', '2022202', '2022202', '0200020', '0020200', '0002000'],
 };
 // icono grande de acción sobre un edificio (con un pequeño bote)
 function actionIcon(x, y, type, bg, fg = '#0f0f1b') {
   const k = 3, n = 7, w = n * k + 8, b = Math.round(Math.sin(performance.now() / 260 + x * .01) * 2), x0 = Math.round(x - w / 2), y0 = Math.round(y - w) + b;
   octx.fillStyle = '#0f0f1b'; octx.fillRect(x0 - 2, y0 - 2, w + 4, w + 4); octx.fillStyle = bg; octx.fillRect(x0, y0, w, w);
-  octx.fillStyle = fg; const m = ICONS[type];
+  octx.fillStyle = fg; const m = ICONS[type] || ICONS.shield;
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (m[j][i] === '2') octx.fillRect(x0 + 4 + i * k, y0 + 4 + j * k, k, k);
   octx.fillStyle = '#0f0f1b'; octx.beginPath(); octx.moveTo(x - 5, y0 + w + 2); octx.lineTo(x + 5, y0 + w + 2); octx.lineTo(x, y0 + w + 8); octx.closePath(); octx.fill();
 }
 function unitIcon(x, y, type, css) {
   const k = 2, n = 7, w = n * k + 6, x0 = Math.round(x - w / 2), y0 = Math.round(y - w);
   octx.fillStyle = '#0f0f1b'; octx.fillRect(x0, y0, w, w); octx.fillStyle = css; octx.fillRect(x0 + 1, y0 + 1, w - 2, w - 2);
-  octx.fillStyle = '#f4f4e8'; const m = ICONS[type];
+  octx.fillStyle = '#f4f4e8'; const m = ICONS[type] || ICONS.shield;
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (m[j][i] === '2') octx.fillRect(x0 + 3 + i * k, y0 + 3 + j * k, k, k);
   octx.fillStyle = '#0f0f1b'; octx.fillRect(Math.round(x) - 1, y0 + w, 2, 3);
 }
@@ -106,7 +108,7 @@ export function drawOverlay(dt) {
     const c = project(spotPos(s), tmpP); s.sx = c.x; s.sy = c.y; s.vis = c.vis && (state !== 'play' || exploredAt(s.x, s.z));
     const ed = project(_h.set(s.x + 3, s.y, s.z), tmpQ); s.pr = Math.max(18, Math.hypot(ed.x - s.sx, ed.y - s.sy) * (s.kind === 'base' ? 1.3 : 1));
     if (!s.vis || !showUI) continue;
-    const top = project(spotPos(s, s.kind === 'base' ? 9 : s.watch ? 11 : s.keep ? 8.5 : s.kind === 'town' ? 6 : 5), tmpP);
+    const top = project(spotPos(s, s.kind === 'base' ? 11.5 : s.watch ? 11 : s.keep ? (s.narrow ? 9.5 : 12) : s.kind === 'town' ? 6 : 5), tmpP);
     if (s.kind === 'base') {
       if (s.hp < GAME.baseHp) bar(top.x, top.y - 4, 70, 6, s.hp / GAME.baseHp, TEAM[s.side].css);
     } else if (s.kind === 'town') {
@@ -127,6 +129,10 @@ export function drawOverlay(dt) {
       if (s.side === 0 && h?.state === 'training') bar(top.x, top.y + 6, 44, 4, 1 - h.t / UNITS.hero.time, '#e8c870');
       if (s.kind === 'temple' && s.side === 0) { const st = sideState[0]; if (st.ritual?.state === 'ritual') bar(top.x, top.y + 6, 44, 4, 1 - st.ritual.t / GAME.ritualTime, '#ffe9a0'); else if (st.godQ) bar(top.x, top.y + 6, 44, 4, 1 - st.godQ.t / UNITS.god.time, '#ffe9a0'); }
     }
+  }
+  for (const g of gateList) {   // puertas dañadas: barra de vida (las derribadas, una marca)
+    if (g.hp >= g.max || !showUI || state !== 'play' || !exploredAt(g.x, g.z)) continue; const c = project(_h.set(g.x, surfY(g.x, g.z) + 3.5, g.z), tmpP); if (!c.vis) continue;
+    if (g.hp > 0) bar(c.x, c.y, 34, 4, g.hp / g.max, '#c07a40'); else label(c.x, c.y, 'PUERTA ROTA', '#0f0f1b', '#d83a4a', 6);
   }
   for (const b of R.bridges) {   // puentes: sitio para construir (icono) o puente en pie
     const c = project(_h.set(b.x, 1, b.z), tmpP); b.sx = c.x; b.sy = c.y; b.vis = c.vis && state === 'play' && exploredAt(b.x, b.z); b.pr = 26;

@@ -2,13 +2,13 @@
 import { ac, audio, master, sfx, startMusic } from './audio.js';
 import { SHAPES } from './behavior.js';
 import { civOf, uname } from './civs.js';
-import { assign } from './combat.js';
-import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, NP, RANKS, TEAM, TEMP0, TYPES, UNITS, players } from './config.js';
+import { assign, repairGates } from './combat.js';
+import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, NP, RANKS, SIEGE, TEAM, TEMP0, TYPES, UNITS, WALL_LV, players } from './config.js';
 import { ping } from './effects.js';
-import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, townIncNow, popOf, state, summonHero, toast, towerDmg, towerRange, upgradeTown } from './game.js';
+import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, townIncNow, popOf, state, summonHero, toast, towerDmg, towerRange, upgradeTown, upgradeWall } from './game.js';
 import { focusOn, heroButton } from './input.js';
 import { MERC, ev, hireMercs, mercRoom } from './events.js';
-import { mapCode, regions, scen, spots } from './map.js';
+import { gateList, mapCode, regions, scen, spots } from './map.js';
 import { seed } from './noise.js';
 import { $, S, track } from './state.js';
 import { THUMB, alive, sel, sideState, units } from './units.js';
@@ -53,7 +53,7 @@ export function updateHud() {
 }
 const hpCol = k => k > .5 ? '#7ed957' : k > .25 ? '#e8c870' : '#d83a4a';
 const pct = k => Math.round(Math.max(0, Math.min(1, k)) * 100) + '%';
-const VS = { titan: 'LENTO Y MUY DURO', sword: 'VENCE A JINETE', bow: 'VENCE A ESPADA', horse: 'VENCE A ARCO', harcher: 'RÁPIDO Y A DISTANCIA', hero: 'CARGA CON SU ESCOLTA', god: 'CURA A LA ESCOLTA DE SU HÉROE' };
+const VS = { ram: 'DERRIBA PUERTAS Y CASTILLOS; NO PELEA', catapult: 'MUY LEJOS, DAÑO EN ÁREA; FRÁGIL DE CERCA', titan: 'LENTO Y MUY DURO', sword: 'VENCE A JINETE', bow: 'VENCE A ESPADA', horse: 'VENCE A ARCO', harcher: 'RÁPIDO Y A DISTANCIA', hero: 'CARGA CON SU ESCOLTA', god: 'CURA A LA ESCOLTA DE SU HÉROE' };
 // Retrato del héroe a la izquierda (como en Imperium), con las tropas asignadas
 let heroesHtml = '';
 function renderHeroes() {
@@ -73,7 +73,7 @@ function panelContent() {
   const st = sideState[0];
   if (S.selBld === 'barracks') {
     const full = popOf(0) >= capOf(0) || st.queue.length >= GAME.queueMax;
-    const cards = TYPES.map((t, i) => { const d = UNITS[t];
+    const cards = [...TYPES, ...SIEGE].map((t, i) => { const d = UNITS[t];
       return `<button type="button" class="rc" data-act="rec" data-t="${t}" ${full || st.gold < d.cost ? 'disabled' : ''} title="${uname(0, t)} · ${d.time} s · ${VS[t]}"><kbd>${i + 1}</kbd><img alt="" src="${THUMB[t] || ''}"><b>${uname(0, t)}</b><s>${d.cost}</s></button>`; }).join('');
     const q = st.queue.map((it, i) => `<button type="button" class="q" data-act="cancel" data-i="${i}" title="Cancelar (devuelve el oro)"><img alt="${uname(0, it.type)}" src="${THUMB[it.type] || ''}">${i === 0 ? `<i><b style="width:${pct(1 - it.t / UNITS[it.type].time)}"></b></i>` : ''}</button>`).join('');
     return `<div class="ph" title="Clic derecho en el mapa: punto de reunión"><h3>CUARTEL</h3><em>COLA ${st.queue.length}/${GAME.queueMax}</em><em>TROPAS ${popOf(0)}/${capOf(0)}</em></div>${cards}<div class="qu">${q || '<span class="none">COLA VACÍA</span>'}</div>`;
@@ -110,8 +110,10 @@ function panelContent() {
       const note = s.built ? `CLIC DERECHO CON TROPAS: DERRIBARLO.${s.style === 'fort' ? ' QUÉDATE ENCIMA SIN ENEMIGOS PARA CONQUISTARLO: SUS TORRES DISPARAN.' : s.style === 'rope' ? ' ES FRÁGIL: CAE ANTES.' : s.style === 'stone' ? ' AGUANTA MUCHO.' : ''}` : 'DERRIBADO. SE PUEDE RECONSTRUIR CON ORO.';
       return `<div class="ph"><h3>${s.name}</h3><em>${s.built ? 'EN PIE' : 'DERRIBADO'}${own}</em></div><div class="info">${hp}<div class="note g">${note}</div></div><div class="act">${s.built ? '' : `<button type="button" class="y" data-act="bridge" ${sideState[0].gold < BRIDGE_COST ? 'disabled' : ''}>${s.breakable ? 'REPARAR' : 'CONSTRUIR'} · ${BRIDGE_COST} ORO</button>`}</div>`;
     }
-    if (s.kind === 'base') { const k = s.hp / GAME.baseHp;
-      return `<div class="ph"><h3>${s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA RIVAL'}</h3></div><div class="info"><div class="hpb"><b style="width:${pct(k)};background:${TEAM[s.side].css}"></b><span>${Math.max(0, Math.ceil(s.hp))}/${GAME.baseHp}</span></div><div class="note">${s.side === 1 ? 'CLIC DERECHO CON TROPAS: ASALTAR.' : 'SI CAE, PIERDES LA PARTIDA.'}</div></div>`; }
+    if (s.kind === 'base') { const k = s.hp / GAME.baseHp, lv = s.wallLvl || 0, gs = gateList.filter(g => g.f.side === s.side), up = gs.filter(g => g.hp > 0).length, hurt = gs.some(g => g.hp < g.max);
+      const wall = `<div class="stats"><span>MURALLA <b style="color:${lv ? RANKS[lv].css : 'inherit'}">${lv ? RANKS[lv].name : 'SIN MEJORAR'}</b></span><span>PUERTAS <b>${up}/${gs.length}</b></span><span>ARQUEROS <b>${GAME.wallShooters}</b></span></div>`;
+      const acts = s.side === 0 ? `<div class="act">${lv < 3 ? `<button type="button" class="y" data-act="wall" ${sideState[0].gold < WALL_LV.cost[lv + 1] ? 'disabled' : ''} title="Los arqueros de las almenas pasan a ${RANKS[lv + 1].name}: más daño, alcance y cadencia; puertas más duras">MURALLA DE ${RANKS[lv + 1].name} · ${WALL_LV.cost[lv + 1]} ORO</button>` : ''}${hurt ? `<button type="button" data-act="gates" ${sideState[0].gold < GAME.gateRepair ? 'disabled' : ''} title="Repara todas las puertas dañadas o derribadas">REPARAR PUERTAS · ${GAME.gateRepair}</button>` : ''}</div>` : '';
+      return `<div class="ph"><h3>${s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA · ' + civOf(s.side).name}</h3></div><div class="info"><div class="hpb"><b style="width:${pct(k)};background:${TEAM[s.side].css}"></b><span>${Math.max(0, Math.ceil(s.hp))}/${GAME.baseHp}</span></div>${wall}<div class="note">${s.side !== 0 ? 'SUS PUERTAS SOLO SE ABREN A SU DUEÑO: DERRÍBALAS (EL ARIETE LO HACE RÁPIDO) O USA CATAPULTAS DESDE FUERA.' : 'SI CAE, PIERDES LA PARTIDA. LAS PUERTAS SOLO SE ABREN A TUS TROPAS.'}</div></div>${acts}`; }
     const own = s.owner, who = own < 0 ? 'NEUTRAL' : own === 0 ? 'TUYO' : 'DEL RIVAL';
     let prog = '';
     if (own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; prog = `<div class="hpb"><b style="width:${pct(s.prog[sd])};background:${TEAM[sd].css}"></b><span>CONQUISTA ${pct(s.prog[sd])}</span></div>`; }
@@ -235,6 +237,8 @@ export function init() {
     else if (a === 'hero') heroButton();
     else if (a === 'assign') assignSelected();
     else if (a === 'upgrade' && S.selSpot) upgradeTown(0, S.selSpot);
+    else if (a === 'wall') upgradeWall(0);
+    else if (a === 'gates') repairGates(0);
     else if (a === 'bridge' && S.selSpot?.kind === 'bridge') { buildBridge(0, S.selSpot); refreshPanel(); }
     else if (a === 'type') { const l = [...sel].filter(u => u.type === b.dataset.t); if (e.shiftKey) { l.forEach(u => sel.delete(u)); updateCtx(); } else setSelection(l, false); }
     else if (a === 'esc') { const h = heroOf(0); if (h) setSelection(h.escort.filter(u => u.type === b.dataset.t), false); }
@@ -247,7 +251,7 @@ export function init() {
     const c = document.createElement('canvas'); c.width = c.height = 7; const x = c.getContext('2d'); x.fillStyle = el.dataset.c;
     UI_IC[el.dataset.ic].forEach((row, j) => [...row].forEach((v, i) => { if (v === '1') x.fillRect(i, j, 1, 1); })); el.src = c.toDataURL();
   });
-  $('fBase').addEventListener('click', () => focusOn(spots[BASE0].x, spots[BASE0].z));
+  $('fBase').addEventListener('click', () => { focusOn(spots[BASE0].x, spots[BASE0].z); selectSpot(spots[BASE0]); });
   $('fEnemy').addEventListener('click', () => { const t = spots[targetBase(0, spots[0])]; focusOn(t.x, t.z); });   // la fortaleza rival más cercana que siga en pie
   $('fBarr').addEventListener('click', () => { selectBuilding('barracks'); focusOn(spots[BARR0].x, spots[BARR0].z); });
   $('fHero').addEventListener('click', heroButton);
