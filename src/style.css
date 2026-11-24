@@ -177,3 +177,32 @@ button.alt{background:var(--paper)}
 #tools .tl kbd{margin:0;border:0;padding:0;font-size:12px;color:var(--dim);opacity:1}
 #tools .tl.on{background:var(--pink)}
 @media (max-width:900px){:root{--barH:64px} #mini{width:72px;height:48px} #tug .cas{display:none} .rc{width:auto;height:46px;grid-template-columns:26px auto} .rc img{width:26px;height:26px} .big{width:40px;height:40px} .hpb{width:120px} .info{min-width:120px} .stats,.note{display:none} #panel .ph{min-width:70px} #tools{grid-template-columns:repeat(2,auto)} #tools .tl{height:24px;padding:0 5px} #tools .tl:nth-child(n+4):not(#menuBtn){display:none}}
+/* pantalla final: gráfica y tabla de la partida */
+#end .card{max-width:min(680px,94vw);max-height:94vh;overflow:auto}
+#endStats canvas{width:100%;height:110px;border:3px solid var(--ink);display:block;image-rendering:pixelated}
+#endStats .leg{font-size:10px;line-height:1;color:var(--mute);text-align:right;margin-top:4px}
+#endStats table{width:100%;border-collapse:collapse;font:400 11px/1.6 var(--font);text-align:right}
+#endStats th{text-align:left;font-weight:400}
+#endStats tr:first-child td{color:var(--mute);font-size:9px}
+#endStats td,#endStats th{padding:2px 4px;border-bottom:2px solid rgba(15,15,27,.12)}
+#endStats .mvp{text-align:center;font-size:12px} #endStats .mvp b{font-weight:400;color:#c07a40}
+#endStats .moments{list-style:none;padding:0;margin:0;font-size:10px;line-height:1.7} #endStats .moments b{font-weight:400;color:var(--pink);margin-right:6px}
+.row2{display:flex;gap:10px} .row2>button{flex:1}
+#tipbox{position:fixed;z-index:50;pointer-events:none;max-width:320px;padding:6px 8px 5px;font:400 11px/1.4 var(--font);color:var(--txt);background:var(--bar);border:2px solid var(--ink);box-shadow:0 3px 0 var(--ink),inset 0 0 0 1px var(--bar3);text-transform:uppercase}
+#tipbox[hidden]{display:none}
+#terr i{transition:background .4s}
+#tug.up{animation:tugUp .9s} #tug.down{animation:tugDown .9s}
+@keyframes tugUp{0%,60%{box-shadow:0 0 0 3px var(--yellow),0 0 18px var(--yellow)}100%{box-shadow:none}}
+@keyframes tugDown{0%,20%,50%{box-shadow:0 0 0 3px var(--red),0 0 18px var(--red)}35%,70%{box-shadow:0 0 0 1px var(--red)}100%{box-shadow:none}}
+/* presentación de la partida y fundidos */
+#vs{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:20;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--font);text-align:center;opacity:0}
+#vs b{font:400 clamp(26px,5vw,54px)/1 var(--font);text-shadow:0 4px 0 var(--ink),0 0 22px rgba(15,15,27,.6)}
+#vs i{font:400 13px/1 var(--font);font-style:normal;color:var(--paper);letter-spacing:.3em;text-shadow:0 2px 0 var(--ink)}
+#vs small{margin-top:8px;padding:5px 10px 4px;font:400 12px/1 var(--font);color:var(--ink);background:var(--yellow);border:2px solid var(--ink);letter-spacing:.15em}
+#vs.go{animation:vsIn 3.4s ease forwards}
+@keyframes vsIn{0%{opacity:0;transform:translate(-50%,-40%) scale(.9)}14%{opacity:1;transform:translate(-50%,-50%) scale(1)}78%{opacity:1}100%{opacity:0;transform:translate(-50%,-58%)}}
+.overlay:not([hidden]){animation:ovIn .35s ease}
+.overlay:not([hidden])>.card{animation:cardIn .4s cubic-bezier(.2,1.4,.4,1)}
+@keyframes ovIn{from{opacity:0}to{opacity:1}}
+@keyframes cardIn{from{transform:translateY(18px) scale(.96)}to{transform:none}}
+#loading{transition:opacity .3s}

@@ -11,6 +11,7 @@ import { VCMAT, mat } from './render.js';
 import { $ } from './state.js';
 import { UGRID, _nearEn, alive, arrows, charging, followField, sel, setMax, sideState, spd, stepToward, unitGeo, units } from './units.js';
 import { geoDmg } from './rules.js';
+import { addMoment, statKill } from './stats.js';
 
 // ---------- Combate ----------
 export const alarm = { t: 0, pos: null, cool: 0 }; export let lastCombat = -99;
@@ -56,7 +57,8 @@ export function assign(u, h) {
   return true;
 }
 export function kill(u, by) {
-  u.dead = true; units.splice(units.indexOf(u), 1); sel.delete(u);
+  u.dead = true; units.splice(units.indexOf(u), 1); sel.delete(u); statKill(u, by);
+  if (u.type === 'hero' && u.side < NEU) addMoment(u.side === 0 ? 'CAE TU HÉROE' : 'CAE UN HÉROE RIVAL'); if (u.type === 'god') addMoment(u.side === 0 ? 'CAE TU DIOS' : 'CAE UN DIOS RIVAL');
   // el caído se queda en el suelo un rato y luego se hunde
   u.mesh.material = VCMAT; u.team.visible = false; u.selR.visible = false; u.crest.visible = false;
   corpses.push({ g: u.g, body: u.body, t: 0, side: Math.random() < .5 ? 1 : -1 });

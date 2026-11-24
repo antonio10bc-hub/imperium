@@ -10,6 +10,7 @@ import { geoTerrain, parseCode, previewMap } from './map.js';
 import { resize } from './overlay.js';
 import { bake, grad, part } from './render.js';
 import { $, S } from './state.js';
+import { seed } from './noise.js';
 import { offscreen } from './units.js';
 
 // ---------- Menú principal: retrato de cada civilización ----------
@@ -182,5 +183,6 @@ export function init() {
   $('howBtn').addEventListener('click', () => { sfx('select'); $('start').hidden = true; $('how').hidden = false; });
   $('howBack').addEventListener('click', () => { sfx('select'); $('how').hidden = true; $('start').hidden = false; });
   $('again').addEventListener('click', () => newGame(1 + Math.floor(Math.random() * 99999)));
+  $('againSame').addEventListener('click', () => { S.pendingStart = true; newGame(seed, true); });   // revancha: mismo mapa y mismas civilizaciones
   document.querySelectorAll('.diff button[data-d]').forEach(b => b.addEventListener('click', () => { S.diff = b.dataset.d; try { localStorage.setItem('imperium-diff', S.diff); } catch (e) {} syncDiff(); sfx('select'); })); resize();
 }

@@ -1,7 +1,7 @@
 // Interfaz: barra superior, héroes, panel de selección y herramientas.
 import { ac, audio, master, sfx, startMusic } from './audio.js';
 import { SHAPES } from './behavior.js';
-import { uname } from './civs.js';
+import { civOf, uname } from './civs.js';
 import { assign } from './combat.js';
 import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, NP, RANKS, TEAM, TEMP0, TYPES, UNITS, players } from './config.js';
 import { ping } from './effects.js';
@@ -38,11 +38,17 @@ export function updateHud() {
   $('pop').textContent = popOf(0); $('cap').textContent = capOf(0);
   const m = ev.merc, showM = !!m && !m.hired[0]; $('merc').hidden = !showM;   // oferta de mercenarios
   if (showM) { $('mercT').textContent = `MERCENARIOS VETERANOS · ${Math.ceil(m.t)} S`; const b = $('mercBtn'), room = mercRoom(0); b.textContent = room ? `CONTRATAR · ${MERC.cost}` : 'SIN SITIO'; b.disabled = !room || sideState[0].gold < MERC.cost; }
-  const n0 = 1 + owned(0), n1 = NP - 1 + spots.filter(s => s.kind === 'town' && s.known > 0).length, NR = regions.length, key = n0 + ',' + n1 + ',' + NR;
-  if (key !== terrKey) { terrKey = key; $('terr').innerHTML = '<i class="b"></i>'.repeat(n0) + '<i></i>'.repeat(Math.max(0, NR - n0 - n1)) + '<i class="r"></i>'.repeat(n1); }
+  // barra de territorio: tus regiones, las neutrales y las de cada rival (lo que sabes de ellas) con su color; destella al ganar o perder una
+  const rv = players().filter(sd => sd > 0).map(sd => (sideState[sd]?.dead ? 0 : 1) + spots.filter(s => s.kind === 'town' && s.known === sd).length);
+  const n0 = 1 + owned(0), n1 = rv.reduce((a, b) => a + b, 0), NR = regions.length, key = n0 + ',' + rv.join('.') + ',' + NR;
+  if (key !== terrKey) {
+    const prev0 = +terrKey.split(',')[0] || n0; terrKey = key;
+    $('terr').innerHTML = '<i class="b"></i>'.repeat(n0) + '<i></i>'.repeat(Math.max(0, NR - n0 - n1)) + rv.map((n, k) => `<i style="background:${TEAM[k + 1].css}"></i>`.repeat(n)).join('');
+    if (n0 !== prev0) { const t = $('tug'); t.classList.remove('up', 'down'); void t.offsetWidth; t.classList.add(n0 > prev0 ? 'up' : 'down'); }
+  }
   $('hp0').textContent = Math.max(0, Math.round(spots[BASE0].hp / GAME.baseHp * 100)) + ' %';
   $('hp1').textContent = NP === 2 ? Math.max(0, Math.round(spots[BASE1].hp / GAME.baseHp * 100)) + ' %' : `${players().filter(sd => sd > 0 && !sideState[sd]?.dead).length}/${NP - 1} EN PIE`;   // con varios rivales: cuántos quedan
-  $('t1').textContent = NP === 2 ? 'RIVAL' : 'RIVALES';
+  $('t1').textContent = NP === 2 ? civOf(1).name : 'RIVALES'; $('t0').textContent = 'TÚ · ' + civOf(0).name;
   renderHeroes(); renderPanel();
 }
 const hpCol = k => k > .5 ? '#7ed957' : k > .25 ? '#e8c870' : '#d83a4a';
@@ -187,7 +193,8 @@ export function syncTools() { $('spd').firstChild.textContent = '×' + S.speed; 
 // menú de pausa: congela la partida mientras está abierto y al cerrarlo la deja como estaba
 export function openMenu() {
   if (state !== 'play' || S.menuOpen) return;
-  S.menuOpen = true; S.pausedBefore = S.paused; S.paused = true; S.amode = false; $('mCode').textContent = mapCode(); { const rt = ruleTimer(); $('mRule').textContent = (GEO.DESC[scen] || '') + (rt ? ' · ' + rt : ''); }   // la regla del mapa (y su próximo cambio) en la pausa $('menu').hidden = false; syncTools(); sfx('select'); $('mResume').focus();
+  S.menuOpen = true; S.pausedBefore = S.paused; S.paused = true; S.amode = false; $('mCode').textContent = mapCode(); { const rt = ruleTimer(); $('mRule').textContent = (GEO.DESC[scen] || '') + (rt ? ' · ' + rt : ''); }   // la regla del mapa (y su próximo cambio) en la pausa
+  $('menu').hidden = false; syncTools(); sfx('select'); $('mResume').focus();
 }
 export function closeMenu() {
   if (!S.menuOpen) return;
@@ -195,8 +202,25 @@ export function closeMenu() {
 }
 export function syncDiff() { document.querySelectorAll('.diff button[data-d]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.d === S.diff))); }
 
+// ---------- Tooltips ----------
+// Los títulos de los botones se muestran en una caja propia (rápida y con el estilo del juego); sobre el mapa, la caja describe el edificio bajo el ratón
+let tipEl = null, tipFrom = null;
+export function showTip(text, x, y) {
+  if (!tipEl) return; if (!text) { tipEl.hidden = true; return; }
+  if (tipEl.textContent !== text) tipEl.textContent = text; tipEl.hidden = false;
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight; tipEl.style.left = Math.max(6, Math.min(innerWidth - w - 6, x + 14)) + 'px'; tipEl.style.top = Math.max(6, y - h - 12 < 6 ? y + 22 : y - h - 12) + 'px';
+}
+export const uiTipOn = () => !!tipFrom;
+function initTips() {
+  tipEl = document.createElement('div'); tipEl.id = 'tipbox'; tipEl.hidden = true; document.body.appendChild(tipEl);
+  document.addEventListener('pointerover', e => { const el = e.target.closest?.('[title],[data-tip]'); if (!el) { if (tipFrom) { tipFrom = null; showTip(''); } return; }
+    if (el.title) { el.dataset.tip = el.title; el.removeAttribute('title'); } tipFrom = el; showTip(el.dataset.tip, e.clientX, e.clientY); });
+  document.addEventListener('pointermove', e => { if (tipFrom) { if (!tipFrom.isConnected) { tipFrom = null; showTip(''); } else showTip(tipFrom.dataset.tip, e.clientX, e.clientY); } });
+  document.addEventListener('pointerdown', () => { if (tipFrom) { tipFrom = null; showTip(''); } });
+}
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
 export function init() {
+  initTips();
   $('heroes').addEventListener('pointerdown', e => { const b = e.button === 0 && e.target.closest('[data-hero]'); if (!b) return; const u = units.find(o => o.id === +b.dataset.hero); if (u) { setSelection([u, ...u.escort], false); S.follow = u; S.focusGoal = null; } else heroButton(); });
   $('panel').addEventListener('pointerdown', e => {
     if (e.button !== 0) return;

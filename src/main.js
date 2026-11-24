@@ -6,14 +6,14 @@ import { alarm, assign, corpses, promote } from './combat.js';
 import { CFG, MD, MW } from './config.js';
 import { dropBox } from './effects.js';
 import { updateFog } from './fog.js';
-import { enqueue, fields, heroOf, newGame, state, summonHero, updateGame, upgradeTown } from './game.js';
+import { endIntro, enqueue, fields, heroOf, newGame, state, summonHero, updateGame, upgradeTown } from './game.js';
 import { selectSpot, setSelection, updateHud } from './hud.js';
 import { PITCH, camT, command, drag, focusOn, keys, mouse, pan, rayPlane } from './input.js';
 import { GEOT, HM, parseCode, roadCell, scen, spots, surfY, wallHit } from './map.js';
 import { drawMinimap } from './minimap.js';
 import { walk } from './nav.js';
 import { _h, applyRes, drawOverlay } from './overlay.js';
-import { camera, fogU, gl, postCam, postScene, scene, target, world } from './render.js';
+import { camera, fogU, gl, postCam, postScene, scene, setFade, target, world } from './render.js';
 import { S } from './state.js';
 import { makeAI } from './ai.js';
 import { ev, triggerEvent } from './events.js';
@@ -66,7 +66,14 @@ function frameBody(now) {
   }
   scene.fog.near = S.camDist * 1.4; scene.fog.far = S.camDist * 3.6;
   applyRes(CFG.lines);
-  if (state === 'play' && !S.paused) { for (let i = 0; i < S.speed; i++) if (state === 'play') updateGame(dt); if ((hudT -= dt) <= 0) { hudT = .1; updateHud(); } }
+  if (S.intro) {   // presentación: la cámara vuela de la fortaleza rival a la tuya (la partida espera)
+    const I = S.intro; I.t += dt; const k = Math.min(1, I.t / I.dur), e = k * k * (3 - 2 * k);
+    camT.x = I.a.x + (I.b.x - I.a.x) * e; camT.z = I.a.z + (I.b.z - I.a.z) * e; S.camGoal = S.camDist = I.a.d + (I.b.d - I.a.d) * e; S.focusGoal = null;
+    if (k >= 1 || state !== 'play') endIntro();
+  }
+  if ((S.fade ?? 1) < 1) { S.fade = Math.min(1, S.fade + dt * 1.6); setFade(S.fade); }
+  if (state === 'play' && !S.paused && !S.intro) for (let i = 0; i < S.speed; i++) if (state === 'play') updateGame(dt);
+  if (state === 'play' && !S.paused && (hudT -= dt) <= 0) { hudT = .1; updateHud(); }
   const live = state !== 'play' || !S.paused;
   if (live) {
     damageFx(dt); templeFx(dt, now); updateLife(dt); rulesFrame(dt);

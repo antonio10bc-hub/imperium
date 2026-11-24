@@ -9,7 +9,7 @@
 <div id="alarm"></div>
 <div id="ui" class="hidden-ui">
   <div class="hud" id="res"><img class="ic" data-ic="coin" data-c="#e8c870" alt=""><b id="gold">0</b><small id="rate">+0/S</small><img class="ic" data-ic="army" data-c="#f4f4e8" alt=""><span><span id="pop">0</span>/<span id="cap">30</span></span><span id="mt" hidden></span></div>
-  <div class="hud" id="tug"><span class="t0">TÚ</span><span id="terr"></span><span class="t1" id="t1">RIVAL</span><span class="cas">FORTALEZAS <b id="hp0" class="c0">100 %</b> · <b id="hp1" class="c1">100 %</b></span></div>
+  <div class="hud" id="tug"><span class="t0" id="t0">TÚ</span><span id="terr"></span><span class="t1" id="t1">RIVAL</span><span class="cas">FORTALEZAS <b id="hp0" class="c0">100 %</b> · <b id="hp1" class="c1">100 %</b></span></div>
   <div class="hud" id="merc" hidden><span id="mercT"></span><button id="mercBtn" type="button">CONTRATAR</button></div>
   <div class="hud" id="feed"></div>
   <div class="hud" id="heroes"></div>
@@ -30,6 +30,7 @@
 </div>
 <div id="toast" hidden></div>
 <div id="pause" hidden>PAUSA</div>
+<div id="vs" hidden></div>
 <div id="start" class="overlay" hidden><div class="menu3">
   <section class="mp civs" aria-label="Civilizaciones: arriba la tuya, abajo la del rival">
     <div class="half s0"><div class="stage" data-side="0"></div>
@@ -89,8 +90,9 @@
 </div></div>
 <div id="end" class="overlay" hidden><div class="card">
   <h2 id="endT">VICTORIA</h2><p id="endP" style="text-align:center"></p>
+  <div id="endStats"></div>
   <p class="mcode">MAPA <b id="eCode"></b> <button id="eCopy" type="button" class="alt">COPIAR</button></p>
-  <button id="again" type="button">OTRA PARTIDA</button>
+  <div class="row2"><button id="againSame" type="button" class="alt" title="El mismo mapa y las mismas civilizaciones">REVANCHA</button><button id="again" type="button">OTRA PARTIDA</button></div>
 </div></div>
 <div id="loading"><div><b>GENERANDO MAPA...</b><p id="tip"></p></div></div>
 

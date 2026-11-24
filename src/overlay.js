@@ -4,11 +4,14 @@ import { spotPos } from './buildings.js';
 import { ALT0, BARR0, BASE1, CFG, GAME, RANKS, TEAM, TEMP0, UNITS } from './config.js';
 import { uname } from './civs.js';
 import { exploredAt, visibleAt } from './fog.js';
-import { state } from './game.js';
+import { edgeMarks, state } from './game.js';
 import { RALLY_BLD, drag, groundAt, mouse, pickEnemy, pickSpot, pickUnit, project } from './input.js';
-import { GEOT, cellOf, spots, surfY } from './map.js';
+import { GEOT, cellOf, signs, spots, surfY } from './map.js';
 import { camera, canvas, gl, target } from './render.js';
 import { $, S } from './state.js';
+import { showTip, uiTipOn } from './hud.js';
+import { townIncNow } from './game.js';
+import { civOf } from './civs.js';
 import { floats, pings, sel, sideState, units } from './units.js';
 import { BRIDGE_COST, R, hiddenFrom, ruleTimer } from './rules.js';
 import { drawWeather } from './ambient.js';
@@ -157,17 +160,52 @@ export function drawOverlay(dt) {
   }
   for (let i = floats.length - 1; i >= 0; i--) {
     const f = floats[i]; f.t += dt; const q = project(f.local, tmpP);
-    if (q.vis) {
-      octx.font = `${Math.max(12, Math.round(f.size * 1.35))}px ${FONT}`; octx.textAlign = 'center'; octx.globalAlpha = Math.max(0, Math.min(1, 2.2 - f.t * 2));
-      octx.fillStyle = '#0f0f1b'; octx.fillText(f.text, q.x + 1, q.y - f.t * 30 + 2); octx.fillStyle = f.color; octx.fillText(f.text, q.x, q.y - f.t * 30); octx.globalAlpha = 1;
+    if (q.vis && f.t >= 0) {   // contorno oscuro: se lee sobre cualquier fondo
+      octx.font = `${Math.max(12, Math.round(f.size * 1.35))}px ${FONT}`; octx.textAlign = 'center'; octx.globalAlpha = Math.max(0, Math.min(1, 2.2 - f.t * 2, f.t * 8));
+      const y = q.y - f.t * 30; octx.lineWidth = 4; octx.lineJoin = 'round'; octx.strokeStyle = '#0f0f1b'; octx.strokeText(f.text, q.x, y); octx.fillStyle = f.color; octx.fillText(f.text, q.x, y); octx.globalAlpha = 1; octx.lineWidth = 1;
     }
     if (f.t > 1.1) floats.splice(i, 1);
   }
+  if (showUI && state === 'play') { edgeArrows(dt); signLabels(); }
   if (drag && drag.btn === 0 && drag.moved) {
     const x = Math.min(drag.x0, mouse.x), y = Math.min(drag.y0, mouse.y), w = Math.abs(mouse.x - drag.x0), h = Math.abs(mouse.y - drag.y0);
     octx.fillStyle = 'rgba(232,200,112,.12)'; octx.fillRect(x, y, w, h); octx.strokeStyle = '#e8c870'; octx.lineWidth = 2; octx.strokeRect(x, y, w, h); octx.lineWidth = 1;
   }
   if (state === 'play' && !drag) canvas.style.cursor = hoverCursor();
+  if (!uiTipOn()) showTip(state === 'play' && !drag && mouse.in && mouse.y < S.VH - (($('bar')?.offsetHeight || 86)) ? worldTip(pickSpot(mouse.x, mouse.y)) : '', mouse.x, mouse.y);
+}
+// flechas en el borde de la pantalla hacia los ataques que pasan fuera de la vista (6 s); se pueden pulsar para ir allí
+export const arrowHits = [];
+function edgeArrows(dt) {
+  arrowHits.length = 0; const top = 70, bot = S.VH - (($('bar')?.offsetHeight || 86) + 14), m = 34;
+  for (let i = edgeMarks.length - 1; i >= 0; i--) {
+    const e = edgeMarks[i]; e.t += dt; if (e.t > 6) { edgeMarks.splice(i, 1); continue; }
+    const front = scr(e.x, surfY(e.x, e.z) + 1, e.z, LA);
+    if (front && LA.x > m && LA.x < S.VW - m && LA.y > top && LA.y < bot) continue;   // se ve en pantalla: la flecha no hace falta
+    let dx = LA.x - S.VW / 2, dy = LA.y - (top + bot) / 2; if (!front) { dx = -dx; dy = -dy; }
+    const k = Math.min((S.VW / 2 - m) / Math.max(1e-3, Math.abs(dx)), ((bot - top) / 2 - 10) / Math.max(1e-3, Math.abs(dy))), x = S.VW / 2 + dx * k, y = (top + bot) / 2 + dy * k, a = Math.atan2(dy, dx);
+    const pulse = 1 + Math.sin(e.t * 9) * .12, al = Math.min(1, (6 - e.t) * 1.5);
+    octx.save(); octx.globalAlpha = al; octx.translate(x, y); octx.rotate(a); octx.scale(pulse, pulse);
+    octx.fillStyle = '#0f0f1b'; octx.beginPath(); octx.moveTo(18, 0); octx.lineTo(-10, -15); octx.lineTo(-4, 0); octx.lineTo(-10, 15); octx.closePath(); octx.fill();
+    octx.fillStyle = '#d83a4a'; octx.beginPath(); octx.moveTo(13, 0); octx.lineTo(-6, -10); octx.lineTo(-1, 0); octx.lineTo(-6, 10); octx.closePath(); octx.fill(); octx.restore();
+    arrowHits.push({ x, y, wx: e.x, wz: e.z });
+  }
+}
+// nombres en los postes indicadores, solo con la cámara cerca
+function signLabels() {
+  if (S.camDist > 34) return;
+  for (const g of signs) { if (!exploredAt(g.x, g.z)) continue; const c = project(_h.set(g.x, g.y, g.z), tmpP); if (!c.vis || c.x < 0 || c.y < 0 || c.x > S.VW || c.y > S.VH) continue; label(c.x, c.y - 4, g.name, '#d8b884', '#0f0f1b', 6); }
+}
+// texto de la caja de ayuda sobre un edificio del mapa
+function worldTip(s) {
+  if (!s) return '';
+  const own = s.owner ?? s.side, who = own == null || own < 0 ? 'NEUTRAL' : own === 0 ? 'TUYO' : 'RIVAL · ' + civOf(own).name;
+  if (s.kind === 'bridge') return `${s.name || 'PUENTE'} · ${s.built ? 'EN PIE' : 'DERRIBADO'}`;
+  if (s.kind === 'base') return `${s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA · ' + civOf(s.side).name} · ${Math.max(0, Math.round(s.hp / GAME.baseHp * 100))} %${s.wallLvl ? ' · MURALLA ' + RANKS[s.wallLvl].name : ''}`;
+  if (s.kind !== 'town') return s.side === 0 ? (LBL[s.kind] || '') + ' · CLIC PARA ABRIR' : LBL[s.kind] || '';
+  if (s.known !== s.owner && s.known != null) return s.name;
+  const what = s.camp ? 'DA JINETES ARQUEROS' : s.keep ? 'DA COLOSOS' : s.watch ? 'VISIÓN LEJANA Y TORRE' : `+${String(Math.round(townIncNow(s) * 10) / 10).replace('.', ',')} ORO/S · NIVEL ${s.lvl}`;
+  return `${s.name} · ${who} · ${what}${s.guards > 0 && own < 0 ? ` · ${s.guards} DEFENSORES` : ''}`;
 }
 // ---------- Cursores ----------
 // Iconos pixelados con contorno: espada = atacar, bandera = conquistar / punto de reunión, corona = asignar al héroe, flecha = mover

@@ -11,6 +11,7 @@ import { fortPt, forts, inGate, paintRegion, sideAt, spots, surfY, wallR } from 
 import { hash } from './noise.js';
 import { BOX, bake, basic, discGeo, mat, part, ring, world } from './render.js';
 import { S, track } from './state.js';
+import { addMoment, statCapture } from './stats.js';
 
 // ---------- Edificios ----------
 export const spotPos = (s, lift = 0) => new THREE.Vector3(s.x, s.y + lift, s.z);
@@ -236,7 +237,7 @@ function townLook(s) {
 // al verlo de nuevo, el pueblo muestra su dueño real
 export function refreshKnownTowns(all) { for (const s of spots) if (s.kind === 'town' && s.known !== s.owner && (all || visibleAt(s.x, s.z))) { s.known = s.owner; townLook(s); } }
 export function setOwner(s, sd) {
-  const prev = s.owner; s.owner = sd; if (sd < 0 && s.lvl > 1) { s.lvl = 1; townLevelLook(s); }
+  const prev = s.owner; s.owner = sd; if (sd >= 0 && sd < NEU) statCapture(sd, s); else if (prev === 0) addMoment(`PIERDES ${s.name}`); if (sd < 0 && s.lvl > 1) { s.lvl = 1; townLevelLook(s); }
   const p = spotPos(s), col = sd < 0 ? null : TEAM[sd];
   if (sd >= 0 && s.camp) { s.genT = GAME.campGen; for (let k = 0; k < 3; k++) campSpawn(s); }   // el campamento da tropas aunque no se vea
   if (sd >= 0 && s.keep) { s.genT = GAME.keepGen; for (let k = 0; k < 2; k++) keepSpawn(s); }

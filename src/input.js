@@ -15,6 +15,7 @@ import { camera, canvas, part, world } from './render.js';
 import { $, S, track } from './state.js';
 import { sel, units } from './units.js';
 import { R, startChop } from './rules.js';
+import { arrowHits } from './overlay.js';
 
 // ---------- Proyección y selección ----------
 const _p = new THREE.Vector3();
@@ -116,6 +117,8 @@ export function heroButton() {   // G: va pasando por tus héroes; sin héroes, 
 export function init() {
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('pointerdown', e => {
+    if (e.button === 0 && S.intro) { S.intro.t = S.intro.dur; return; }   // un clic se salta la presentación
+    if (e.button === 0) { const h = arrowHits.find(a => Math.hypot(a.x - e.clientX, a.y - e.clientY) < 24); if (h) { focusOn(h.wx, h.wz); return; } }   // flecha de un ataque fuera de la vista
     try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
     if (e.pointerType === 'touch') {
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -178,6 +181,7 @@ export function init() {
     if (e.target.closest?.('button') && (e.key === ' ' || e.key === 'Enter')) return;
     const k = e.key.toLowerCase(); keys.add(k);
     if (state !== 'play') return;
+    if (S.intro) { S.intro.t = S.intro.dur; keys.delete(k); return; }   // una tecla se salta la presentación
     if (S.menuOpen) { if (k === 'escape') closeMenu(); return; }   // con el menú abierto, el juego no recibe teclas
     if (/^f[1-5]$/.test(k)) { e.preventDefault(); pickGroup(+k[1] - 1); }
     else if (k === '1' || k === '2' || k === '3') enqueue(0, TYPES[+k - 1]);

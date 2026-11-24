@@ -33,5 +33,6 @@ export function streak(from, to, color, life = .45, size = .2) {
 }
 // lo que pasa en la niebla no se ve: textos, señales, partículas y flechas
 export const seenAt = p => !fogOn || visibleAt(p.x, p.z);
-export const floatText = (loc, text, color, size = 10) => { if (seenAt(loc)) floats.push({ local: loc.clone(), text, color, t: 0, size }); };
+// los rótulos que salen a la vez en el mismo sitio («+1,5 ORO/S», «NIVEL 2», «+6 TROPAS»…) esperan su turno en vez de pisarse
+export const floatText = (loc, text, color, size = 10) => { if (!seenAt(loc)) return; let n = 0; for (const f of floats) if (f.t < .45 && Math.abs(f.local.x - loc.x) < 2.5 && Math.abs(f.local.z - loc.z) < 2.5 && size >= 9 && f.size >= 9) n++; floats.push({ local: loc.clone(), text, color, t: -n * .45, size }); };
 export const ping = (loc, color) => { if (seenAt(loc)) pings.push({ local: loc.clone(), color, t: 0 }); };
