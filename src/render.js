@@ -8,10 +8,12 @@ export const gl = new THREE.WebGLRenderer({ canvas, antialias: false, powerPrefe
 gl.setPixelRatio(1); gl.outputColorSpace = THREE.LinearSRGBColorSpace;
 export const target = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: true });
 const post = new THREE.ShaderMaterial({
-  uniforms: { tDiffuse: { value: target.texture }, uSat: { value: CFG.sat } },
+  uniforms: { tDiffuse: { value: target.texture }, uSat: { value: CFG.sat }, uVig: { value: .28 }, uTint: { value: new THREE.Vector3(1, 1, 1) }, uFade: { value: 1 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }`,
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uSat; varying vec2 vUv;
-  void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = dot(c, vec3(.299,.587,.114)); gl_FragColor = vec4(mix(vec3(l), c, uSat), 1.); }`,
+  // saturación, tinte de la luz de cada geografía, viñeteado suave en las esquinas y fundido a negro (transiciones)
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uSat, uVig, uFade; uniform vec3 uTint; varying vec2 vUv;
+  void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb * uTint; float l = dot(c, vec3(.299,.587,.114)); c = mix(vec3(l), c, uSat);
+    vec2 d = vUv - .5; c *= 1. - uVig * smoothstep(.28, .75, dot(d, d) * 2.2); gl_FragColor = vec4(c * uFade, 1.); }`,
   depthTest: false, depthWrite: false });
 export const postScene = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post); quad.frustumCulled = false; postScene.add(quad);
@@ -19,7 +21,32 @@ const SKY = new THREE.Color(0x8ad8f0);
 export const scene = new THREE.Scene(); scene.background = SKY; scene.fog = new THREE.Fog(SKY, 100, 300);
 export const camera = new THREE.PerspectiveCamera(40, 1, 3, 1400);
 const sun = new THREE.DirectionalLight(0xfff6e8, 2.2); sun.position.set(-60, 120, 80);
-scene.add(sun, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25));
+const hemi = new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25);
+scene.add(sun, hemi);
+// luz propia de cada geografía (fija, sin ciclo de día): color e intensidad del sol, del cielo y del suelo, color del cielo y tinte final
+const LIGHTS = {
+  def: { sun: 0xfff6e8, si: 2.2, sky: 0xe6eeff, gnd: 0x5a4aa8, hi: 1.25, bg: 0x8ad8f0, tint: [1, 1, 1] },
+  cordillera: { sun: 0xfff8f0, si: 2.35, sky: 0xdce8ff, gnd: 0x4a5aa8, hi: 1.3, bg: 0x9cd0f4, tint: [.97, 1, 1.05] },
+  istmo: { sun: 0xfff2dc, si: 2.25, sky: 0xe0f0ff, gnd: 0x4a6ab0, hi: 1.25, bg: 0x84d4f4, tint: [1, 1, 1.02] },
+  archipielago: { sun: 0xfff4d8, si: 2.3, sky: 0xd8f4ff, gnd: 0x3a7ab0, hi: 1.3, bg: 0x7ad8f4, tint: [.98, 1.02, 1.04] },
+  barrancos: { sun: 0xffe0b8, si: 2.25, sky: 0xffe8d8, gnd: 0x7a4a6a, hi: 1.15, bg: 0xf0c8a0, tint: [1.03, .99, .96] },
+  meseta: { sun: 0xffeccc, si: 2.3, sky: 0xf0ecff, gnd: 0x6a4a8a, hi: 1.2, bg: 0xa8d8f0, tint: [1.03, 1, .96] },
+  afluentes: { sun: 0xfff8e8, si: 2.15, sky: 0xe0f4ff, gnd: 0x4a6aa0, hi: 1.3, bg: 0x8ad8f0, tint: [.99, 1.02, 1] },
+  delta: { sun: 0xf0f4d8, si: 1.9, sky: 0xd8ecd8, gnd: 0x4a6a5a, hi: 1.35, bg: 0xa8c8b8, tint: [.96, 1.02, .96] },
+  bosque: { sun: 0xf4ffd8, si: 2, sky: 0xd8f0d0, gnd: 0x3a5a4a, hi: 1.3, bg: 0x9ad0c0, tint: [.95, 1.03, .94] },
+  oasis: { sun: 0xffe4b0, si: 2.45, sky: 0xfff0d8, gnd: 0x8a5a4a, hi: 1.1, bg: 0xf4d8a8, tint: [1.03, 1, .94] },
+  lago: { sun: 0xffb890, si: 2.1, sky: 0xe8c8c8, gnd: 0x5a2a3a, hi: 1.15, bg: 0xc89a8a, tint: [1.03, .97, .95] },
+  helado: { sun: 0xf0f8ff, si: 2.05, sky: 0xe0f0ff, gnd: 0x5a6ab8, hi: 1.4, bg: 0xc8e4f4, tint: [.93, .99, 1.08] },
+  canon: { sun: 0xffd8a8, si: 2.35, sky: 0xffe0c8, gnd: 0x8a4a3a, hi: 1.1, bg: 0xf0b890, tint: [1.02, .99, .96] },
+  costa: { sun: 0xfff0d0, si: 2.25, sky: 0xe0f0ff, gnd: 0x4a6ab0, hi: 1.25, bg: 0x84d0f0, tint: [1.01, 1, 1] },
+  ruinas: { sun: 0xf8f0e0, si: 2.05, sky: 0xe8e4f0, gnd: 0x6a5a7a, hi: 1.25, bg: 0xb8c8d0, tint: [1.01, .99, .97] },
+};
+export function setGeoLight(key) {
+  const L = LIGHTS[key] || LIGHTS.def;
+  sun.color.setHex(L.sun); sun.intensity = L.si; hemi.color.setHex(L.sky); hemi.groundColor.setHex(L.gnd); hemi.intensity = L.hi;
+  SKY.setHex(L.bg); post.uniforms.uTint.value.set(...L.tint);
+}
+export const setFade = k => { post.uniforms.uFade.value = k; };
 // ---------- Materiales ----------
 export const grad = new THREE.DataTexture(new Uint8Array([120, 195, 255]), 3, 1, THREE.RedFormat);
 grad.minFilter = grad.magFilter = THREE.NearestFilter; grad.needsUpdate = true;

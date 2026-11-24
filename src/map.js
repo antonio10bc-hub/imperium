@@ -6,7 +6,7 @@ import { GEO } from './geo.js';
 import { buildMinimap, markMiniDirty } from './minimap.js';
 import { NBO, bfs, buildNav, cellX, cellZ, inMain, mainList, nearestNode, stepMask, walk } from './nav.js';
 import { hash, n2, plains, rngOf, seed, setSeed, smooth01 } from './noise.js';
-import { fogU, grad, ocean, world } from './render.js';
+import { fogU, grad, ocean, setGeoLight, world } from './render.js';
 import { S } from './state.js';
 
 export let scen = 'rio', geoR = null, geoRiver = true, GEOT = null;
@@ -117,7 +117,7 @@ function groundPaint(x, z) {   // patio de la fortaleza, pie de muralla, caminos
   for (const f of forts) {
     const p = polar(f, x, z); if (!p) continue;
     const [r, th] = p, rw = wallR(f, th), M = civOf(f.side).map, qi = f.rings[f.rings.length - 1];
-    if (r < rw * qi - .7) { const a = f.tb - Math.PI / 2, ic = M.inside ? M.inside(r * Math.cos(th - a), r * Math.sin(th - a)) : -1; return ic >= 0 ? ic : M.plaza; }
+    if (r < rw * qi - .7) { const a = f.tb - Math.PI / 2, ic = M.inside ? M.inside(r * Math.cos(th - a), r * Math.sin(th - a)) : -1; return ic >= 0 ? ic : (Math.floor(x) + Math.floor(z)) % 2 ? M.plaza : mixHex(M.plaza, 0x10203a, .07); }   // losas del patio
     if (f.rings.length > 1 && r < rw - .7) return M.between;
     if (r < rw + 1.2) return M.wallbase;
     if (r < rw + 9 && f.gates.some(g => angDiff(th, g) * r < 1.2)) return M.path;
@@ -126,6 +126,13 @@ function groundPaint(x, z) {   // patio de la fortaleza, pie de muralla, caminos
   return -1;
 }
 // color de la cara superior de una casilla: pocas manchas grandes (personalidad) sin ruido por vóxel
+// mezcla suave entre los suelos de dos civilizaciones: peso del otro bioma en la franja de transición
+function mixAt(x, z, side) {
+  const w0 = (n2(x, z, .08, 2, 61) - .5) * 26;
+  if (NP > 2 && forts.length === NP) { const ds = forts.map(f => Math.hypot(f.x - x, f.z - z) + w0 * (f.side % 2 ? 1 : -1)); let o = -1, bo = 1e9; ds.forEach((d, k) => { if (k !== side && d < bo) { bo = d; o = k; } }); const w = .45 * Math.max(0, 1 - (bo - ds[side]) / 18); return w > .02 ? { o, w } : null; }
+  const t = THREE.MathUtils.clamp((x - RIVX[THREE.MathUtils.clamp(z | 0, 0, MD - 1)] + w0) / 24 + .5, 0, 1), w = .42 * (1 - Math.abs(2 * t - 1));
+  return w > .02 ? { o: 1 - side, w } : null;
+}
 export function sideAt(x, z) {   // 0 = orilla oeste (tu civilización), 1 = orilla este; borde ruidoso de ~24 casillas
   if (NP > 2 && forts.length === NP) { let b = 0, bd = 1e9; const w = (n2(x, z, .08, 2, 61) - .5) * 26; for (const f of forts) { const d = Math.hypot(f.x - x, f.z - z) + w * (f.side % 2 ? 1 : -1); if (d < bd) { bd = d; b = f.side; } } return b; }   // con más jugadores: el suelo de la fortaleza más cercana
   const d = x - RIVX[THREE.MathUtils.clamp(z | 0, 0, MD - 1)] + (n2(x, z, .08, 2, 61) - .5) * 26, t = THREE.MathUtils.clamp(d / 24 + .5, 0, 1);
@@ -162,7 +169,7 @@ export function terrainColor(x, z) {
   const i = idx(x, z), h = HM[i], cx = x + .5, cz = z + .5;
   const pc = groundPaint(cx, cz); if (pc >= 0) return pc;
   const side = sideAt(cx, cz), B = bioOf(side), gt = GEOT[i];
-  if (roadCell && roadCell[i]) { const rc = h <= 1 ? TP.ford : B.road; if (roadCell[i] === 1) return rc;   // borde difuminado del camino: mitad camino, mitad suelo
+  if (roadCell && roadCell[i]) { const rc = h <= 1 ? TP.ford : B.road; if (roadCell[i] === 1) return hash(x, 31, z) < .16 ? mixHex(rc, 0x5a4630, .16) : rc;   // rodadas   // borde difuminado del camino: mitad camino, mitad suelo
     const t2 = n2(cx, cz, .045, 3, 21 + side * 7), g2 = B.ground[THREE.MathUtils.clamp(Math.floor((t2 - .34) / .09), 0, 3)]; return mixHex(rc, g2, .5); }
   if (gt === 1) return B.lush;
   if (gt === 2) { const w = n2(cx, cz, .12, 2, 71) > .55; return h <= 1 ? (w ? 0xb8ccc0 : 0xd6cca0) : (w ? 0x6c9a92 : 0x6a8a5a); }   // bajío / pantano: manchas grandes, sin moteado
@@ -183,10 +190,12 @@ export function terrainColor(x, z) {
   if (treeCell && treeCell[i]) return B.lush;
   const fc = geoR?.snow ? -1 : featureAt(x, z, side, B); if (fc >= 0) return fc;   // en la nieve no hay cultivos ni jardines
   const m = n2(cx, cz, .045, 3, 21 + side * 7) + (h - 2) * .05, tone = THREE.MathUtils.clamp(Math.floor((m - .34) / .09), 0, 3);
-  const col = h >= 6 ? (h >= 9 ? 0xe4e2da : mixHex(B.ground[tone], 0x9a9488, Math.min(1, (h - 5) / 3))) : B.ground[tone];   // alturas: la hierba pasa a roca y, en las cumbres, a nieve
+  let col = h >= 6 ? (h >= 9 ? 0xe4e2da : mixHex(B.ground[tone], 0x9a9488, Math.min(1, (h - 5) / 3))) : B.ground[tone];   // alturas: la hierba pasa a roca y, en las cumbres, a nieve
+  if (h < 6) { const mx = mixAt(cx, cz, side); if (mx) col = mixHex(col, bioOf(mx.o).ground[tone], mx.w); }   // transición entre biomas
+  if (roadCell && (roadCell[i + 1] === 1 || roadCell[i - 1] === 1 || roadCell[i + MW] === 1 || roadCell[i - MW] === 1)) col = mixHex(col, 0x3a4a2a, .09);   // cuneta junto al camino
   return geoR?.snow && (geoR.snowSide == null || (cx < geoR.seam(cz)) === (geoR.snowSide === 0)) ? mixHex(col, 0xeef2f6, .62) : col;   // valle helado: todo nevado
 }
-export let meshes = [], spots = [], bridgeSites = [];
+export let meshes = [], spots = [], bridgeSites = [], signs = [];
 const STRATA = [0xb85a3a, 0xd08a4a, 0xc87850, 0xa04a30, 0xd8a060];
 // código de mapa para compartir: GEOGRAFÍA-SEMILLA (p. ej. RIO-48213). La misma geografía y semilla dan el mismo terreno y los mismos pueblos
 export const mapCode = () => `${scen.toUpperCase()}-${seed}${sizeKey !== 'n' ? '-' + sizeKey.toUpperCase() : ''}${NP > 2 ? '-J' + NP : ''}`;   // -J3…-J5: jugadores   // -P o -G: tamaño pequeño o grande
@@ -203,11 +212,11 @@ export function generate(newSeed, tries = 0) {
   // tras muchas semillas fallidas se cae al río clásico, que siempre sale jugable (evita reintentar sin fin)
   const pickR = rng();   // se tira siempre, para que un código de mapa (geografía + semilla) dé el mismo mapa tanto si se eligió al azar como a mano
   scen = tries >= 20 ? 'rio' : S.wantScen === 'random' ? GEO.keys[pickR * GEO.keys.length | 0] : (GEO.LIST[S.wantScen] ? S.wantScen : 'canon');
-  baseGround(rng);
+  baseGround(rng); setGeoLight(scen);
   flats = []; forts = [];
   computeHM();
   if (buildNav() < .55 && tries < 40) return generate(newSeed + 7919, tries + 1);
-  const plateau = (x, z, rad) => { let s = 0, n = 0; for (let dz = -rad; dz <= rad; dz++) for (let dx = -rad; dx <= rad; dx++) { const cx = Math.floor(x) + dx, cz = Math.floor(z) + dz; if (cx < 0 || cz < 0 || cx >= MW || cz >= MD || dx * dx + dz * dz > rad * rad) continue; const g = G[idx(cx, cz)]; if (g > .5) { s += g; n++; } } return THREE.MathUtils.clamp(Math.round(n ? s / n : 2), 2, 4) + .2; };
+  const plateau = (x, z, rad, hi = 4) => { let s = 0, n = 0; for (let dz = -rad; dz <= rad; dz++) for (let dx = -rad; dx <= rad; dx++) { const cx = Math.floor(x) + dx, cz = Math.floor(z) + dz; if (cx < 0 || cz < 0 || cx >= MW || cz >= MD || dx * dx + dz * dz > rad * rad) continue; const g = G[idx(cx, cz)]; if (g > .5) { s += g; n++; } } return THREE.MathUtils.clamp(Math.round(n ? s / n : 2), 2, hi) + .2; };   // hi: los pueblos pueden estar en alto (la cima de la meseta) sin que su explanada la rebaje
   const pick = (x0, x1) => {   // sitio llano para la fortaleza en un extremo del mapa
     let best = -1, bs = -1e9;
     for (let t = 0; t < 500; t++) {
@@ -249,16 +258,35 @@ export function generate(newSeed, tries = 0) {
   const names = [...TOWN_NAMES].sort(() => rng() - .5);
   // pueblos lejos de los bordes del mapa (en las esquinas quedaban apartados del juego)
   const dry = i => { const x = i % MW, z = (i / MW) | 0; for (const [a, b] of [[6, 0], [-6, 0], [0, 6], [0, -6], [4, 4], [-4, 4], [4, -4], [-4, -4]]) { const xx = x + a, zz = z + b; if (xx < 0 || zz < 0 || xx >= MW || zz >= MD || EL[idx(xx, zz)] <= .5) return false; } return true; };   // sin agua cerca
-  let pool = mainList.filter(i => HM[i] <= 7 && ![6, 7, 9, 10, 11, 13, 15].includes(GEOT[i]) && dry(i) && cellX(i) > 26 && cellX(i) < MW - 26 && cellZ(i) > 22 && cellZ(i) < MD - 22);
-  const addTown = (x, z, extra = {}) => { spots.push({ kind: 'town', x, z, name: names[spots.length % names.length], owner: -1, ...extra }); flats.push({ kind: 'town', x, z, r0: 4.8, r1: 8.5, h: plateau(x, z, 4) }); };
-  for (const [x, z] of geoR?.special || []) { const n = nearestNode(x, z); if (Math.hypot(cellX(n) - x, cellZ(n) - z) < 8) addTown(cellX(n), cellZ(n), geoR.goldTop || scen === 'lago' ? { special: true } : geoR.oasis ? { oasis: true } : {}); }
+  // sitio para un pueblo: la explanada (radio r) no puede tocar agua, ríos, rampas, puertos, vados, puentes, bosque, ruinas, hielo ni lava,
+  // y todo el suelo que cubre está a la misma altura (±1): así un pueblo nunca rellena un río ni rompe el borde de la meseta o sube a ella por una rampa nueva
+  const BAD = new Uint8Array(32); for (const t of [1, 2, 5, 6, 7, 9, 10, 12, 13, 14, 15, 16, 17]) BAD[t] = 1;
+  const keyPts = [...(geoR?.passes || []), ...(geoR?.bridges || []).map(b => [b[0], b[1]]), ...(geoR?.lavaEnds || []), ...(geoR?.volcano ? [geoR.volcano] : [])];
+  const siteOK = (x, z, r, key = true) => {
+    x = Math.floor(x); z = Math.floor(z); if (x < 0 || z < 0 || x >= MW || z >= MD) return false; const h0 = HM[idx(x, z)]; if (h0 < 1) return false;
+    if (key && keyPts.some(([px, pz]) => Math.hypot(px - x, pz - z) < r + 6)) return false;
+    if (scen === 'rio' && Math.abs(x + .5 - RIVX[z]) < r + 6) return false;
+    const R = Math.ceil(r);
+    for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) { if (dx * dx + dz * dz > r * r) continue; const xx = x + dx, zz = z + dz;
+      if (xx < 0 || zz < 0 || xx >= MW || zz >= MD) return false; const j = idx(xx, zz); if (HM[j] < 1 || Math.abs(HM[j] - h0) > 1 || BAD[GEOT[j]]) return false; }
+    return true;
+  };
+  const inside = i => HM[i] <= 7 && ![6, 7, 9, 10, 11, 13, 15].includes(GEOT[i]) && dry(i) && cellX(i) > 26 && cellX(i) < MW - 26 && cellZ(i) > 22 && cellZ(i) < MD - 22;
+  let pool = mainList.filter(i => inside(i) && siteOK(cellX(i), cellZ(i), 8.5));
+  if (pool.length < GAME.towns * 40) pool = mainList.filter(i => inside(i) && siteOK(cellX(i), cellZ(i), 5));   // geografía muy accidentada: basta con que la plaza quede limpia
+  const addTown = (x, z, extra = {}) => { const small = extra.watch || extra.keep && scen !== 'canon'; spots.push({ kind: 'town', x, z, name: names[spots.length % names.length], owner: -1, ...extra });
+    flats.push({ kind: 'town', x, z, r0: small ? 3.5 : 4.8, r1: small ? 6 : 8.5, h: plateau(x, z, 4, small ? 4 : 8) }); };   // atalayas de los puertos y ciudadelas de los pasos: explanada pequeña para no ensanchar el paso
+  // sitio propio de la geografía (ciudadela de la confluencia, atalaya de un puerto…): el punto más cercano donde el edificio cabe entero en tierra firme
+  const findSite = (x, z, r, maxD) => { let best = -1, bd = 1e9; for (let dz = -maxD; dz <= maxD; dz++) for (let dx = -maxD; dx <= maxD; dx++) { const d = dx * dx + dz * dz, xx = Math.floor(x) + dx, zz = Math.floor(z) + dz; if (d >= bd || d > maxD * maxD || xx < 0 || zz < 0 || xx >= MW || zz >= MD) continue; const i = idx(xx, zz); if (inMain[i] && siteOK(xx, zz, r, false)) { bd = d; best = i; } } return best; };
+  const nearSite = (x, z, r, maxD) => { const n = findSite(x, z, r, maxD); return n >= 0 ? n : nearestNode(x, z); };
+  for (const [x, z] of geoR?.special || []) { const n = nearSite(x, z, geoR.oasis ? 4 : 6, 13); if (Math.hypot(cellX(n) - x, cellZ(n) - z) < 14) addTown(cellX(n), cellZ(n), geoR.goldTop || scen === 'lago' ? { special: true } : geoR.oasis ? { oasis: true } : {}); }
   // sitios propios de la geografía: una atalaya en cada puerto de la cordillera y la ciudadela en el paso del istmo
-  const onLand = ([x, z], max = 8) => { const n = nearestNode(x, z); return Math.hypot(cellX(n) - x, cellZ(n) - z) < max && spots.every(o => Math.hypot(o.x - cellX(n), o.z - cellZ(n)) > 18) ? n : -1; };
+  const onLand = ([x, z], max = 8, r = 3.5) => { const n = nearSite(x, z, r, max); return Math.hypot(cellX(n) - x, cellZ(n) - z) < max && spots.every(o => Math.hypot(o.x - cellX(n), o.z - cellZ(n)) > 18) ? n : -1; };
   if (scen === 'cordillera') for (const p of geoR.passes) { const n = onLand(p); if (n >= 0) addTown(cellX(n), cellZ(n), { watch: true }); }
   if (geoR?.confluence) {   // la ciudadela en la confluencia (afluentes) o en el centro de la isla (cañón: siempre dentro de la isla)
-    const n = scen === 'canon' ? nearestNode(geoR.confluence[0], geoR.confluence[1]) : onLand(geoR.confluence, 16);
+    const n = scen === 'canon' ? nearestNode(geoR.confluence[0], geoR.confluence[1]) : onLand(geoR.confluence, 18, 6.5);
     if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }
-  if (scen === 'istmo' && geoR.passes[0]) { const n = onLand(geoR.passes[0], 14); if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }
+  if (scen === 'istmo' && geoR.passes[0]) { const n = onLand(geoR.passes[0], 14, 5); if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }
   // el mismo número de pueblos en cada mitad (con más de dos jugadores, en la zona de cada fortaleza)
   const zoneOf = (x, z) => { if (NP === 2) return x >= MW / 2 ? 1 : 0; let b = 0, bd = 1e9; for (const f of forts) { const d = Math.hypot(f.x - x, f.z - z); if (d < bd) { bd = d; b = f.side; } } return b; };
   const halves = players().map(h => pool.filter(i => zoneOf(cellX(i), cellZ(i)) === h));
@@ -271,7 +299,7 @@ export function generate(newSeed, tries = 0) {
   }
   const plain = s => s.kind === 'town' && !s.camp && !s.keep && !s.watch && !s.fortified && !s.special;
   // el pueblo más céntrico del mapa es la ciudadela: guardada por colosos neutrales, da colosos a quien la conquiste
-  if (!spots.some(s => s.keep)) { const c = spots.filter(plain).sort((a, b) => Math.hypot(a.x - MW / 2, (a.z - MD / 2) * 1.2) - Math.hypot(b.x - MW / 2, (b.z - MD / 2) * 1.2))[0];
+  if (!spots.some(s => s.keep)) { const cs = spots.filter(plain).sort((a, b) => Math.hypot(a.x - MW / 2, (a.z - MD / 2) * 1.2) - Math.hypot(b.x - MW / 2, (b.z - MD / 2) * 1.2)), c = cs.slice(0, 4).find(s => siteOK(s.x, s.z, 14)) || cs[0];
     if (c) c.keep = true; }
   for (const c of spots) if (c.keep && !c.name.startsWith('CIUDADELA')) c.name = 'CIUDADELA DE ' + c.name;
   // dos pueblos (uno a cada lado del río, cerca del centro) son campamentos con guardianes neutrales
@@ -290,12 +318,12 @@ export function generate(newSeed, tries = 0) {
   const nFort = Math.round(spots.filter(plain).length * .25);
   for (let k = 0; k < nFort; k++) {
     const half = k % 2, f = forts[half];
-    const cand = spots.filter(s => plain(s) && (s.x >= MW / 2) === !!half && Math.hypot(s.x - f.x, s.z - f.z) > 55);
+    const cand0 = spots.filter(s => plain(s) && (s.x >= MW / 2) === !!half && Math.hypot(s.x - f.x, s.z - f.z) > 55), big = cand0.filter(s => siteOK(s.x, s.z, 12)), cand = big.length ? big : cand0;   // los grandes, donde cabe su explanada
     const c = cand[(rng() * cand.length) | 0]; if (!c) continue;
     c.fortified = true;
   }
   for (const c of spots) if (c.kind === 'town' && (geoR?.fumaroles || []).some(([fx, fz]) => Math.hypot(fx - c.x, fz - c.z) < 26)) c.fumarole = true;   // caldera: los pueblos junto a una fumarola dan más oro
-  for (const c of spots) if (c.fortified || c.keep) { const fl = flats.find(q => q.kind === 'town' && q.x === c.x && q.z === c.z); if (fl) { fl.r0 = 8; fl.r1 = 12; } }   // los grandes, sobre una explanada mayor
+  for (const c of spots) if ((c.fortified || c.keep) && !(c.keep && (scen === 'istmo' || (geoR?.confluence && scen !== 'canon')))) { const fl = flats.find(q => q.kind === 'town' && q.x === c.x && q.z === c.z); if (fl) { fl.r0 = c.keep ? 10 : 8; fl.r1 = c.keep ? 14 : 12; } }   // los grandes, sobre una explanada mayor (salvo la ciudadela de un paso o de una confluencia, que no lo ensancha)
   computeHM(); buildNav();
   for (const s of spots) s.node = nearestNode(s.x, s.z);
   // equilibrio: distancia por camino de cada fortaleza a sus 3 pueblos más cercanos de su mitad; si difiere más de un 18 %, otra semilla
@@ -423,8 +451,10 @@ function buildVoxels() {
   const shadow = new Float32Array(N);
   for (let z = 0; z < MD; z++) for (let x = 0; x < MW; x++) {
     const i = idx(x, z);
-    if (treeCell[i]) for (const [dx, dz, k] of [[1, -1, .16], [0, -1, .1], [1, 0, .08]]) { const nx = x + dx, nz = z + dz; if (nx < MW && nz >= 0) shadow[idx(nx, nz)] = Math.max(shadow[idx(nx, nz)], k); }
-    if (hAt(x - 1, z + 1) > HM[i] && HM[i] > 0) shadow[i] = Math.max(shadow[i], .12);
+    if (treeCell[i]) for (const [dx, dz, k] of [[1, -1, .18], [2, -2, .1], [0, -1, .1], [1, 0, .08], [1, -2, .06]]) { const nx = x + dx, nz = z + dz; if (nx < MW && nz >= 0) shadow[idx(nx, nz)] = Math.max(shadow[idx(nx, nz)], k); }
+    const h = HM[i]; if (h <= 0) continue;
+    for (let k = 1; k <= 6; k++) { const d = hAt(x - k, z + k) - h - (k - 1) * .75; if (d > 0) shadow[i] = Math.max(shadow[i], Math.min(.26, .11 + d * .04)); }   // sombra larga de los desniveles
+    let up = 0; for (const [a, b] of H4) if (hAt(x + a, z + b) > h) up++; if (up) shadow[i] = Math.max(shadow[i], .03 + up * .025);   // oclusión al pie de las laderas
   }
   const CH = 64, NCX = Math.ceil(MW / CH), NCZ = Math.ceil(MD / CH), landC = [], waterC = [];
   for (let k = 0; k < NCX * NCZ; k++) { landC.push(new Chunk()); waterC.push(new Chunk()); }
@@ -433,13 +463,16 @@ function buildVoxels() {
     if (GEOT[i] === 9) { L.quad(2, x, x + 1, 1, 1, z, z + 1, 0x7a4a34); continue; }   // bajo los puentes del cañón: el fondo seco (el puente se dibuja aparte)
     if (h <= 0) {   // agua
       const depth = -G[i], nearLand = H4.some(([a, b]) => hAt(x + a, z + b) > 0);
-      waterC[ck].quad(2, x, x + 1, 0, 0, z, z + 1, nearLand ? TP.edge : depth < 2.2 ? TP.shallow : TP.deep);
+      waterC[ck].quad(2, x, x + 1, 0, 0, z, z + 1, nearLand ? TP.edge : mixHex(TP.shallow, TP.deep, THREE.MathUtils.clamp((depth - .8) / 2.2, 0, 1)));   // más oscuro cuanto más hondo
+      if (x === 0 || z === 0 || x === MW - 1 || z === MD - 1) for (const [a, b, f] of H4) { const xx = x + a, zz = z + b; if (xx < 0 || zz < 0 || xx >= MW || zz >= MD) waterC[ck].quad(f, x, x + 1, -5, 0, z, z + 1, TP.deep); }
       continue;
     }
     let col = terrainColor(x, z); if (shadow[i]) col = mixHex(col, 0x10203a, shadow[i]);
+    { const j = hash(x, 23, z); if (j < .18) col = mixHex(col, 0x10203a, .045); else if (j > .88) col = mixHex(col, 0xffffff, .045); }   // un poco de grano en el suelo
     L.quad(2, x, x + 1, h, h, z, z + 1, col);
     const sc = h <= 1 ? TP.cliffS : TP.cliff, lip = mixHex(col, 0x10203a, .14);   // escalón de 1: color del suelo; más hondo: ladera
-    for (const [a, b, f] of H4) { const hn = Math.max(0, hAt(x + a, z + b)); if (hn >= h) continue;
+    for (const [a, b, f] of H4) { const xx = x + a, zz = z + b; if (xx < 0 || zz < 0 || xx >= MW || zz >= MD) L.quad(f, x, x + 1, -5, 0, z, z + 1, (h + x + z) % 2 ? 0x6a5038 : 0x5a4230);   // borde del mapa: corte de tierra
+      const hn = Math.max(0, hAt(xx, zz)); if (hn >= h) continue;
       if (scen === 'canon' && h >= 3) { for (let y = hn; y < h; y++) L.quad(f, x, x + 1, y, y + 1, z, z + 1, STRATA[(y + (hash(x, 3, z) < .2 ? 1 : 0)) % STRATA.length]); continue; }   // estratos de colores en las paredes del cañón
       L.quad(f, x, x + 1, h - 1, h, z, z + 1, h <= 1 ? sc : lip); if (hn < h - 1) L.quad(f, x, x + 1, hn, h - 1, z, z + 1, sc); }
     if (treeCell[i] === 2) { const v0 = L.nv; treeV.set(i, [ck, v0]); const B = biomeAt(cx, cz), r2 = hash(x * 5, 7, z * 3); const lt = GEOT[i] === 16, tc = lt ? mixHex(B.treeCol, 0xd8e890, .55) : B.treeCol;   // bosque claro: árboles más bajos y claros
@@ -454,11 +487,48 @@ function buildVoxels() {
       else if (B.feature === 'heath' && featureAt(x, z, side, B) === 0x8a6a8a && hash(x, 9, z) < .12) { L.box(cx, h + .2, cz, .66, .4, .54, 0x8a8a86); L.box(cx + .14, h + .46, cz, .3, .18, .3, 0x9a9a96); }
       else if (B.feature === 'tea' && featureAt(x, z, side, B) === 0x4a8040 && x % 2) L.box(cx, h + .2, cz, .9, .4, .7, 0x3f7a3a);
       else if (B.feature === 'maize' && featureAt(x, z, side, B) >= 0 && x % 2 === 0 && z % 2) { L.box(cx, h + .3, cz, .1, .6, .1, 0x8ab04a); L.box(cx, h + .6, cz, .12, .14, .12, 0xe0c050); }
+      else if (GEOT[i] !== 2) {   // matas, flores y piedras sueltas por todo el campo
+        const r = hash(x, 41, z), snow = geoR?.snow, dry = scen === 'oasis' || scen === 'canon' || scen === 'lago', ox = (hash(x, 43, z) - .5) * .5, oz = (hash(x, 47, z) - .5) * .5;
+        if (r < .028 && !snow) { const tc = dry ? 0xa89a5a : mixHex(B.ground[0], 0x2a4a1a, .35); for (let k = 0; k < 3; k++) L.box(cx + ox + (k - 1) * .16, h + .14 + (k % 2) * .05, cz + oz + (k % 2) * .12, .08, .28 + (k % 2) * .1, .08, tc); }
+        else if (r < .04 && !snow && !dry) { L.box(cx + ox, h + .1, cz + oz, .06, .2, .06, 0x4a7a30); L.box(cx + ox, h + .24, cz + oz, .16, .1, .16, [0xe85a6a, 0xf0d050, 0xf4f4f4, 0xa87ad8][(x * 3 + z * 7) % 4]); }
+        else if (r < .05) { L.box(cx + ox, h + .12, cz + oz, .42, .24, .34, dry ? 0xb89a70 : 0x8a8a86); if (snow) L.box(cx + ox, h + .26, cz + oz, .36, .06, .3, 0xf4f8fa); }
+      }
     }
   }
+  // postes indicadores: a la salida de cada pueblo, junto a cada camino, con su nombre (la capa 2D lo escribe al acercar la cámara)
+  signs = [];
+  for (const s of spots) {
+    if (s.kind !== 'town') continue; const dirs = [];
+    for (let dz = -11; dz <= 11; dz++) for (let dx = -11; dx <= 11; dx++) { const d = Math.hypot(dx, dz); if (d < 9 || d > 10.5) continue; const x = Math.floor(s.x) + dx, z = Math.floor(s.z) + dz; if (x < 1 || z < 1 || x >= MW - 1 || z >= MD - 1 || roadCell[idx(x, z)] !== 1) continue;
+      const a = Math.atan2(dz, dx); if (dirs.some(b => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < .9)) continue;
+      const side = [[-dz, dx], [dz, -dx]].map(([u, v]) => [x + Math.sign(u) * 2, z + Math.sign(v) * 2]).find(([u, v]) => u > 0 && v > 0 && u < MW && v < MD && !roadCell[idx(u, v)] && walk[idx(u, v)] && !treeCell[idx(u, v)]);
+      if (!side) continue; dirs.push(a); const [u, v] = side, h = HM[idx(u, v)], L = landC[(v / CH | 0) * NCX + (u / CH | 0)];
+      L.box(u + .5, h + .7, v + .5, .14, 1.4, .14, 0x6a4a2e); L.box(u + .5 + Math.cos(a) * .3, h + 1.2, v + .5 + Math.sin(a) * .3, .7 * Math.abs(Math.cos(a)) + .1, .26, .7 * Math.abs(Math.sin(a)) + .1, 0xd8b884);
+      signs.push({ x: u + .5, y: h + 1.6, z: v + .5, name: s.name });
+      if (dirs.length >= 3) break; }
+  }
+  buildOutside();
   const lmat = terrainMat(false), wmat = terrainMat(true);
   chunkMesh = landC.map(L => { if (!L.nv) return null; const m = L.build(lmat); meshes.push(m); return m; });
   waterC.forEach(W => { if (W.nv) meshes.push(W.build(wmat)); });
+}
+
+// alrededores del mapa: lomas y montes (o islotes en el mar) que siguen el terreno del borde y se pierden en la bruma; no se juegan
+function buildOutside() {
+  const L = new Chunk(), M = 44, S2 = 2, sea = geoR?.sea;
+  for (let z = -M; z < MD + M; z += S2) for (let x = -M; x < MW + M; x += S2) {
+    if (x >= 0 && z >= 0 && x < MW && z < MD) continue;
+    const ex = THREE.MathUtils.clamp(x, 0, MW - 1), ez = THREE.MathUtils.clamp(z, 0, MD - 1), d = Math.max(Math.abs(x - ex), Math.abs(z - ez)), eh = Math.max(0, HM[idx(ex, ez)]);
+    const hill = 2 + n2(x, z, .03, 3, 73) * 10, k = smooth01(d / 14);
+    let h = sea ? (d < 8 ? eh * (1 - d / 8) : 0) + (n2(x, z, .035, 2, 77) > .7 ? 1 + (n2(x, z, .035, 2, 77) - .7) * 20 : 0) : eh * (1 - k) + hill * k;
+    h = Math.round(h); if (h <= 0) continue;
+    const B = bioOf(sideAt(ex + .5, ez + .5)), c0 = h >= 8 ? (geoR?.snow || h >= 10 ? 0xe4e2da : 0x9a9488) : B.ground[(hash(x, 5, z) * 4) | 0];
+    const col = mixHex(geoR?.snow ? mixHex(c0, 0xeef2f6, .6) : c0, 0x20304a, .12 + Math.min(.3, d / M * .3));
+    L.box(x + S2 / 2, (h - 6) / 2, z + S2 / 2, S2, h + 6, S2, col);
+  }
+  if (!L.nv) return;
+  meshes.push(L.build(new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: grad })));
+  ocean.position.y = sea ? -.06 : -5;
 }
 
 // ---------- Vista de una geografía para el menú ----------

@@ -203,6 +203,27 @@ export function buildWalls(f) {
     });
   });
 }
+// vida en el patio de la fortaleza: pozo, carros, cajas y toneles, almiar, estafermo de prácticas y estandartes del bando.
+// Van en los huecos libres (lejos de los edificios, de la muralla y del paso de las puertas); solo decoran, no estorban
+const PROPS = {
+  well(g, T) { for (let k = 0; k < 6; k++) { const a = k / 6 * 6.28; part(g, .5, .6, .5, 0x9a968c, Math.cos(a) * .55, .3, Math.sin(a) * .55); } part(g, .7, .05, .7, 0x3a6a9a, 0, .5, 0, false); for (const x of [-.6, .6]) part(g, .1, 1.3, .1, 0x6a4a2e, x, .9, 0); part(g, 1.5, .14, .8, 0x8a5a34, 0, 1.6, 0); },
+  cart(g, T) { part(g, 1.2, .3, .8, 0x8a5a34, 0, .55, 0); for (const x of [-.4, .4]) for (const z of [-.45, .45]) part(g, .36, .36, .08, 0x5a3a24, x, .22, z); part(g, .9, .3, .6, 0xd8c060, 0, .85, 0); part(g, .08, .08, .8, 0x6a4a2e, .85, .5, 0); },
+  crates(g, T) { part(g, .6, .6, .6, 0xa87a4a, 0, .3, 0); part(g, .5, .5, .5, 0x9a6a3a, .55, .25, .2); part(g, .45, .45, .45, 0xa87a4a, .2, .82, .05); for (const [x, z] of [[-.6, .3], [-.65, -.35]]) { part(g, .4, .55, .4, 0x7a4a2a, x, .27, z); part(g, .44, .06, .44, 0x3a3a3a, x, .4, z, false); } },
+  hay(g, T) { part(g, 1.1, .7, 1.1, 0xd8c060, 0, .35, 0); part(g, .75, .4, .75, 0xe0c870, 0, .9, 0); part(g, .35, .25, .35, 0xe0c870, 0, 1.2, 0); },
+  dummy(g, T) { part(g, .12, 1.6, .12, 0x6a4a2e, 0, .8, 0); part(g, .9, .1, .1, 0x6a4a2e, 0, 1.2, 0); part(g, .44, .6, .3, 0xc8b070, 0, 1.15, 0); part(g, .3, .3, .3, 0xc8b070, 0, 1.6, 0); part(g, .4, .4, .06, T, -.45, 1.1, .1); },
+  banner(g, T) { part(g, .12, 3.2, .12, 0x5a3a24, 0, 1.6, 0); part(g, .06, 1.1, .7, T, 0, 2.5, .36, false); part(g, .2, .2, .2, 0xe8c050, 0, 3.25, 0); },
+  firepit(g, T) { for (let k = 0; k < 6; k++) { const a = k / 6 * 6.28; part(g, .3, .22, .3, 0x6a6266, Math.cos(a) * .45, .11, Math.sin(a) * .45); } part(g, .35, .3, .35, 0xff9a2a, 0, .2, 0, false); part(g, .18, .25, .18, 0xffe06a, 0, .4, 0, false); },
+};
+export function buildFortDeco(f) {
+  const T = TEAM[f.side].c, q = f.rings[f.rings.length - 1], blds = spots.filter(s => s.side === f.side && s.kind !== 'town'), kinds = Object.keys(PROPS), put = [];
+  for (let t = 0; t < 160 && put.length < 9; t++) {
+    const th = hash(f.side, t, 7) * Math.PI * 2, r = 2.5 + hash(t, f.side, 9) * (wallR(f, th) * q - 4.2), p = fortPt(f, r, th);
+    if (f.gates.some(ga => Math.abs(Math.atan2(Math.sin(th - ga), Math.cos(th - ga))) * r < 2.2)) continue;   // el paso de las puertas queda libre
+    if (blds.some(b => Math.hypot(b.x - p.x, b.z - p.z) < (b.kind === 'base' ? 5.6 : 3.9) * (b.sc || 1)) || put.some(o => Math.hypot(o.x - p.x, o.z - p.z) < 2.6)) continue;
+    const kind = put.length < 2 ? 'banner' : kinds[(hash(t, 3, f.side) * kinds.length) | 0], g = new THREE.Group(); PROPS[kind](g, T); bake(g);
+    g.position.set(p.x, surfY(p.x, p.z), p.z); g.rotation.y = hash(t, 5, 1) * 6.28; world.add(g); decos.push(g); put.push(p);
+  }
+}
 // aspecto del pueblo según su dueño conocido
 function townLook(s) {
   const sd = s.known, col = sd < 0 ? null : TEAM[sd];

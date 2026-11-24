@@ -80,7 +80,8 @@ let bedT = 0;
 export function updateLife(dt) {
   if ((bedT -= dt) <= 0) { bedT = 1; if (state !== 'play') setAmbience(null); else if (WEA.k > .4 && WX_BED[WEA.kind]) setAmbience(WX_BED[WEA.kind], .6 + WEA.k * .6); else { const b = BED[scen]; setAmbience(b?.[0], b?.[1]); } }
   if (!HM || dt <= 0) return;
-  if (flock) { flock.t += dt; flock.g.position.addScaledVector(flock.v, dt); flock.g.visible = visibleAt(flock.g.position.x, flock.g.position.z);   // los pájaros no se ven sobre la niebla flock.birds.forEach((b, i) => { b.scale.y = 1 + Math.sin(flock.t * 12 + i) * .8; b.scale.x = .75 + Math.abs(Math.sin(flock.t * 12 + i)) * .5; });
+  if (flock) { flock.t += dt; flock.g.position.addScaledVector(flock.v, dt); flock.g.visible = visibleAt(flock.g.position.x, flock.g.position.z);   // los pájaros no se ven sobre la niebla
+    flock.birds.forEach((b, i) => { b.scale.y = 1 + Math.sin(flock.t * 12 + i) * .8; b.scale.x = .75 + Math.abs(Math.sin(flock.t * 12 + i)) * .5; });
     if (flock.t > 22) { world.remove(flock.g); flock.g.children.forEach(b => b.geometry.dispose()); flock = null; } }
   else if ((lifeT.bird -= dt) <= 0) { lifeT.bird = 18 + fxRand() * 25; flock = makeFlock(); }
   if (vents.length && (lifeT.steam -= dt) <= 0) { lifeT.steam = .18; const [x, z, y, lava] = vents[fxRand() * vents.length | 0]; plume(new THREE.Vector3(x + fxRand() - .5, y, z + fxRand() - .5), fxRand() < .6 ? 0xf4f4f0 : 0xd8d8d4, lava ? 1.1 : .7, 2.4, lava ? 2.2 : 1.6, -.3); }
@@ -109,6 +110,25 @@ const LM = {
   haystack(g) { part(g, 1.4, .9, 1.4, 0xd8c060, 0, .45, 0); part(g, 1, .5, 1, 0xe0c870, 0, 1.1, 0); part(g, .5, .3, .5, 0xe0c870, 0, 1.45, 0); },
   fishhut(g) { part(g, 1.6, 1.2, 1.4, 0x8a5a34, 0, .6, 0); part(g, 1.9, .3, 1.7, 0xf0f4f8, 0, 1.35, 0); part(g, 1.2, .3, 1.1, 0xf0f4f8, 0, 1.6, 0); part(g, .5, .05, .5, 0x2a5a7a, 1.4, .05, .4); part(g, .06, 1, .06, 0x6a4224, 1.4, .5, .4).rotation.z = .4; },
 };
+// hito único de cada geografía: grande, reconocible desde lejos y que no se atraviesa
+const GRAND_LM = {
+  cascade(g) { part(g, 4, 7, 3, 0x8a8680, 0, 3.5, -1); part(g, 3, 2, 2.4, 0x9a968c, -.4, 7.6, -1.2); part(g, 1.4, 7.4, .3, 0x6ab0e0, 0, 3.7, .6, false); part(g, .5, 7.4, .32, 0xd8f0fa, -.3, 3.7, .62, false); part(g, 3.6, .2, 2.4, 0x5aa0d0, 0, .1, 1.8, false); for (let k = 0; k < 5; k++) part(g, .5, .4, .5, 0xf4f8fa, -1.2 + k * .6, .3, 1 + (k % 2) * .4, false); },
+  colossus(g) { const b = 0xb87a3a, b2 = 0x9a6a30; part(g, 4, 1.2, 4, 0x9a968c, 0, .6, 0); for (const x of [-.8, .8]) { part(g, .9, 4, .9, b, x, 3.2, 0); } part(g, 2.6, 3.4, 1.4, b, 0, 6.8, 0); part(g, 1.2, 1.2, 1.2, b2, 0, 9.1, 0); for (let k = 0; k < 5; k++) part(g, .2, .7, .2, 0xe8c050, -.6 + k * .3, 10, 0); part(g, .7, 3.2, .7, b, 1.7, 8, 0); part(g, .7, .9, .7, 0xffc040, 1.7, 10, 0, false); part(g, .7, 3, .7, b2, -1.7, 5.8, .2); },
+  seaarch(g) { for (const x of [-2.4, 2.4]) part(g, 1.8, 6, 2, 0x8a8478, x, 2.5, 0); part(g, 6.6, 1.8, 2.2, 0x9a9488, 0, 6.2, 0); part(g, 4, .8, 1.8, 0x8a8478, 0, 7.4, 0); part(g, 2, .4, 1.6, 0x6a9a48, -1, 7.9, 0); },
+  rockarch(g) { for (const x of [-2.6, 2.6]) part(g, 1.6, 5, 1.8, 0xb86a44, x, 2.5, 0); part(g, 7, 1.5, 2, 0xc87a50, 0, 5.6, 0); part(g, 4, .8, 1.6, 0xa85a3a, 0, 6.6, 0); part(g, 1.2, .6, 1.4, 0xd08a5a, -2.6, .3, 1.4); },
+  henge(g) { for (let k = 0; k < 10; k++) { const a = k / 10 * 6.28; part(g, .9, 3.2, .7, 0x8a8a86, Math.cos(a) * 4, 1.6, Math.sin(a) * 4).rotation.y = -a; if (k % 2 === 0) part(g, 2.6, .6, .8, 0x7a7a76, Math.cos(a + .31) * 4, 3.5, Math.sin(a + .31) * 4).rotation.y = -a - 1.57 - .31; } part(g, 1.8, .6, 1, 0x7a7a76, 0, .3, 0); },
+  aqueduct(g) { for (let k = 0; k < 5; k++) { part(g, .9, 4.5, 1.2, 0xd8cdb4, -4.8 + k * 2.4, 2.25, 0); if (k < 4) part(g, 1.6, .9, 1.2, 0xd8cdb4, -3.6 + k * 2.4, 4.05, 0); } part(g, 10.5, .8, 1.4, 0xc8bca4, 0, 4.9, 0); part(g, 10.5, .2, .8, 0x5aa0d0, 0, 5.35, 0, false); },
+  ziggurat(g) { for (let k = 0; k < 4; k++) part(g, 7 - k * 1.6, 1.2, 7 - k * 1.6, k % 2 ? 0x6a7a5a : 0x7a8a6a, 0, .6 + k * 1.2, 0); part(g, 1.2, 3.6, 1.2, 0x5a6a4a, 0, 2.4, 3.2); part(g, 1.6, 1.4, 1.6, 0x8a9a7a, 0, 5.5, 0); for (let k = 0; k < 6; k++) part(g, .3, .8, .3, 0x3f7a45, -2.6 + k, 1.6 + (k % 3) * .4, -3.2); },
+  greattree(g) { part(g, 1.6, 6, 1.6, 0x5a3a24, 0, 3, 0); for (const [x, z] of [[-1.2, 0], [1.2, .3], [0, -1.2]]) part(g, .7, 1, .7, 0x5a3a24, x, .4, z); part(g, 9, 2.2, 9, 0x2f5a30, 0, 7, 0); part(g, 6.5, 2, 6.5, 0x3a6a38, .4, 8.8, -.3); part(g, 3.6, 1.4, 3.6, 0x4a7a40, -.2, 10.3, .2); },
+  bones(g) { for (let k = 0; k < 7; k++) { const x = -4.2 + k * 1.4, h = 3.6 - Math.abs(k - 3) * .4; for (const sz of [-1, 1]) { part(g, .35, h, .35, 0xf0e8d8, x, h / 2, sz * 1.6).rotation.x = sz * .3; } } part(g, 9, .6, .6, 0xe8e0d0, 0, .3, 0); part(g, 2.2, 1.6, 2, 0xf0e8d8, 5.6, .8, 0); part(g, .5, .5, .3, 0x3a3030, 6.3, 1.1, .6, false); },
+  obelisk(g) { part(g, 3, .8, 3, 0x3a3034, 0, .4, 0); part(g, 1.6, 8, 1.6, 0x2a2228, 0, 4.8, 0); part(g, 1, 1.2, 1, 0x2a2228, 0, 9.4, 0); part(g, .5, .7, .5, 0xff7a1a, 0, 10.3, 0, false); for (const y of [3, 5.5, 8]) part(g, 1.64, .14, 1.64, 0xff9a3a, 0, y, 0, false); },
+  icespire(g) { for (const [x, z, h, w] of [[0, 0, 9, 1.8], [1.6, .8, 6, 1.2], [-1.4, .6, 5, 1.1], [.6, -1.5, 4, 1], [-.9, -1.1, 3, .8]]) { part(g, w, h, w, 0xbce4f4, x, h / 2, z).rotation.y = x; part(g, w * .5, h * .25, w * .5, 0xf0fafe, x, h + h * .1, z); } },
+  face(g) { part(g, 4.4, 5.6, 2.4, 0xa89a88, 0, 2.8, 0); part(g, 5, 1.2, 2.8, 0x8a7a68, 0, 5.8, 0); for (const x of [-1, 1]) part(g, 1, .5, .3, 0x3a3030, x, 3.8, 1.25, false); part(g, .8, 1.4, .6, 0x9a8a78, 0, 2.8, 1.4); part(g, 2.2, .4, .3, 0x5a4a40, 0, 1.6, 1.25, false); },
+  galleon(g) { const w = 0x6a4224; part(g, 3, 1.8, 9, w, 0, .9, 0).rotation.z = .3; part(g, 3, 1.6, 2.4, 0x5a3418, .3, 2.4, -3.4).rotation.z = .3; for (const [z, h] of [[-1.5, 6], [1.8, 5]]) { part(g, .25, h, .25, 0x4a2a14, .9, h / 2 + .6, z).rotation.z = .5; } part(g, .1, 2, 2.6, 0xe8e0cc, 2.2, 4, -1.5).rotation.z = .5; },
+  head(g) { part(g, 4.6, 4.2, 4.2, 0xc8c4b8, 0, 2.1, 0).rotation.z = .25; part(g, 4.8, 1, 4.4, 0xb8b4a8, -.6, 4.1, 0).rotation.z = .25; for (const z of [-.9, .9]) part(g, .3, .7, .8, 0x4a4a4a, 2.3, 2.8, z, false); part(g, 1, 1.2, .9, 0xb8b4a8, 2.5, 1.7, 0); part(g, 2.6, 1, 1.4, 0xc8c4b8, -1, .5, 3.6); for (let k = 0; k < 4; k++) part(g, .4, .4, 1.4, 0xc8c4b8, -2.4 + k * .5, .5, 4.6); },
+};
+const GRAND = { rio: ['aqueduct', 'land'], cordillera: ['cascade', 'high'], istmo: ['colossus', 'coast'], archipielago: ['seaarch', 'water'], barrancos: ['rockarch', 'plateau'], meseta: ['henge', 'top'],
+  afluentes: ['aqueduct', 'land'], delta: ['ziggurat', 'bank'], bosque: ['greattree', 'clearing'], oasis: ['bones', 'sand'], lago: ['obelisk', 'land'], helado: ['icespire', 'ice'], canon: ['face', 'gorge'], costa: ['galleon', 'beach'], ruinas: ['head', 'land'] };
 const PLACES = {
   rio: [['boat', 'water', 3], ['mill', 'bank', 1], ['windmill', 'land', 1]], cordillera: [['shrine', 'peak', 2], ['menhirs', 'high', 1]],
   istmo: [['lighthouse', 'coast', 2], ['boat', 'water', 2]], archipielago: [['boat', 'water', 4], ['lighthouse', 'coast', 1]],
@@ -133,6 +153,7 @@ const WHERE = {
   clearing: (x, z, i) => GEOT[i] === 0 && HM[i] >= 2 && flat(x, z) && [[4, 0], [-4, 0], [0, 4], [0, -4]].some(([a, b]) => GEOT[idx(Math.min(MW - 1, Math.max(0, x + a)), Math.min(MD - 1, Math.max(0, z + b)))] === 1),
   ice: (x, z, i) => GEOT[i] === 6 && N4.every(([a, b]) => GEOT[idx(Math.min(MW - 1, Math.max(0, x + a * 2)), Math.min(MD - 1, Math.max(0, z + b * 2)))] === 6),
   edge: (x, z, i) => HM[i] >= 3 && flat(x, z) && nearWater(x, z, 3) && GEOT[i] !== 9,
+  gorge: (x, z, i) => HM[i] >= 3 && flat(x, z) && GEOT[i] === 0 && [[4, 0], [-4, 0], [0, 4], [0, -4]].some(([a, b]) => GEOT[idx(Math.min(MW - 1, Math.max(0, x + a)), Math.min(MD - 1, Math.max(0, z + b)))] === 17),   // asomado a la garganta del cañón
 };
 export function setupAmbient() {
   resetWeather(); P.length = 0;
@@ -159,6 +180,16 @@ export function setupAmbient() {
       if (where !== 'water') for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const j = idx(x + dx, z + dz); if (walk[j]) { blocked[j] = 1; blockCells.push(j); } }   // no se atraviesan
     }
   }
+  { const [model, where] = GRAND[keys[0]] || GRAND.rio, wide = (x, z) => [[-3, -3], [3, -3], [-3, 3], [3, 3], [0, 0]].filter(([a, b]) => { const j = idx(Math.min(MW - 1, Math.max(0, x + a)), Math.min(MD - 1, Math.max(0, z + b))); return where === 'water' ? HM[j] <= 0 : Math.abs(HM[j] - HM[idx(x, z)]) <= 1 && HM[j] > 0; }).length >= (['coast', 'beach', 'bank', 'edge', 'gorge'].includes(where) ? 3 : 5);   // en la orilla basta con que casi todo sea tierra
+    for (let tries = 0; tries < 6000; tries++) {   // el gran hito: en el centro del mapa si puede ser, para que se vea en la partida
+      const x = 6 + (r() * (MW - 12) | 0), z = 6 + (r() * (MD - 12) | 0), i = idx(x, z);
+      if (Math.abs(x - MW / 2) > MW * (.2 + tries / 12000) || !WHERE[where](x, z, i) || !wide(x, z)) continue;
+      let road = false; for (let dz = -4; dz <= 4 && !road; dz++) for (let dx = -4; dx <= 4; dx++) if (roadCell?.[idx(x + dx, z + dz)]) { road = true; break; } if (road) continue;
+      if (forts.some(f => Math.hypot(f.x - x, f.z - z) < 30) || spots.some(s => Math.hypot(s.x - x, s.z - z) < 15) || placed.some(p => Math.hypot(p[0] - x, p[1] - z) < 12)) continue;
+      const g = new THREE.Group(); GRAND_LM[model](g); bake(g); g.position.set(x + .5, where === 'water' ? -.6 : HM[i], z + .5); g.rotation.y = (r() * 4 | 0) * Math.PI / 2; world.add(g); decos.push(g); placed.push([x, z, model]);
+      if (where !== 'water') for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { const j = idx(x + dx, z + dz); if (walk[j]) { blocked[j] = 1; blockCells.push(j); } }
+      break;
+    } }
   if (blockCells.length) refreshCells(blockCells);
   landmarks = placed;
 }

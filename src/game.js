@@ -4,7 +4,7 @@ import { makeAI, updateAIs } from './ai.js';
 import { raidersAt, resetEvents, updateEvents } from './events.js';
 import { sfx, startMusic } from './audio.js';
 import { updateUnit } from './behavior.js';
-import { buildAltar, buildBarracks, buildCastle, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
+import { buildAltar, buildBarracks, buildCastle, buildFortDeco, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
 import { BONUS, bonusOf, civOf, resolveCivs, uname } from './civs.js';
 import { alarm, applyRank, corpses, damage, kill, raiseAlarm, shoot } from './combat.js';
 import { ALT0, BARR0, BASE0, BASE1, DIFF, GAME, MAP_SIZES, MAX_PLAYERS, NEU, NP, TEAM, TEMP0, TOWN0, UNITS, players, setPlayers } from './config.js';
@@ -139,7 +139,7 @@ function buildGame(s, keepCivs) {
     generate(s); resetFog(false); UGRID.resize();
     const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, temple: buildTemple, town: buildTown };
     for (const sp of spots) B[sp.kind](sp);
-    for (const f of forts) buildWalls(f);
+    for (const f of forts) { buildWalls(f); buildFortDeco(f); }
     setupRules(); setupAmbient();
     spawnGuards(); makeThumbs();
     regions.forEach((_, r) => paintRegion(r));
