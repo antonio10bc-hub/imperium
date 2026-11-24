@@ -26,6 +26,8 @@ import { init as init_menu, setPlayersPick, setSize } from './menu.js';
 import { init as init_overlay } from './overlay.js';
 import { R, breakBridge, buildBridge, rulesFrame, startChop } from './rules.js';
 import { WEA, ambientInfo, updateLife } from './ambient.js';
+import { STATS } from './stats.js';
+import { civOf } from './civs.js';
 
 // ---------- Bucle ----------
 let prev = performance.now(), hudT = 0, miniT = 0, fogT = 0;
@@ -43,7 +45,9 @@ function frame(now) {
     const m = String(e && e.message || e); if (m !== lastErr) { lastErr = m; logError(e); }
   }
 }
+let lastState = '';
 function frameBody(now) {
+  if (state !== lastState) { lastState = state; document.body.classList.toggle('inmenu', state !== 'play'); }   // en el menú se puede usar el móvil en vertical
   const dt = Math.min(.05, (now - prev) / 1000); prev = now;
   S.camDist += (S.camGoal - S.camDist) * Math.min(1, dt * 8);
   // desplazamiento: WASD / flechas / borde de pantalla
@@ -111,8 +115,8 @@ function mapShot(w = 1536) {
 }
 window.__game = { mapShot, WEATHER: WEA, ambientInfo, S, gl, units, triggerEvent, ev, R, buildBridge, breakBridge, startChop, get scen() { return scen; },
   // pruebas: pone un cerebro de IA en un bando (diff: dificultad base; over: ajustes que la sobrescriben) o se lo quita con diff = null
-  setAI(sd, diff, brain, over) { sideState[sd].ai = diff ? makeAI(sd, diff, brain) : null; if (over && sideState[sd].ai) { const A = sideState[sd].ai; A.Df = { ...A.Df, ...over }; if (over.inc != null) A.inc = over.inc; } }, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
-  step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) S.camGoal = S.camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, spawnAt, dbg: () => ({ world, roadCell, fields, walk, HM, GEOT, MW, wallHit, promote, gateList }) };
+  setAI(sd, diff, brain, over) { sideState[sd].ai = diff ? makeAI(sd, diff, brain, over?.persona) : null; if (over && sideState[sd].ai) { const A = sideState[sd].ai; A.Df = { ...A.Df, ...over }; if (over.inc != null) A.inc = over.inc; } }, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
+  step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) S.camGoal = S.camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, get stats() { return STATS; }, civs: () => [0, 1].map(sd => civOf(sd).id), spawnAt, dbg: () => ({ world, roadCell, fields, walk, HM, GEOT, MW, wallHit, promote, gateList }) };
 makeThumbs();
 // ?mapa=RIO-48213 en la dirección abre ese mapa
 { let c = null; try { c = parseCode(new URLSearchParams(location.search).get('mapa')); } catch (e) {}

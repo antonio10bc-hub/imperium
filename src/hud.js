@@ -6,7 +6,7 @@ import { assign, repairGates } from './combat.js';
 import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, NP, RANKS, SIEGE, TEAM, TEMP0, TYPES, UNITS, WALL_LV, players } from './config.js';
 import { ping } from './effects.js';
 import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, townIncNow, popOf, state, summonHero, toast, towerDmg, towerRange, upgradeTown, upgradeWall } from './game.js';
-import { focusOn, heroButton } from './input.js';
+import { focusOn, heroButton, syncTouch } from './input.js';
 import { MERC, ev, hireMercs, mercRoom } from './events.js';
 import { gateList, mapCode, regions, scen, spots } from './map.js';
 import { seed } from './noise.js';
@@ -188,9 +188,9 @@ const UI_IC = {
   crown: ['1010101','1111111','1111111','0000000','0111110','0111110','0000000'], target: ['0011100','0100010','1001001','1011101','1001001','0100010','0011100'],
   pause: ['0000000','0110110','0110110','0110110','0110110','0110110','0000000'], menu: ['0000000','1111111','0000000','1111111','0000000','1111111','0000000'],
 };
-export function selectBuilding(kind) { sel.clear(); S.follow = null; S.selBld = kind; S.selSpot = null; updateCtx(); }
-export function selectSpot(s) { sel.clear(); S.follow = null; S.selBld = null; S.selSpot = s; updateCtx(); }
-export function setSelection(list, add) { S.amode = false; if (!add) sel.clear(); for (const u of list) sel.add(u); S.selBld = null; S.selSpot = null; if (list.length) sfx('select'); updateCtx(); }
+export function selectBuilding(kind) { sel.clear(); S.follow = null; S.selBld = kind; S.selSpot = null; updateCtx(); syncTouch(); }
+export function selectSpot(s) { sel.clear(); S.follow = null; S.selBld = null; S.selSpot = s; updateCtx(); syncTouch(); }
+export function setSelection(list, add) { S.amode = false; if (!add) sel.clear(); for (const u of list) sel.add(u); S.selBld = null; S.selSpot = null; if (list.length) sfx('select'); updateCtx(); syncTouch(); }
 export function syncTools() { $('spd').firstChild.textContent = '×' + S.speed; $('spd').classList.toggle('on', S.speed > 1); $('pz').classList.toggle('on', S.paused); $('pause').hidden = !S.paused || S.menuOpen; }
 // menú de pausa: congela la partida mientras está abierto y al cerrarlo la deja como estaba
 export function openMenu() {

@@ -24,7 +24,7 @@ export function project(loc, out = {}) {
   out.vis = _p.z < 1 && out.x > -40 && out.x < S.VW + 40 && out.y > -40 && out.y < S.VH + 40; return out;
 }
 export function pickUnit(x, y, side) {
-  let best = null, bd = 22;
+  let best = null, bd = S.touch ? 30 : 22;   // con el dedo, más margen
   for (const u of units) if (u.side === side && u.vis) { const d = Math.hypot(u.sx - x, u.sy - y) * (u.type === 'hero' ? .6 : 1); if (d < bd) { bd = d; best = u; } }
   return best;
 }
@@ -80,6 +80,47 @@ export function command(x, y, attack = false) {
   if (!sp && !attack && GEOT[cellOf(g.x, g.z)] === 1 && startChop(g.x, g.z, list)) { sfx('cmd'); return; }   // bosque denso: talarlo
   orderTo(list, sp, g, attack);
 }
+// ---------- Táctil ----------
+// Con tropas o un edificio seleccionados, tocar el mapa da la orden (mover, atacar, conquistar, asaltar, talar o fijar el punto de reunión);
+// tocar una tropa propia o un edificio propio lo selecciona. La pulsación larga elige todas las tropas de ese tipo o avanza atacando
+const buzz = ms => { try { navigator.vibrate?.(ms); } catch (e) {} };   // vibración corta al dar una orden (Android)
+function touchTap(x, y) {
+  const r = touchTap0(x, y); if (r) buzz(12); return r;
+}
+function touchTap0(x, y) {
+  if (S.amode && sel.size) { S.amode = false; command(x, y, true); syncTouch(); return true; }
+  if (pickUnit(x, y, 0)) { const own = pickUnit(x, y, 0); if (own.type === 'hero' && sel.size && ![...sel].every(u => u === own || u.leader === own)) { command(x, y); return true; } return false; }
+  const sp = pickSpot(x, y), ownBld = sp && sp.side === 0 && sp.kind !== 'town';
+  if (S.selBld in RALLY_BLD && !ownBld) { command(x, y); return true; }
+  if (sel.size && !ownBld && !(sp && sp.kind === 'town' && sp.owner === 0)) { command(x, y); return true; }
+  return false;
+}
+function longPress(x, y) {
+  if (state !== 'play') return; buzz(25);
+  const u = pickUnit(x, y, 0);
+  if (u) { setSelection(units.filter(o => o.side === 0 && o.vis && o.type === u.type), false); ping(u.pos, '#e8c870'); sfx('select'); return; }
+  if (sel.size) { command(x, y, true); const g = groundAt(x, y); if (g) ping(new THREE.Vector3(g.x, surfY(g.x, g.z), g.z), '#d83a4a'); return; }
+  const g = groundAt(x, y); if (g) ping(new THREE.Vector3(g.x, surfY(g.x, g.z), g.z), '#f4f4e8');
+}
+// botones táctiles (solo en pantallas táctiles): selección por área, todo el ejército, avanzar atacando y quitar la selección
+export function syncTouch() {
+  const b = $('ttools'); if (!b) return;
+  b.querySelector('[data-t=box]').classList.toggle('on', !!S.boxMode); b.querySelector('[data-t=amove]').classList.toggle('on', !!S.amode);
+  b.querySelector('[data-t=amove]').disabled = !sel.size; b.querySelector('[data-t=none]').disabled = !sel.size && !S.selBld && !S.selSpot;
+}
+function initTouch() {
+  const on = () => { if (S.touch) return; S.touch = true; document.body.classList.add('touch'); syncTouch(); };
+  if (window.matchMedia('(pointer: coarse)').matches) on();
+  addEventListener('pointerdown', e => { if (e.pointerType === 'touch') on(); }, { capture: true });
+  $('ttools').addEventListener('pointerdown', e => { const b = e.target.closest('[data-t]'); if (!b || b.disabled) return; e.preventDefault(); const t = b.dataset.t;
+    if (t === 'box') S.boxMode = !S.boxMode;
+    else if (t === 'all') { const l = units.filter(u => u.side === 0 && u.type !== 'god'); setSelection(l, false); if (!l.length) sfx('deny'); }
+    else if (t === 'amove') { if (sel.size) { S.amode = !S.amode; sfx('select'); } }
+    else if (t === 'none') { S.amode = false; S.follow = null; setSelection([], false); }
+    syncTouch(); });
+  const fs = $('fullBtn'); if (fs) fs.addEventListener('click', () => { const d = document.documentElement;
+    if (document.fullscreenElement) document.exitFullscreen?.(); else (d.requestFullscreen || d.webkitRequestFullscreen)?.call(d)?.then?.(() => window.screen.orientation?.lock?.('landscape').catch(() => {})).catch?.(() => {}); });
+}
 // orden desde el minimapa (clic derecho): punto de reunión con el cuartel seleccionado; si no, mover, conquistar o asaltar
 export function commandAt(x, z, attack = false) {
   if (state !== 'play') return false;
@@ -115,6 +156,7 @@ export function heroButton() {   // G: va pasando por tus héroes; sin héroes, 
 
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
 export function init() {
+  initTouch();
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('pointerdown', e => {
     if (e.button === 0 && S.intro) { S.intro.t = S.intro.dur; return; }   // un clic se salta la presentación
@@ -124,7 +166,9 @@ export function init() {
       touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (touches.size === 2) { const [a, b] = [...touches.values()]; pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: S.camGoal, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; if (drag) drag.pinch = true; return; }
       if (touches.size > 2) return;
-      drag = { btn: 'touch', x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, shift: false }; return;
+      drag = { btn: S.boxMode ? 0 : 'touch', touch: true, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, shift: false };
+      const d0 = drag; d0.lp = setTimeout(() => { if (drag === d0 && !d0.moved && !pinch) { d0.done = true; longPress(d0.x0, d0.y0); } }, 480);   // pulsación larga
+      return;
     }
     drag = { btn: e.button, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, shift: e.shiftKey };
   });
@@ -140,15 +184,17 @@ export function init() {
       }
     }
     if (!drag || drag.pinch) return;
-    if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 5) drag.moved = true;
+    if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > (drag.touch ? 12 : 5)) { drag.moved = true; clearTimeout(drag.lp); }
     if (drag.btn !== 0 && drag.moved) { const k = S.camDist * .0019; pan(-(e.clientX - drag.lx) * k, -(e.clientY - drag.ly) * k * 1.5); }
     drag.lx = e.clientX; drag.ly = e.clientY;
   });
-  canvas.addEventListener('pointercancel', e => { touchEnd(e); if (!touches.size) drag = null; });
+  canvas.addEventListener('pointercancel', e => { if (drag) clearTimeout(drag.lp); touchEnd(e); if (!touches.size) drag = null; });
   canvas.addEventListener('pointerup', e => {
+    if (drag) clearTimeout(drag.lp);
     if (touchEnd(e) || !drag) return; const d = drag; drag = null;
-    if (state !== 'play') return;
-    if (d.btn === 'touch') { if (d.moved) return; d.btn = 0; }   // toque corto = clic
+    if (state !== 'play' || d.done) return;
+    if (d.touch && d.btn === 0 && d.moved) { S.boxMode = false; syncTouch(); }   // la selección por área se usa una vez
+    if (d.btn === 'touch') { if (d.moved) return; if (touchTap(e.clientX, e.clientY)) return; d.btn = 0; }   // toque corto: orden o clic
     if (S.amode && !d.moved && (d.btn === 0 || d.btn === 2)) { S.amode = false; command(e.clientX, e.clientY, true); return; }
     if (d.btn === 0) {
       if (d.moved) {

@@ -207,3 +207,56 @@ button.alt{background:var(--paper)}
 @keyframes cardIn{from{transform:translateY(18px) scale(.96)}to{transform:none}}
 #loading{transition:opacity .3s}
 #vs em{font:400 12px/1 var(--font);font-style:normal;letter-spacing:.12em;text-shadow:0 2px 0 var(--ink),0 0 10px rgba(15,15,27,.8)}
+/* ---------- móvil y pantallas táctiles ---------- */
+html,body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#c,#ov{touch-action:none}
+#ttools,.tonly{display:none}
+body.touch .tonly{display:revert} body.touch .monly{display:none}
+body.touch #tools .tl.tonly{display:flex}
+body.touch #ttools{display:flex;flex-direction:column;gap:8px;right:max(10px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-62%);pointer-events:auto;z-index:5}
+#ttools button{width:58px;height:52px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:18px;line-height:1;color:var(--txt);background:rgba(38,42,59,.92);border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink)}
+#ttools button span{font-size:9px;letter-spacing:.04em}
+#ttools button.on{background:var(--yellow);color:var(--ink)} #ttools button[data-t=amove].on{background:var(--pink);color:#fff}
+#ttools button:disabled{opacity:.35}
+body.touch #tipbox{display:none}
+body.touch kbd{display:none}
+body.touch button{touch-action:manipulation}
+#rotate{display:none}
+@media (orientation:portrait){body.touch:not(.inmenu) #rotate{display:grid;position:fixed;inset:0;z-index:60;place-items:center;background:rgba(15,15,27,.94);color:var(--paper);font-family:var(--font);text-align:center}
+  #rotate b{display:block;font:400 64px/1 var(--font);color:var(--yellow);animation:rot 2s ease-in-out infinite} #rotate p{margin:14px 0 6px;font-size:18px} #rotate small{font-size:11px;color:var(--dim)}}
+@keyframes rot{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+/* pantallas bajas (móvil en horizontal): todo más compacto */
+@media (max-height:520px){
+  :root{--barH:58px}
+  #res{top:8px;padding:5px 8px;font-size:13px;gap:5px} #res small{font-size:10px;margin-right:4px}
+  #tug{top:8px;padding:5px 8px;gap:6px;font-size:10px} #terr i{width:9px;height:10px} #tug .cas{display:none}
+  #feed{top:44px;max-width:46vw} #feed div{font-size:10px;padding:4px 7px;white-space:normal}
+  #feed div:nth-child(n+4){display:none}
+  #merc{top:40px;font-size:10px}
+  #heroes{top:44px;gap:5px} #heroes .hc{width:50px} #heroes .hc img{width:44px;height:44px} #heroes .hc .n{min-width:20px;height:20px;line-height:16px;font-size:11px;right:-6px;top:-6px}
+  #bar{padding-top:3px;padding-bottom:max(3px,env(safe-area-inset-bottom,0px))} #mini{width:69px;height:46px}
+  #panel{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding:2px 6px;gap:7px} #panel::-webkit-scrollbar{display:none}
+  #panel .ph{min-width:64px;max-width:120px} #panel .ph h3{font-size:11px} #panel .ph em{font-size:9px}
+  #panel button{min-height:38px} .rc{height:44px} .gc img,.cell img{width:34px;height:34px}
+  #tools{grid-template-columns:repeat(5,auto);gap:3px} #tools .tl{height:24px;min-width:30px;padding:0 5px;font-size:11px}
+  .stats,.note{display:none} .hpb{width:110px}
+  #vs b{font-size:30px} #vs{top:42%}
+  .card{padding:14px 16px;gap:8px;max-height:92vh;overflow:auto;font-size:11px;line-height:1.8} .card h2{font-size:24px}
+  #end .card{max-width:min(760px,96vw)} #endStats canvas{height:80px}
+  /* menú principal en una sola pantalla: tres columnas bajas */
+  .menu3{grid-template-columns:1fr 1.15fr 1fr;width:100vw;height:100vh;max-height:none;border-width:0;box-shadow:none;overflow:hidden}
+  .mp+.mp{border-left:3px solid var(--ink);border-top:0}
+  .mp.mid{order:0;gap:8px;padding:10px 14px} .mp.mid h2{font-size:28px;margin:0} .mp.mid .sub{margin:-4px 0 0;font-size:8px}
+  .mcard{gap:5px;padding:7px} .mcard h3{font-size:9px} .diff button{padding:6px 7px 5px;font-size:10px}
+  .mp.mid #go{padding:10px 0;font-size:16px} .mp.mid #howBtn{padding:6px 10px;font-size:10px} .codein{font-size:9px} .codein input{padding:4px;font-size:11px}
+  .mp.civs,.mp.geo{height:auto} .civinfo{font-size:9px;min-height:28px;padding:4px 8px} .tag{font-size:10px;left:6px;top:6px} .arr{width:34px;height:34px;margin-top:-17px}
+}
+/* móvil en vertical (menú): en una columna, con el botón de jugar arriba */
+@media (max-width:600px) and (orientation:portrait){.menu3{width:100vw;height:100vh;max-height:none;border-width:0} .mp.civs{height:440px} .mp.geo{height:300px}}
+@media (max-height:520px){
+  #tools .tl:nth-child(n+4):not(#menuBtn):not(.tonly){display:flex}
+  body.touch #ttools{top:auto;transform:none;bottom:calc(var(--barH) + 10px);gap:6px}
+  #ttools button{width:50px;height:44px;font-size:16px}
+  body.touch #feed{right:calc(max(10px,env(safe-area-inset-right,0px)) + 60px);max-width:40vw}
+}
+body.touch #tools #fullBtn{display:flex}

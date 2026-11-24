@@ -41,12 +41,22 @@ Juego de estrategia en tiempo real con estética voxel (Three.js por CDN), sin d
 - **ESC** (o el botón ☰) abre el menú de pausa: continuar, reiniciar el mismo mapa, rendirse o volver al menú principal.
 - El héroe aparece a la izquierda con sus tropas asignadas (hasta 50), que forman delante de él en bloque, línea o cuña.
 
+## Móvil
+
+Se juega en horizontal (en vertical, el juego pide girar el móvil; el menú sí funciona en vertical). Con el dedo:
+
+- **Tocar** una tropa o un edificio lo selecciona. Con algo seleccionado, **tocar el mapa** da la orden: mover, atacar, conquistar, asaltar, talar o fijar el punto de reunión.
+- **Mantener pulsado** sobre una tropa selecciona todas las de su tipo; sobre el mapa, avanzan atacando.
+- **Un dedo** mueve la cámara y **dos dedos** hacen zoom. A la derecha: **▢ ÁREA** (arrastrar para elegir tropas), **⚑ TODOS**, **⚔ ATACAR** y **✕ NADA**. **⛶** pone pantalla completa donde el navegador lo permite.
+- En pantallas bajas el menú cabe en una pantalla (tres columnas) y la interfaz se compacta.
+
 ## Pruebas
 
 Tras `npm install` (solo herramientas de desarrollo) y `npm run build`:
 
 - `npm run check`: revisa los módulos de `src/` (importaciones sin usar, nombres sin importar, exportaciones que no existen).
 - `npm run smoke`: juega IA contra IA en cada geografía con Chrome sin ventana y falla si hay algún error (`-- --geo=canon,lago --min=4 --size=g`).
+- `npm run balance`: simulación de equilibrio IA contra IA (civilizaciones, geografías, dificultad y personalidades); deja el informe en `docs/balance.md` (`-- --rounds=2 --workers=3`; `THREE=` y `GAME=` para usarlo sin conexión).
 - `npm run bench`: mapa grande con 200 tropas peleando; mide el paso de simulación y los fotogramas por segundo (`-- --units=300 --geo=helado`).
 
 ## Notas técnicas (rendimiento)
