@@ -163,17 +163,17 @@ export const GEO = (() => {
     canon(M, r, s, F) {   // una garganta seca (17 = fondo de roca) parte el mapa; en el centro se abre en una cuenca redonda con una isla (la ciudadela) unida a cada orilla por un puente; otro puente al norte y otro al sur
       const P = wander(r, 96 + (r() - .5) * 20, -4, 96 + (r() - .5) * 20, H + 4, 22, 16), atZ = z => { for (let i = 0; i + 1 < P.length; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1]; if ((az - z) * (bz - z) <= 0) return ax + (bx - ax) * ((z - az) / ((bz - az) || 1)); } return 96; };
       M.div = atZ;
-      const zc = H * .5 + (r() - .5) * 6, ic = [atZ(zc), zc], isl = blobR(ic[0], ic[1], 10, 11, .8, s + 63), basin = blobR(ic[0], ic[1], 15, 16.5, .6, s + 64);   // cuenca e isla irregulares
+      const zc = H * .5 + (r() - .5) * 6, ic = [atZ(zc), zc], isl = blobR(ic[0], ic[1], 10, 11, .8, s + 63), basin = blobR(ic[0], ic[1], 13.5, 14.5, .4, s + 64);   // cuenca e isla irregulares
       // en la fila de los puentes centrales, los bordes de la isla y de la cuenca (para que los tableros encajen entre paredes rectas)
       const edge = (f, dir) => { let x = ic[0]; while (f(x, zc) < 1 && Math.abs(x - ic[0]) < 60) x += dir * .25; return x; };
       const iW = edge(isl, -1), iE = edge(isl, 1), bW = edge(basin, -1), bE = edge(basin, 1);
       const bz = [H * .17 + (r() - .5) * 6, H * .83 + (r() - .5) * 6];
       const bridges = [[atZ(bz[0]), bz[0], 10], [(bW + iW) / 2, zc, (iW - bW) / 2 + 2], [(iE + bE) / 2, zc, (bE - iE) / 2 + 2], [atZ(bz[1]), bz[1], 10]];
       M.each((x, z) => {
-        const bNear = bz.find(b => Math.abs(z - b) < 5), nearB = bNear != null || Math.abs(z - zc) < 4.5, d = Math.abs(x - atZ(bNear ?? z)) + (nearB ? 0 : (fbm(x * .15, z * .15, s + 60) - .5) * 1.6);   // junto a un puente la garganta va recta (paredes paralelas al tablero)
+        const bNear = bz.find(b => Math.abs(z - b) < 5), nearB = bNear != null || Math.abs(z - zc) < 4.5, d = Math.abs(x - atZ(bNear ?? z)) + (nearB ? 0 : (fbm(x * .15, z * .15, s + 60) - .5) * .7);   // junto a un puente la garganta va recta (paredes paralelas al tablero)
         const row = Math.abs(z - zc) < 4.5, inBasin = row ? (x > bW && x < iW) || (x > iE && x < bE) : basin(x, z) < 1, onIsl = row ? x >= iW && x <= iE : isl(x, z) < 1, onB = bz.some(b => Math.abs(z - b) < 2.4) || (Math.abs(z - zc) < 2.4 && inBasin);
         if (onIsl) return [4, 0];
-        if (d < 3.8 || inBasin) return onB ? [4, 9] : [1, 17];   // garganta estrecha
+        if (d < 3 || inBasin) return onB ? [4, 9] : [1, 17];   // garganta estrecha, de anchura casi constante
         if ((bz.some(b => Math.abs(z - b) < 7) && d < 12) || basin(x, z) < 1.25) return [4, 0];   // explanadas junto a los puentes y alrededor de la cuenca
         return [3.6 + fbm(x * .05, z * .05, s + 61) * 1.6, 0]; });
       M.bridges = bridges; M.bridgeStyles = ['wood', 'stone', 'stone', 'wood']; M.confluence = ic; return bridges.map(b => [b[0], b[1]]);   // de madera al norte y al sur; de piedra a la isla
@@ -228,6 +228,12 @@ export const GEO = (() => {
     const r = rngOf(seed), s = seed % 997, F = fortsFor(r), HMg = new Float32Array(MW * MD), TTg = new Uint8Array(MW * MD);
     const M = { each(fn) { for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, o = fn((gx + .5) * W / MW, (gz + .5) * H / MD, HMg[i], TTg[i]); if (o) { HMg[i] = Math.min(12, Math.round(o[0])); TTg[i] = o[1]; } } } };
     const passes = GEN[id](M, r, s, F) || [];
+    // la fortaleza no puede tapar un río, un lago ni un rasgo especial: si su explanada los toca, se busca el sitio limpio más cercano en su lado
+    const at = (x, z) => { const gx = Math.floor(x * MW / W), gz = Math.floor(z * MD / H); return gx < 0 || gz < 0 || gx >= MW || gz >= MD ? -1 : gz * MW + gx; };
+    const clean = (fx, fz) => { for (let dz = -15; dz <= 15; dz += 1.5) for (let dx = -15; dx <= 15; dx += 1.5) { if (dx * dx + dz * dz > 225) continue; const i = at(fx + dx, fz + dz); if (i < 0 || HMg[i] <= 0 || (TTg[i] && TTg[i] !== 3 && TTg[i] !== 16 && TTg[i] !== 1)) return false; } return true; };
+    if (id !== 'archipielago' && id !== 'costa') F.forEach((f, k) => { if (clean(f[0], f[1])) return; let best = null, bd = 1e9;
+      for (let z = 22; z <= H - 22; z += 2) for (let x = k ? W - 46 : 16; x <= (k ? W - 16 : 46); x += 2) { const d = Math.hypot(x - f[0], z - f[1]); if (d < bd && clean(x, z)) { bd = d; best = [x, z]; } }
+      if (best) { f[0] = best[0]; f[1] = best[1]; } });
     for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 13 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
     const up = p => [p[0] * MW / W, p[1] * MD / H];
     return { HM: HMg, TT: TTg, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z * H / MD) * MW / W : null,

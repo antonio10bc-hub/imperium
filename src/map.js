@@ -170,8 +170,10 @@ export function terrainColor(x, z) {
   const i = idx(x, z), h = HM[i], cx = x + .5, cz = z + .5;
   const pc = groundPaint(cx, cz); if (pc >= 0) return pc;
   const side = sideAt(cx, cz), B = bioOf(side), gt = GEOT[i];
-  if (roadCell && roadCell[i]) { const rc = h <= 1 ? TP.ford : B.road; if (roadCell[i] === 1) return hash(x, 31, z) < .16 ? mixHex(rc, 0x5a4630, .16) : rc;   // rodadas   // borde difuminado del camino: mitad camino, mitad suelo
-    const t2 = n2(cx, cz, .045, 3, 21 + side * 7), g2 = B.ground[THREE.MathUtils.clamp(Math.floor((t2 - .34) / .09), 0, 3)]; return mixHex(rc, g2, .5); }
+  if (roadCell && roadCell[i]) {   // camino sutil: unos tramos se marcan más y otros casi se pierden en la hierba; el borde, aún menos
+    const rc0 = h <= 1 ? TP.ford : B.road, rc = hash(x, 31, z) < .16 ? mixHex(rc0, 0x5a4630, .14) : rc0, t2 = n2(cx, cz, .045, 3, 21 + side * 7), g2 = B.ground[THREE.MathUtils.clamp(Math.floor((t2 - .34) / .09), 0, 3)];
+    const k = .22 + .42 * smooth01((n2(cx, cz, .018, 2, 95) - .3) / .45), c = mixHex(g2, rc, roadCell[i] === 1 ? k : k * .45);
+    return geoR?.snow && (geoR.snowSide == null || (cx < geoR.seam(cz)) === (geoR.snowSide === 0)) ? mixHex(c, 0xeef2f6, .55) : c; }   // en la nieve, el camino también está nevado
   if (gt === 1) return B.lush;
   if (gt === 2) { const w = n2(cx, cz, .12, 2, 71) > .55; return h <= 1 ? (w ? 0xb8ccc0 : 0xd6cca0) : (w ? 0x6c9a92 : 0x6a8a5a); }   // bajío / pantano: manchas grandes, sin moteado
   if (gt === 3) return B.sand;
@@ -181,6 +183,7 @@ export function terrainColor(x, z) {
   if (gt === 10) return (x + z * 3) % 4 ? 0xff7a1a : 0xffb03a;   // lava
   if (gt === 11) return n2(cx, cz, .3, 2, 81) > .5 ? 0xe8d29a : 0xdcc488;   // duna
   if (gt === 12) return 0x8a8a86;   // arrecife
+  if (scen === 'canon' && gt === 0 && (GEOT[i + 1] === 17 || GEOT[i - 1] === 17 || GEOT[i + MW] === 17 || GEOT[i - MW] === 17)) return (x + z) % 2 ? 0x9a4a2a : 0xa85a34;   // borde marcado de la garganta
   if (gt === 17) return n2(cx, cz, .2, 2, 85) > .55 ? 0x8a5a40 : (x * 3 + z) % 5 ? 0x7a4a34 : 0x6a3e2c;   // fondo seco del cañón
   if (gt === 13) return (x + z) % 3 ? 0xd8c898 : 0xcdb98c;   // vado de arena
   if (gt === 14) return n2(cx, cz, .25, 2, 83) > .5 ? 0x6a9a48 : 0x5a8a40;   // ribera
@@ -193,7 +196,7 @@ export function terrainColor(x, z) {
   const m = n2(cx, cz, .045, 3, 21 + side * 7) + (h - 2) * .05, tone = THREE.MathUtils.clamp(Math.floor((m - .34) / .09), 0, 3);
   let col = h >= 6 ? (h >= 9 ? 0xe4e2da : mixHex(B.ground[tone], 0x9a9488, Math.min(1, (h - 5) / 3))) : B.ground[tone];   // alturas: la hierba pasa a roca y, en las cumbres, a nieve
   if (h < 6) { const mx = mixAt(cx, cz, side); if (mx) col = mixHex(col, bioOf(mx.o).ground[tone], mx.w); }   // transición entre biomas
-  if (roadCell && (roadCell[i + 1] === 1 || roadCell[i - 1] === 1 || roadCell[i + MW] === 1 || roadCell[i - MW] === 1)) col = mixHex(col, 0x3a4a2a, .09);   // cuneta junto al camino
+  if (roadCell && (roadCell[i + 1] === 1 || roadCell[i - 1] === 1 || roadCell[i + MW] === 1 || roadCell[i - MW] === 1)) col = mixHex(col, 0x3a4a2a, .05);   // cuneta junto al camino
   return geoR?.snow && (geoR.snowSide == null || (cx < geoR.seam(cz)) === (geoR.snowSide === 0)) ? mixHex(col, 0xeef2f6, .62) : col;   // valle helado: todo nevado
 }
 export let meshes = [], spots = [], bridgeSites = [], signs = [], gateList = [], gateCell = null;
@@ -376,6 +379,8 @@ export function generate(newSeed, tries = 0) {
 }
 // caminos: árbol de mínima distancia POR CAMINO (no en línea recta) entre fortalezas y pueblos, más algunos atajos que cierran bucles,
 // para que no salgan caminos que rodean medio mapa (al otro lado de un cañón, un lago o un brazo de mar) ni ramales sueltos
+// en el desierto la arena tapa casi todos los caminos: solo asoman algunos tramos sueltos
+const sandHides = j => scen === 'oasis' && n2(j % MW, (j / MW) | 0, .03, 2, 93) < .66;
 function buildRoads() {
   roadCell = new Uint8Array(N);
   // los caminos van por terreno bajo: nunca cruzan montañas (altura 8 o más; la cima de la meseta llega a 7)
@@ -403,7 +408,7 @@ function buildRoads() {
       for (let k = 0, m = stepMask[v]; k < 8; k++) { if (!(m >> k & 1)) continue; const j = v + NBO[k]; if (f[j] !== f[v] - 1) continue; const d = Math.sqrt((cellX(j) - A.x) ** 2 + (cellZ(j) - A.z) ** 2) + (n2(cellX(j), cellZ(j), .06, 2, 91 + a) - .5) * 9; if (d < bd) { bd = d; best = j; } }
       if (best < 0) break;
       // ancho irregular: el centro casi siempre es camino; los bordes a veces se difuminan o desaparecen, y en algunos tramos se ensancha
-      const w = n2(x, z, .09, 2, 97), mark = (j, faded) => { if (j >= 0 && j < N && HM[j] > 0 && low(j) && walk[j] && roadCell[j] !== 1) roadCell[j] = faded ? 2 : 1; };
+      const w = n2(x, z, .09, 2, 97), mark = (j, faded) => { if (j >= 0 && j < N && HM[j] > 0 && low(j) && walk[j] && roadCell[j] !== 1 && GEOT[j] !== 6 && GEOT[j] !== 15 && !sandHides(j)) roadCell[j] = faded ? 2 : 1; };   // sobre el hielo no hay camino
       mark(v, hash(x, 17, z) < .08);
       if (x + 1 < MW) mark(v + 1, w < .45); mark(v + MW, w < .35 || hash(x, 19, z) < .2);
       if (w > .68 && x > 0) mark(v - 1, true); if (w > .74) mark(v - MW, true);
