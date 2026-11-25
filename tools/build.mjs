@@ -43,6 +43,9 @@ html = html.replace(/<!-- el código está en src\/[\s\S]*?<\/script>/, `<script
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
 const out = path.join(root, 'dist', 'imperium.html');
 fs.writeFileSync(out, html);
+// icono de la app y manifiesto (para instalarla en el móvil): se copian junto al HTML
+fs.cpSync(path.join(root, 'icons'), path.join(root, 'dist', 'icons'), { recursive: true });
+fs.copyFileSync(path.join(root, 'manifest.webmanifest'), path.join(root, 'dist', 'manifest.webmanifest'));
 
 // comprobación de sintaxis del módulo resultante (detecta, por ejemplo, nombres repetidos entre módulos)
 const tmp = path.join(root, 'dist', '.check.mjs');
