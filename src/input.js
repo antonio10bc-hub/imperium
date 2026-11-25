@@ -9,7 +9,8 @@ import { ping } from './effects.js';
 import { exploredAt, toggleFog } from './fog.js';
 import { enqueue, heroesOf, newGame, startGame, state, toast } from './game.js';
 import { closeMenu, curCity, cycleBuilding, openMenu, pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
-import { GEOT, HM, cellOf, homeOf, spots, surfY } from './map.js';
+import { GEOT, HM, cellOf, gateList, homeOf, spots, surfY } from './map.js';
+import { bfs, nearestNode } from './nav.js';
 import { seed } from './noise.js';
 import { camera, canvas, part, world } from './render.js';
 import { $, S, track } from './state.js';
@@ -31,6 +32,13 @@ export function pickUnit(x, y, side) {
 export function pickEnemy(x, y) {   // cualquier tropa que no sea tuya: rivales, guardianes, bandidos y caravanas
   let best = null, bd = 22;
   for (const u of units) if (u.side !== 0 && u.vis) { const d = Math.hypot(u.sx - x, u.sy - y) * (u.type === 'hero' ? .6 : 1); if (d < bd) { bd = d; best = u; } }
+  return best;
+}
+// puerta en pie de una fortaleza ajena bajo el cursor (solo si se ha explorado)
+const _gq = new THREE.Vector3(), _gs = {};
+export function pickGate(x, y) {
+  let best = null, bd = 24;
+  for (const g of gateList) if (g.hp > 0 && spots[g.f.side].side !== 0 && exploredAt(g.x, g.z)) { project(_gq.set(g.x, surfY(g.x, g.z) + 1.2, g.z), _gs); const d = Math.hypot(_gs.x - x, _gs.y - y); if (_gs.vis && d < bd) { bd = d; best = g; } }
   return best;
 }
 // cofre del tesoro bajo el cursor (solo los que se ven)
@@ -84,7 +92,11 @@ export function command(x, y, attack = false) {
   }
   if (own && own.type === 'hero' && list.length === 1 && list[0] === own) return;
   for (const u of list) unassign(u);
-  const eu = pickEnemy(x, y);
+  const eu = pickEnemy(x, y), gt = pickGate(x, y);
+  if (gt && (list.some(u => u.def.siege) || !eu)) {   // derribar esa puerta (con asedio seleccionado, la puerta manda aunque haya enemigos delante)
+    const f = bfs([nearestNode(gt.x, gt.z)]); for (const u of list) u.order = { type: 'gate', g: gt, f };
+    ping(new THREE.Vector3(gt.x, surfY(gt.x, gt.z) + .5, gt.z), '#d83a4a'); sfx('cmd'); track('order', { type: 'gate' }); return;
+  }
   if (eu) { for (const u of list) u.order = { type: 'attack', target: eu }; ping(eu.pos, '#d83a4a'); sfx('cmd'); track('order', { type: 'attack' }); return; }
   const sp = pickSpot(x, y), g = sp ? { x: sp.x, z: sp.z } : groundAt(x, y); if (!g) return;
   if (!sp && !attack && GEOT[cellOf(g.x, g.z)] === 1 && startChop(g.x, g.z, list)) { sfx('cmd'); return; }   // bosque denso: talarlo

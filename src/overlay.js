@@ -5,7 +5,7 @@ import { ALT0, BARR0, BASE1, CFG, GAME, RANKS, TEAM, TEMP0, UNITS } from './conf
 import { uname } from './civs.js';
 import { exploredAt, visibleAt } from './fog.js';
 import { edgeMarks, state } from './game.js';
-import { RALLY_BLD, drag, groundAt, mouse, pickEnemy, pickSpot, pickTreasure, pickUnit, project } from './input.js';
+import { RALLY_BLD, drag, groundAt, mouse, pickEnemy, pickGate, pickSpot, pickTreasure, pickUnit, project } from './input.js';
 import { GEOT, cellOf, gateList, signs, spots, surfY } from './map.js';
 import { curCity } from './hud.js';
 import { camera, canvas, gl, target } from './render.js';
@@ -89,6 +89,7 @@ function orderLines() {
     let x, z, c;
     if (o.type === 'move') { x = o.tx; z = o.tz; c = o.attack ? '#d83a4a' : '#9ad86a'; }
     else if (o.type === 'attack') { if (!o.target || o.target.dead) continue; x = o.target.pos.x; z = o.target.pos.z; c = '#d83a4a'; }
+    else if (o.type === 'gate') { x = o.g.x; z = o.g.z; c = '#d83a4a'; }
     else if (o.type === 'capture') { const t = spots[o.k]; x = t.x; z = t.z; c = '#e8c870'; }
     else if (o.type === 'siege') { const t = o.s || spots[BASE1]; x = t.x; z = t.z; c = '#d83a4a'; }
     else continue;
@@ -249,7 +250,7 @@ function hoverCursor() {
   const x = mouse.x, y = mouse.y, has = sel.size > 0;
   if (S.amode && has) return CUR.attack;
   if (S.selBld in RALLY_BLD) { const sp = pickSpot(x, y); return sp ? 'pointer' : CUR.rally; }
-  if (has && pickEnemy(x, y)) return CUR.attack;
+  if (has && (pickEnemy(x, y) || pickGate(x, y))) return CUR.attack;   // tropas ajenas y puertas de fortalezas ajenas
   if (pickTreasure(x, y)) return has ? CUR.loot : 'pointer';   // cofre: ir a por él
   const own = pickUnit(x, y, 0);
   if (own) return has && own.type === 'hero' && [...sel].some(u => u !== own && u.type !== 'hero') ? CUR.assign : 'pointer';

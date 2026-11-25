@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { bashGate, nearestEnemy, siege, strike } from './combat.js';
-import { BASE1, GAME, MD, MW, NEU, NP, idx } from './config.js';
+import { BASE1, GAME, MD, MW, NEU, NP, RANGED, idx } from './config.js';
 import { burst, floatText, ping, plume, streak } from './effects.js';
 import { aiUnit } from './ai.js';
 import { bonusOf } from './civs.js';
@@ -124,6 +124,14 @@ function playerUnit(u, dt) {
     return;
   }
   if (o?.type === 'attack') { if (strike(u, o.target, dt)) return; u.order = null; }
+  if (o?.type === 'gate') {   // derribar una puerta marcada: solo la puerta (el asedio no se distrae; el resto se defiende si le atacan de cerca)
+    const g = o.g; if (g.hp <= 0) { u.order = null; return; }
+    if (!u.def.siege) { if ((u.think -= dt) <= 0) { u.think = .3; u.enemy = nearestEnemy(u, 2.5); } if (alive(u.enemy) && strike(u, u.enemy, dt)) return; }
+    const d = Math.hypot(g.x - u.pos.x, g.z - u.pos.z);
+    if (d < (RANGED(u.type) ? u.def.range - .5 : 2.6)) { bashGate(u, g, dt); return; }
+    if (!(o.f[u.node] > 0 && followField(u, o.f, dt))) stepToward(u, g.x, g.z, spd(u), dt);
+    return;
+  }
   if (o?.type === 'demolish') { if ((u.think -= dt) <= 0) { u.think = .3; u.enemy = nearestEnemy(u, 3); } if (alive(u.enemy) && strike(u, u.enemy, dt)) return; hitBridge(u, o.b, dt); return; }   // derribar: se defienden si les atacan de cerca
   if ((u.think -= dt) <= 0) { u.think = .3; u.enemy = nearestEnemy(u, u.def.aggro); }
   if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
