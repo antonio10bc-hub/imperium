@@ -8,7 +8,6 @@ import { updateCtx } from './hud.js';
 import { HM } from './map.js';
 import { bfs } from './nav.js';
 import { VCMAT, mat } from './render.js';
-import { $ } from './state.js';
 import { UGRID, _nearEn, alive, arrows, charging, followField, sel, setMax, sideState, spd, stepToward, unitGeo, units } from './units.js';
 import { geoDmg } from './rules.js';
 
@@ -18,8 +17,7 @@ export const corpses = [];
 export function raiseAlarm(loc, msg) {
   if (alarm.cool > 0) return;
   Object.assign(alarm, { t: 3, pos: loc.clone(), cool: 10 });
-  toast(msg + ' · ESPACIO', 'bad', loc); sfx('alarm');
-  const a = $('alarm'); a.classList.remove('on'); void a.offsetWidth; a.classList.add('on');
+  sfx('alarm');   // sin avisos en pantalla: ESPACIO lleva al último ataque
 }
 // tiñe la tropa del metal de su rango (variante de color de su plantilla) y le pone la cresta
 export function applyRank(u) {
@@ -81,7 +79,7 @@ export function kill(u, by) {
 }
 function hitBase(att, s) {
   const dmg = att.def.dmg * (RANGED(att.type) ? .6 : 1) * (att.leader ? GAME.escortBonus : 1) * RANKS[att.rank].mul;
-  s.hp -= dmg; s.shake = .18;
+  s.hp -= dmg; s.shake = .18; s.lastBy = att.side;
   if (s.vis) floatText(spotPos(s, 7), '-' + Math.round(dmg), s.side === 0 ? '#d83a4a' : '#ffffff', 9);
   if (s.side === 0) raiseAlarm(spotPos(s), '¡TU CASTILLO ESTÁ BAJO ATAQUE!');
 }
@@ -113,7 +111,7 @@ export function siege(u, s, dt) {
   if (d < 3.8 + u.def.range) {
     u.fwd.set(c.x - u.pos.x, 0, c.z - u.pos.z).normalize(); u.combatT = 2;
     if (u.cd <= 0) { u.cd = u.def.cd; if (RANGED(u.type)) shoot(u.pos, spotPos(s, 2)); else u.lunge = 1; hitBase(u, s); }
-  } else followField(u, fields[s.side], dt);
+  } else followField(u, fields[s.civ ?? s.side], dt);
 }
 export function nearestEnemy(u, range) {
   let best = null, bd = range;

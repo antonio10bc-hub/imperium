@@ -3,12 +3,13 @@ import { ac, audio, master, sfx, startMusic } from './audio.js';
 import { SHAPES } from './behavior.js';
 import { uname } from './civs.js';
 import { assign } from './combat.js';
-import { ALLT, ALT0, BARR0, BASE0, BASE1, GAME, NP, RANKS, TEAM, TEMP0, TYPES, UNITS, players } from './config.js';
+import { ALLT, ALT0, BARR0, BASE1, GAME, NP, RANKS, TEAM, TEMP0, TYPES, UNITS, players } from './config.js';
 import { ping } from './effects.js';
-import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, townIncNow, popOf, state, summonHero, toast, towerDmg, towerRange, upgradeTown } from './game.js';
+import { TOWN_LV, cancelQueue, capOf, endGame, enqueue, startRitual, summonGod, heroCount, heroOf, heroesOf, incomeOf, newGame, townIncNow, popOf, state, summonHero, towerDmg, towerRange, upgradeTown } from './game.js';
 import { focusOn, heroButton } from './input.js';
 import { MERC, ev, hireMercs, mercRoom } from './events.js';
-import { mapCode, regions, scen, spots } from './map.js';
+import { citiesOf, homeOf, mapCode, regions, scen, spots } from './map.js';
+import { civOf } from './civs.js';
 import { seed } from './noise.js';
 import { $, S, track } from './state.js';
 import { THUMB, alive, sel, sideState, units } from './units.js';
@@ -38,9 +39,9 @@ export function updateHud() {
   $('pop').textContent = popOf(0); $('cap').textContent = capOf(0);
   const m = ev.merc, showM = !!m && !m.hired[0]; $('merc').hidden = !showM;   // oferta de mercenarios
   if (showM) { $('mercT').textContent = `MERCENARIOS VETERANOS · ${Math.ceil(m.t)} S`; const b = $('mercBtn'), room = mercRoom(0); b.textContent = room ? `CONTRATAR · ${MERC.cost}` : 'SIN SITIO'; b.disabled = !room || sideState[0].gold < MERC.cost; }
-  const n0 = 1 + owned(0), n1 = NP - 1 + spots.filter(s => s.kind === 'town' && s.known > 0).length, NR = regions.length, key = n0 + ',' + n1 + ',' + NR;
+  const n0 = citiesOf(0).length + owned(0), n1 = NP - citiesOf(0).length + spots.filter(s => s.kind === 'town' && s.known > 0).length, NR = regions.length, key = n0 + ',' + n1 + ',' + NR;
   if (key !== terrKey) { terrKey = key; $('terr').innerHTML = '<i class="b"></i>'.repeat(n0) + '<i></i>'.repeat(Math.max(0, NR - n0 - n1)) + '<i class="r"></i>'.repeat(n1); }
-  $('hp0').textContent = Math.max(0, Math.round(spots[BASE0].hp / GAME.baseHp * 100)) + ' %';
+  $('hp0').textContent = Math.max(0, Math.round(spots[homeOf(0)].hp / GAME.baseHp * 100)) + ' %';
   $('hp1').textContent = NP === 2 ? Math.max(0, Math.round(spots[BASE1].hp / GAME.baseHp * 100)) + ' %' : `${players().filter(sd => sd > 0 && !sideState[sd]?.dead).length}/${NP - 1} EN PIE`;   // con varios rivales: cuántos quedan
   $('t1').textContent = NP === 2 ? 'RIVAL' : 'RIVALES';
   renderHeroes(); renderPanel();
@@ -64,16 +65,16 @@ function renderPanel() {
   if (html !== panelHtml) { panelHtml = html; $('panel').innerHTML = html; }
 }
 function panelContent() {
-  const st = sideState[0];
+  const st = sideState[0], cc = curCity(), cn = citiesOf(0).length > 1 ? ' · ' + civOf(cc).name : '';
   if (S.selBld === 'barracks') {
     const full = popOf(0) >= capOf(0) || st.queue.length >= GAME.queueMax;
     const cards = TYPES.map((t, i) => { const d = UNITS[t];
-      return `<button type="button" class="rc" data-act="rec" data-t="${t}" ${full || st.gold < d.cost ? 'disabled' : ''} title="${uname(0, t)} · ${d.time} s · ${VS[t]}"><kbd>${i + 1}</kbd><img alt="" src="${THUMB[t] || ''}"><b>${uname(0, t)}</b><s>${d.cost}</s></button>`; }).join('');
+      return `<button type="button" class="rc" data-act="rec" data-t="${t}" ${full || st.gold < d.cost ? 'disabled' : ''} title="${uname(cc, t)} · ${d.time} s · ${VS[t]}"><kbd>${i + 1}</kbd><img alt="" src="${THUMB[t] || ''}"><b>${uname(cc, t)}</b><s>${d.cost}</s></button>`; }).join('');
     const q = st.queue.map((it, i) => `<button type="button" class="q" data-act="cancel" data-i="${i}" title="Cancelar (devuelve el oro)"><img alt="${uname(0, it.type)}" src="${THUMB[it.type] || ''}">${i === 0 ? `<i><b style="width:${pct(1 - it.t / UNITS[it.type].time)}"></b></i>` : ''}</button>`).join('');
-    return `<div class="ph" title="Clic derecho en el mapa: punto de reunión"><h3>CUARTEL</h3><em>COLA ${st.queue.length}/${GAME.queueMax}</em><em>TROPAS ${popOf(0)}/${capOf(0)}</em></div>${cards}<div class="qu">${q || '<span class="none">COLA VACÍA</span>'}</div>`;
+    return `<div class="ph" title="Clic derecho en el mapa: punto de reunión"><h3>CUARTEL${cn}</h3><em>COLA ${st.queue.length}/${GAME.queueMax}</em><em>TROPAS ${popOf(0)}/${capOf(0)}</em></div>${cards}<div class="qu">${q || '<span class="none">COLA VACÍA</span>'}</div>`;
   }
   if (S.selBld === 'temple') {   // templo: primero el ritual; después, invocar al dios (uno por bando)
-    const r = st.ritual, god = uname(0, 'god'), d = UNITS.god;
+    const r = st.ritual, god = uname(r.c ?? cc, 'god'), d = UNITS.god;
     let info, act = '';
     if (r.state === 'none') {
       info = `<div class="note g">COMIENZA EL RITUAL PARA PODER INVOCAR A ${god}.</div><div class="note">DURA ${GAME.ritualTime} S. LUEGO, ${god} SE INVOCA AQUÍ.</div>`;
@@ -87,14 +88,14 @@ function panelContent() {
       info += `<div class="note">UN DIOS POR BANDO. ASÍGNALO A UN HÉROE: IRÁ DETRÁS DE ÉL.</div><div class="note">CLIC DERECHO EN EL MAPA: DÓNDE APARECE.</div>`;
       act = g ? `<button type="button" data-act="god">SELECCIONAR</button>` : st.godQ ? '' : `<button type="button" class="y" data-act="summonGod" ${st.gold < d.cost || popOf(0) >= capOf(0) ? 'disabled' : ''}>INVOCAR · ${d.cost} ORO</button>`;
     }
-    return `<div class="ph"><h3>TEMPLO</h3><em>${r.state === 'done' ? 'CONSAGRADO' : r.state === 'ritual' ? 'RITUAL EN CURSO' : 'SIN CONSAGRAR'}</em></div><img class="big" alt="" src="${THUMB.god || ''}"><div class="info">${info}</div>${act ? `<div class="act">${act}</div>` : ''}`;
+    return `<div class="ph"><h3>TEMPLO${cn}</h3><em>${r.state === 'done' ? 'CONSAGRADO' : r.state === 'ritual' ? 'RITUAL EN CURSO' : 'SIN CONSAGRAR'}</em></div><img class="big" alt="" src="${THUMB.god || ''}"><div class="info">${info}</div>${act ? `<div class="act">${act}</div>` : ''}`;
   }
   if (S.selBld === 'altar') {
     const n = heroCount(0), alive = heroesOf(0).length, tr = st.heroQ.filter(h => h.state === 'training'), dead = st.heroQ.filter(h => h.state === 'dead');
     let btn = n < GAME.maxHeroes ? `<button type="button" class="y" data-act="summon" ${st.gold < UNITS.hero.cost ? 'disabled' : ''}>INVOCAR · ${UNITS.hero.cost} ORO</button>` : `<button type="button" disabled>MÁXIMO ${GAME.maxHeroes} HÉROES</button>`;
     if (alive) btn = `<button type="button" data-act="hero">SELECCIONAR</button>` + btn;
     const note = `HÉROES ${n}/${GAME.maxHeroes}` + (tr.length ? ` · LLEGA EN ${Math.ceil(tr[0].t)} S` : '') + (dead.length ? ` · VUELVE EN ${Math.ceil(dead[0].t)} S` : '');
-    return `<div class="ph"><h3>SALÓN DE HÉROES</h3><em>${note}</em></div><img class="big" alt="" src="${THUMB.hero || ''}"><div class="info"><div class="note">MÁS FUERTE, CARGA CONTRA EL ENEMIGO.</div><div class="note">HASTA ${GAME.escortMax} TROPAS EN FORMACIÓN.</div><div class="note">CLIC DERECHO EN EL MAPA: A DÓNDE VA AL LLEGAR.</div></div><div class="act">${btn}</div>`;
+    return `<div class="ph"><h3>SALÓN DE HÉROES${cn}</h3><em>${note}</em></div><img class="big" alt="" src="${THUMB.hero || ''}"><div class="info"><div class="note">MÁS FUERTE, CARGA CONTRA EL ENEMIGO.</div><div class="note">HASTA ${GAME.escortMax} TROPAS EN FORMACIÓN.</div><div class="note">CLIC DERECHO EN EL MAPA: A DÓNDE VA AL LLEGAR.</div></div><div class="act">${btn}</div>`;
   }
   if (S.selSpot) {
     const s = S.selSpot;
@@ -105,7 +106,7 @@ function panelContent() {
       return `<div class="ph"><h3>${s.name}</h3><em>${s.built ? 'EN PIE' : 'DERRIBADO'}${own}</em></div><div class="info">${hp}<div class="note g">${note}</div></div><div class="act">${s.built ? '' : `<button type="button" class="y" data-act="bridge" ${sideState[0].gold < BRIDGE_COST ? 'disabled' : ''}>${s.breakable ? 'REPARAR' : 'CONSTRUIR'} · ${BRIDGE_COST} ORO</button>`}</div>`;
     }
     if (s.kind === 'base') { const k = s.hp / GAME.baseHp;
-      return `<div class="ph"><h3>${s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA RIVAL'}</h3></div><div class="info"><div class="hpb"><b style="width:${pct(k)};background:${TEAM[s.side].css}"></b><span>${Math.max(0, Math.ceil(s.hp))}/${GAME.baseHp}</span></div><div class="note">${s.side === 1 ? 'CLIC DERECHO CON TROPAS: ASALTAR.' : 'SI CAE, PIERDES LA PARTIDA.'}</div></div>`; }
+      return `<div class="ph"><h3>${s.side === 0 ? 'TU FORTALEZA' : 'FORTALEZA RIVAL'} · ${civOf(s.civ ?? s.side).name}</h3></div><div class="info"><div class="hpb"><b style="width:${pct(k)};background:${TEAM[s.side].css}"></b><span>${Math.max(0, Math.ceil(s.hp))}/${GAME.baseHp}</span></div><div class="note">${s.side !== 0 ? (NP > 2 ? 'CLIC DERECHO CON TROPAS: ASALTAR. SI CAE, SERÁ TUYA.' : 'CLIC DERECHO CON TROPAS: ASALTAR.') : citiesOf(0).length > 1 || NP > 2 ? 'SI CAE, PASA A QUIEN LA CONQUISTE.' : 'SI CAE, PIERDES LA PARTIDA.'}</div></div>`; }
     const own = s.owner, who = own < 0 ? 'NEUTRAL' : own === 0 ? 'TUYO' : 'DEL RIVAL';
     let prog = '';
     if (own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; prog = `<div class="hpb"><b style="width:${pct(s.prog[sd])};background:${TEAM[sd].css}"></b><span>CONQUISTA ${pct(s.prog[sd])}</span></div>`; }
@@ -132,7 +133,7 @@ function panelContent() {
   const cards = groupCards(list, 'type');
   const asg = h && free.length ? `<button type="button" class="y" data-act="assign">ASIGNAR (${h.escort.length}/${GAME.escortMax})</button>` : '';
   const shp = h && sel.has(h) ? shapeButtons(h) : '';
-  return `<div class="ph"><h3>${list.length} UNIDADES</h3><em>${cnt.slice(0, 2).join(' · ')}</em>${cnt[2] ? `<em>${cnt[2]}</em>` : ''}</div>${cards}<div class="act">${shp}${asg}<button type="button" data-act="amove" title="Avanzar atacando lo que encuentren">ATACAR <kbd>E</kbd></button></div>`;
+  return `<div class="ph"><h3>${list.length} UNIDADES</h3><em>${cnt.slice(0, 2).join(' · ')}</em>${cnt[2] ? `<em>${cnt[2]}</em>` : ''}</div>${cards}<div class="act">${shp}${asg}<button type="button" data-act="amove" title="Avanzar atacando lo que encuentren">ATACAR <kbd>A</kbd></button></div>`;
 }
 // una tarjeta por tipo de tropa: retrato, cuántas hay y vida media
 function groupCards(list, act) {
@@ -145,7 +146,7 @@ function shapeButtons(h) {
 }
 function cellHtml(u) {
   const k = u.hp / u.maxHp;
-  return `<button type="button" class="cell${u.leader ? ' esc' : ''}" data-act="one" data-id="${u.id}" title="${uname(u.side, u.type)}${u.rank ? ' · ' + RANKS[u.rank].name : ''}"><img alt="" src="${THUMB[u.type] || ''}">${u.rank ? `<u style="background:${RANKS[u.rank].css}"></u>` : ''}<i><b style="width:${pct(k)};background:${hpCol(k)}"></b></i></button>`;
+  return `<button type="button" class="cell${u.leader ? ' esc' : ''}" data-act="one" data-id="${u.id}" title="${uname(u.civ ?? u.side, u.type)}${u.rank ? ' · ' + RANKS[u.rank].name : ''}"><img alt="" src="${THUMB[u.type] || ''}">${u.rank ? `<u style="background:${RANKS[u.rank].css}"></u>` : ''}<i><b style="width:${pct(k)};background:${hpCol(k)}"></b></i></button>`;
 }
 function unitDetail(u) {
   const k = u.hp / u.maxHp, R1 = RANKS[u.rank], hero = u.type === 'hero', mul = (u.leader ? GAME.escortBonus : 1) * R1.mul;
@@ -156,7 +157,7 @@ function unitDetail(u) {
   if (hero) note = u.chargeT > 0 ? '¡CARGANDO!' : u.chargeCd > 0 ? `CARGA EN ${Math.ceil(u.chargeCd)} S` : 'CARGA LISTA';
   const esc = hero && u.escort.length ? groupCards(u.escort, 'esc') + `<div class="act">${shapeButtons(u)}</div>` : '';
   const h = heroOf(0), asg = !hero && h && u.leader !== h ? `<div class="act"><button type="button" class="y" data-act="assign">ASIGNAR (${h.escort.length}/${GAME.escortMax})</button></div>` : '';
-  return `<div class="ph"><h3>${uname(u.side, u.type)}${rk}</h3><em>${hero ? `ESCOLTA ${u.escort.length}/${GAME.escortMax}` : next}</em></div><img class="big" alt="" src="${THUMB[u.type] || ''}">
+  return `<div class="ph"><h3>${uname(u.civ ?? u.side, u.type)}${rk}</h3><em>${hero ? `ESCOLTA ${u.escort.length}/${GAME.escortMax}` : next}</em></div><img class="big" alt="" src="${THUMB[u.type] || ''}">
     <div class="info"><div class="hpb"><b style="width:${pct(k)};background:${hpCol(k)}"></b><span>${Math.ceil(u.hp)}/${u.maxHp}</span></div>
       <div class="stats"><span>ATQ <b>${Math.round(u.def.dmg * mul)}</b></span><span>ALC <b>${u.def.range}</b></span><span>VEL <b>${u.def.speed}</b></span>${hero ? `<span>BAJAS <b>${u.kills}</b></span>` : ''}</div>
       <div class="note${u.leader || hero ? ' g' : ''}">${note}</div></div>${esc}${asg}`;
@@ -166,12 +167,11 @@ function assignSelected() {
   const h = heroOf(0); if (!h) return;
   let n = 0; for (const u of sel) if (assign(u, h)) n++;
   ping(h.pos, '#e8c870'); sfx(n ? 'cmd' : 'deny');
-  toast(n ? `${n} ${n === 1 ? 'TROPA ESCOLTA' : 'TROPAS ESCOLTAN'} AL HÉROE (${h.escort.length}/${GAME.escortMax})` : 'LA ESCOLTA ESTÁ COMPLETA', n ? 'good' : 'bad');
   track('escort_assign', { n }); updateCtx();
 }
 export function updateCtx() {
   refreshPanel();
-  for (const k of [BARR0, ALT0, TEMP0]) if (spots[k]?.sel) spots[k].sel.visible = S.selBld === spots[k].kind;
+  const cc = curCity(); for (let c = 0; c < NP; c++) for (const k of [BARR0 + c, ALT0 + c, TEMP0 + c]) if (spots[k]?.sel) spots[k].sel.visible = c === cc && spots[k].side === 0 && S.selBld === spots[k].kind;
 }
 // Iconos pixelados 7×7 para la interfaz
 const UI_IC = {
@@ -180,7 +180,15 @@ const UI_IC = {
   crown: ['1010101','1111111','1111111','0000000','0111110','0111110','0000000'], target: ['0011100','0100010','1001001','1011101','1001001','0100010','0011100'],
   pause: ['0000000','0110110','0110110','0110110','0110110','0110110','0000000'], menu: ['0000000','1111111','0000000','1111111','0000000','1111111','0000000'],
 };
-export function selectBuilding(kind) { sel.clear(); S.follow = null; S.selBld = kind; S.selSpot = null; updateCtx(); }
+// ciudad elegida para producir (con varias ciudades, Q/W/E pasan de una a otra)
+export const curCity = () => S.city != null && spots[S.city]?.side === 0 ? S.city : homeOf(0);
+export function selectBuilding(kind, city) { sel.clear(); S.follow = null; S.selBld = kind; S.selSpot = null; if (city != null) S.city = city; S.city = curCity(); updateCtx(); }
+const BLD0 = { barracks: BARR0, altar: ALT0, temple: TEMP0 };
+export function cycleBuilding(kind) {   // Q cuartel · W salón de héroes · E templo; pulsar otra vez pasa a la siguiente ciudad
+  const cs = citiesOf(0); if (!cs.length) return;
+  let c = curCity(); if (S.selBld === kind && cs.length > 1) c = cs[(cs.indexOf(c) + 1) % cs.length];
+  selectBuilding(kind, c); sfx('select'); const s = spots[BLD0[kind] + c]; focusOn(s.x, s.z);
+}
 export function selectSpot(s) { sel.clear(); S.follow = null; S.selBld = null; S.selSpot = s; updateCtx(); }
 export function setSelection(list, add) { S.amode = false; if (!add) sel.clear(); for (const u of list) sel.add(u); S.selBld = null; S.selSpot = null; if (list.length) sfx('select'); updateCtx(); }
 export function syncTools() { $('spd').firstChild.textContent = '×' + S.speed; $('spd').classList.toggle('on', S.speed > 1); $('pz').classList.toggle('on', S.paused); $('pause').hidden = !S.paused || S.menuOpen; }
@@ -202,10 +210,10 @@ export function init() {
     if (e.button !== 0) return;
     const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
     const a = b.dataset.act;
-    if (a === 'rec') enqueue(0, b.dataset.t);
+    if (a === 'rec') enqueue(0, b.dataset.t, curCity());
     else if (a === 'cancel') cancelQueue(+b.dataset.i);
-    else if (a === 'summon') summonHero(0);
-    else if (a === 'ritual') startRitual(0);
+    else if (a === 'summon') summonHero(0, curCity());
+    else if (a === 'ritual') startRitual(0, curCity());
     else if (a === 'summonGod') summonGod(0);
     else if (a === 'god') { const g = units.find(u => u.side === 0 && u.type === 'god'); if (g) { setSelection([g], false); S.follow = g; S.focusGoal = null; } }
     else if (a === 'hero') heroButton();
@@ -223,10 +231,10 @@ export function init() {
     const c = document.createElement('canvas'); c.width = c.height = 7; const x = c.getContext('2d'); x.fillStyle = el.dataset.c;
     UI_IC[el.dataset.ic].forEach((row, j) => [...row].forEach((v, i) => { if (v === '1') x.fillRect(i, j, 1, 1); })); el.src = c.toDataURL();
   });
-  $('fBase').addEventListener('click', () => focusOn(spots[BASE0].x, spots[BASE0].z));
-  $('fEnemy').addEventListener('click', () => { const t = spots[targetBase(0, spots[0])]; focusOn(t.x, t.z); });   // la fortaleza rival más cercana que siga en pie
-  $('fBarr').addEventListener('click', () => { selectBuilding('barracks'); focusOn(spots[BARR0].x, spots[BARR0].z); });
-  $('fHero').addEventListener('click', heroButton);
+  $('fBase').addEventListener('click', () => { const h = spots[homeOf(0)]; focusOn(h.x, h.z); });
+  $('fEnemy').addEventListener('click', () => { const t = spots[targetBase(0, spots[homeOf(0)])]; focusOn(t.x, t.z); });   // la fortaleza rival más cercana que siga en pie
+  $('fBarr').addEventListener('click', () => cycleBuilding('barracks'));
+  $('fHero').addEventListener('click', () => cycleBuilding('altar'));
   $('spd').addEventListener('click', () => { S.speed = S.speed === 1 ? 2 : 1; syncTools(); });
   $('pz').addEventListener('click', () => { S.paused = !S.paused; syncTools(); });
   $('menuBtn').addEventListener('click', openMenu);

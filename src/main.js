@@ -46,9 +46,9 @@ function frame(now) {
 function frameBody(now) {
   const dt = Math.min(.05, (now - prev) / 1000); prev = now;
   S.camDist += (S.camGoal - S.camDist) * Math.min(1, dt * 8);
-  // desplazamiento: WASD / flechas / borde de pantalla
-  let kx = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
-  let kz = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
+  // desplazamiento: flechas / borde de pantalla (Q, W, E y A son atajos)
+  let kx = (keys.has('arrowright') ? 1 : 0) - (keys.has('arrowleft') ? 1 : 0);
+  let kz = (keys.has('arrowdown') ? 1 : 0) - (keys.has('arrowup') ? 1 : 0);
   if (mouse.in && !drag && state === 'play') { const E = 8; if (mouse.x < E) kx = -1; else if (mouse.x > S.VW - E) kx = 1; if (mouse.y < E) kz = -1; else if (mouse.y > S.VH - E) kz = 1; }
   if ((kx || kz) && !keys.has('control') && !keys.has('meta')) pan(kx * S.camDist * .9 * dt, kz * S.camDist * .9 * dt);
   if (S.follow && (S.follow.dead || !sel.has(S.follow))) S.follow = null;

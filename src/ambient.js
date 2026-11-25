@@ -1,67 +1,62 @@
 // Ambiente de cada geografía:
-// · Clima: niebla en el delta y las ruinas, tormentas de arena en el desierto, nieve en la cordillera y el valle helado, ceniza en la caldera
-//   y lluvia en el resto. Mientras dura, las tropas ven un poco menos (también las del rival).
+// · Clima: tormentas de arena en el desierto, nieve en la cordillera y el valle helado, ceniza en la caldera y, en los afluentes, lluvia
+//   mientras dura la crecida (la lluvia es la que corta los vados). Sin niebla. Mientras dura, las tropas ven un poco menos (también las del rival).
 // · Vida: pájaros, humo en los pueblos, espuma en la costa y peces que saltan (solo cerca de la cámara).
 // · Elementos propios: faros, barcas, molinos, menhires, pirámides, estatuas… colocados al generar el mapa.
 import * as THREE from 'three';
 import { decos } from './buildings.js';
 import { MD, MW, idx } from './config.js';
 import { burst, fxRand, plume } from './effects.js';
-import { state, toast } from './game.js';
+import { state } from './game.js';
 import { camT } from './input.js';
 import { GEOT, HM, forts, geoR, roadCell, scen, spots } from './map.js';
 import { blocked, refreshCells, walk } from './nav.js';
 import { rngOf, seed } from './noise.js';
 import { bake, basic, part, world } from './render.js';
 import { visibleAt } from './fog.js';
+import { R } from './rules.js';
 import { setAmbience } from './audio.js';
 
 // ---------- clima ----------
-const KIND = { delta: 'fog', ruinas: 'fog', oasis: 'sand', cordillera: 'snow', helado: 'snow', lago: 'ash' };
+const KIND = { oasis: 'sand', cordillera: 'snow', helado: 'snow', lago: 'ash' };
 const WX = {
-  fog: { vis: .72, on: 'NIEBLA: SE VE MENOS', off: 'LA NIEBLA SE LEVANTA' },
   sand: { vis: .62, on: '¡TORMENTA DE ARENA! SE VE MUCHO MENOS', off: 'LA TORMENTA DE ARENA AMAINA' },
   snow: { vis: .82, on: 'NIEVA: SE VE MENOS', off: 'DEJA DE NEVAR' },
-  rain: { vis: .88, on: 'LLUEVE: SE VE UN POCO MENOS', off: 'ESCAMPA' },
+  rain: { vis: .92 },
   ash: { vis: .8, on: 'CAE CENIZA DEL VOLCÁN: SE VE MENOS', off: 'LA CENIZA SE DISIPA' },
 };
-export const WEA = { kind: 'rain', on: false, t: 60, k: 0 };
-const kindFor = () => { const k = geoR?.mix ? geoR.mix[Math.random() < .5 ? 0 : 1] : scen; return KIND[k] || 'rain'; };
+export const WEA = { kind: null, on: false, t: 60, k: 0 };   // kind null: esta geografía no tiene clima
+const kindFor = () => { const k = geoR?.mix ? geoR.mix[Math.random() < .5 ? 0 : 1] : scen; return KIND[k] || null; };
 export function resetWeather() { WEA.kind = kindFor(); WEA.on = false; WEA.t = 70 + Math.random() * 60; WEA.k = 0; }
 // cuánto ven las tropas ahora (1 = normal)
-export const weatherVis = () => 1 - (1 - WX[WEA.kind].vis) * Math.min(1, WEA.k);
+export const weatherVis = () => WEA.kind ? 1 - (1 - WX[WEA.kind].vis) * Math.min(1, WEA.k) : 1;
 // paso de simulación: el clima empieza y acaba (afecta a la visión, así que va con la partida)
 export function updateWeather(dt) {
+  if (R.on.floods && R.cycle) { WEA.kind = 'rain'; WEA.on = R.cycle.phase !== 'open'; }   // afluentes: llueve justo durante la crecida
   WEA.k += ((WEA.on ? 1 : 0) - WEA.k) * Math.min(1, dt * .5);
+  if (R.on.floods && R.cycle) return;
   if ((WEA.t -= dt) > 0) return;
   WEA.on = !WEA.on; WEA.t = WEA.on ? 45 + Math.random() * 35 : 90 + Math.random() * 70;
-  if (WEA.on) WEA.kind = kindFor();
-  toast(WX[WEA.kind][WEA.on ? 'on' : 'off'], WEA.on ? 'bad' : '');
+  if (WEA.on) { const k = kindFor(); if (!k) { WEA.on = false; return; } WEA.kind = k; }
 }
 // partículas del clima en pantalla (capa 2D)
-const P = []; let fogPh = 0;
+const P = [];
 export function drawWeather(c, w, h, dt) {
   const k = Math.min(1, WEA.k); if (k < .02 || state === 'menu') return;
-  const kind = WEA.kind, n = { rain: 160, snow: 130, sand: 170, ash: 110, fog: 0 }[kind];
+  const kind = WEA.kind, n = { rain: 120, snow: 130, sand: 170, ash: 110 }[kind]; if (!n) return;
   while (P.length < n) P.push({ x: fxRand() * w, y: fxRand() * h, s: .5 + fxRand(), p: fxRand() * 6 });
   c.save();
-  if (kind === 'fog') {   // bancos de niebla que se desplazan despacio
-    fogPh += dt * .02; c.fillStyle = `rgba(226,232,238,${.22 * k})`; c.fillRect(0, 0, w, h);
-    for (let i = 0; i < 7; i++) { const x = ((i * .37 + fogPh * (1 + i * .1)) % 1.4 - .2) * w, y = (.15 + ((i * .61) % 1) * .8) * h, r = (.22 + (i % 3) * .08) * Math.max(w, h);
-      const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(236,240,244,${.32 * k})`); g.addColorStop(1, 'rgba(236,240,244,0)'); c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }
-  } else {
-    if (kind === 'sand') { c.fillStyle = `rgba(214,178,118,${.3 * k})`; c.fillRect(0, 0, w, h); }
-    if (kind === 'ash') { c.fillStyle = `rgba(60,56,60,${.14 * k})`; c.fillRect(0, 0, w, h); }
-    c.strokeStyle = kind === 'rain' ? `rgba(190,210,235,${.55 * k})` : `rgba(240,220,170,${.6 * k})`; c.lineWidth = kind === 'rain' ? 1.5 : 2;
-    c.fillStyle = kind === 'snow' ? `rgba(255,255,255,${.85 * k})` : `rgba(120,116,120,${.8 * k})`;
-    c.beginPath();
-    for (let i = 0; i < n; i++) { const p = P[i];
-      if (kind === 'rain') { p.x += -120 * dt * p.s; p.y += 620 * dt * p.s; c.moveTo(p.x, p.y); c.lineTo(p.x + 5, p.y - 16 * p.s); }
-      else if (kind === 'sand') { p.x += 700 * dt * p.s; p.y += 40 * dt * Math.sin(p.p += dt * 3); c.moveTo(p.x, p.y); c.lineTo(p.x - 18 * p.s, p.y); }
-      else { p.y += (kind === 'snow' ? 50 : 35) * dt * p.s; p.x += Math.sin(p.p += dt * 1.6) * 20 * dt; c.fillRect(p.x, p.y, 2 + p.s * 1.5, 2 + p.s * 1.5); }
-      if (p.y > h + 20) { p.y = -10; p.x = fxRand() * (w + 200); } if (p.x < -40) p.x = w + 20; if (p.x > w + 40) p.x = -20; }
-    c.stroke();
-  }
+  if (kind === 'sand') { c.fillStyle = `rgba(214,178,118,${.3 * k})`; c.fillRect(0, 0, w, h); }
+  if (kind === 'ash') { c.fillStyle = `rgba(60,56,60,${.14 * k})`; c.fillRect(0, 0, w, h); }
+  c.strokeStyle = kind === 'rain' ? `rgba(190,210,235,${.4 * k})` : `rgba(240,220,170,${.6 * k})`; c.lineWidth = kind === 'rain' ? 1.2 : 2;
+  c.fillStyle = kind === 'snow' ? `rgba(255,255,255,${.85 * k})` : `rgba(120,116,120,${.8 * k})`;
+  c.beginPath();
+  for (let i = 0; i < n; i++) { const p = P[i];
+    if (kind === 'rain') { p.x += -100 * dt * p.s; p.y += 560 * dt * p.s; c.moveTo(p.x, p.y); c.lineTo(p.x + 4, p.y - 13 * p.s); }
+    else if (kind === 'sand') { p.x += 700 * dt * p.s; p.y += 40 * dt * Math.sin(p.p += dt * 3); c.moveTo(p.x, p.y); c.lineTo(p.x - 18 * p.s, p.y); }
+    else { p.y += (kind === 'snow' ? 50 : 35) * dt * p.s; p.x += Math.sin(p.p += dt * 1.6) * 20 * dt; c.fillRect(p.x, p.y, 2 + p.s * 1.5, 2 + p.s * 1.5); }
+    if (p.y > h + 20) { p.y = -10; p.x = fxRand() * (w + 200); } if (p.x < -40) p.x = w + 20; if (p.x > w + 40) p.x = -20; }
+  c.stroke();
   c.restore();
 }
 

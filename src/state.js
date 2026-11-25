@@ -3,8 +3,8 @@
 // ---------- Estado de sesión ----------
 // Lo que cambian a la vez varias partes del juego (interfaz, cámara, partida, menú) vive aquí y no en variables sueltas
 export const S = {
-  selBld: null, selSpot: null, rally: {}, rallyFlag: {}, follow: null,   // selección de edificio o pueblo, punto de reunión y unidad seguida por la cámara
-  amode: false,   // ataque-mover pendiente (tecla E o botón ATACAR)
+  selBld: null, selSpot: null, rally: {}, rallyFlag: {}, follow: null, city: null,   // selección de edificio o pueblo, punto de reunión y unidad seguida por la cámara
+  amode: false,   // ataque-mover pendiente (tecla A o botón ATACAR) · city: ciudad elegida para producir
   camDist: 64, camGoal: 64, focusGoal: null, zoomAnchor: null,   // zoomAnchor: punto del suelo que debe quedarse bajo el ratón mientras se hace zoom
   VW: innerWidth, VH: innerHeight,
   paused: false, speed: 1, diff: 'easy', wantScen: 'random', soundOn: false,

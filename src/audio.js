@@ -78,7 +78,7 @@ const N2F = n => 440 * Math.pow(2, (n - 69) / 12);
 // side: bando que suena (carga y héroe del rival con su cuerno); el resto, con el de tu civilización
 // fondo sonoro de cada geografía: un ruido filtrado que suena a viento, oleaje, lluvia o arena (con un vaivén lento)
 let amb = null;
-const AMB = { wind: ['bandpass', 520, .6, .05, .03], waves: ['lowpass', 650, .7, .07, .05], rain: ['highpass', 2300, .5, .05, 0], sand: ['bandpass', 1500, .7, .07, .025] };
+const AMB = { wind: ['bandpass', 520, .6, .05, .03], waves: ['lowpass', 650, .7, .07, .05], rain: ['lowpass', 1600, .4, .008, 0], sand: ['bandpass', 1500, .7, .07, .025] };
 export function setAmbience(kind, level = 1) {
   if (!S.soundOn || !audio()) return;
   if (!amb) { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();

@@ -187,6 +187,10 @@ export function terrainColor(x, z) {
   return geoR?.snow && (geoR.snowSide == null || (cx < geoR.seam(cz)) === (geoR.snowSide === 0)) ? mixHex(col, 0xeef2f6, .62) : col;   // valle helado: todo nevado
 }
 export let meshes = [], spots = [], bridgeSites = [];
+// ciudades (fortaleza + cuartel + salón de héroes + templo de cada civilización, índice = bando original): se pueden conquistar
+export const citiesOf = sd => { const r = []; for (let c = 0; c < NP; c++) if (spots[c]?.side === sd) r.push(c); return r; };
+// ciudad principal de un bando: la suya si la conserva; si no, la primera que tenga
+export const homeOf = sd => spots[sd]?.side === sd ? sd : (citiesOf(sd)[0] ?? sd);
 const STRATA = [0xb85a3a, 0xd08a4a, 0xc87850, 0xa04a30, 0xd8a060];
 // código de mapa para compartir: GEOGRAFÍA-SEMILLA (p. ej. RIO-48213). La misma geografía y semilla dan el mismo terreno y los mismos pueblos
 export const mapCode = () => `${scen.toUpperCase()}-${seed}${sizeKey !== 'n' ? '-' + sizeKey.toUpperCase() : ''}${NP > 2 ? '-J' + NP : ''}`;   // -J3…-J5: jugadores   // -P o -G: tamaño pequeño o grande

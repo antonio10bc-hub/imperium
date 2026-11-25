@@ -13,7 +13,7 @@ import { resetFog } from './fog.js';
 import { GEO } from './geo.js';
 import { refreshPanel, syncDiff, syncTools, updateCtx } from './hud.js';
 import { focusOn } from './input.js';
-import { fortPt, forts, generate, geoR, mapCode, paintRegion, regions, scen, spots, wallR } from './map.js';
+import { citiesOf, homeOf, fortPt, forts, generate, geoR, mapCode, paintRegion, regions, scen, spots, wallR } from './map.js';
 import { showPortraits } from './menu.js';
 import { cellX, cellZ, fieldAround, nearestNode } from './nav.js';
 import { seed } from './noise.js';
@@ -27,11 +27,13 @@ import { setupAmbient, updateWeather } from './ambient.js';
 // límite de tropas: crece con el territorio (pueblos y campamentos propios)
 export const capOf = side => Math.min(GAME.capMax, GAME.capBase + GAME.capTown * spots.filter(s => s.kind === 'town' && s.owner === side).length);
 export const popOf = side => units.filter(u => u.side === side && u.type !== 'hero').length + sideState[side].queue.length;
-export function enqueue(side, type) {
+// ciudad válida para producir: la pedida si sigue siendo del bando; si no, su ciudad principal
+const cityOk = (sd, c) => spots[c]?.side === sd && spots[c].kind === 'base' ? c : homeOf(sd);
+export function enqueue(side, type, c) {
   const st = sideState[side], def = UNITS[type];
   if (state !== 'play') return false;
   if (st.gold < def.cost || st.queue.length >= GAME.queueMax || popOf(side) >= capOf(side)) { if (side === 0) sfx('deny'); return false; }
-  st.gold -= def.cost; st.queue.push({ type, t: def.time });
+  st.gold -= def.cost; st.queue.push({ type, t: def.time, c: cityOk(side, c) });
   if (side === 0) { sfx('select'); track('unit_queued', { type }); refreshPanel(); }
   return true;
 }
@@ -40,21 +42,21 @@ export const heroesOf = side => units.filter(u => u.side === side && u.type === 
 export const heroCount = side => heroesOf(side).length + sideState[side].heroQ.length;   // vivos + en camino + esperando a volver tras caer
 // el héroe "activo": para ti, el seleccionado (o el primero); para la IA, el primero
 export function heroOf(side) { if (side === 0) { const hs = [...sel].find(u => u.type === 'hero' && u.side === 0 && !u.dead); if (hs) return hs; } return units.find(u => u.side === side && u.type === 'hero'); }
-export function summonHero(side) {
+export function summonHero(side, c) {
   const st = sideState[side];
   if (state !== 'play' || heroCount(side) >= GAME.maxHeroes || st.gold < UNITS.hero.cost) { if (side === 0) sfx('deny'); return false; }
-  st.gold -= UNITS.hero.cost; st.heroQ.push({ state: 'training', t: UNITS.hero.time });
+  st.gold -= UNITS.hero.cost; st.heroQ.push({ state: 'training', t: UNITS.hero.time, c: cityOk(side, c) });
   if (side === 0) { sfx('select'); track('hero_summon'); refreshPanel(); }
   return true;
 }
 // ---------- Templo: ritual y dios ----------
 // un dios por bando: el que camina o el que se está invocando
 export const hasGod = side => !!sideState[side].godQ || units.some(u => u.side === side && u.type === 'god');
-export function startRitual(side) {
+export function startRitual(side, c) {
   const st = sideState[side];
   if (state !== 'play' || st.ritual.state !== 'none' || st.gold < GAME.ritualCost) { if (side === 0) sfx('deny'); return false; }
-  st.gold -= GAME.ritualCost; st.ritual = { state: 'ritual', t: GAME.ritualTime };
-  burst(spotPos(spots[TEMP0 + side], 1), [0xffe9a0, 0xffffff], 20, 2.5, 6, 1, .24);
+  st.gold -= GAME.ritualCost; c = cityOk(side, c); st.ritual = { state: 'ritual', t: GAME.ritualTime, c };
+  burst(spotPos(spots[TEMP0 + c], 1), [0xffe9a0, 0xffffff], 20, 2.5, 6, 1, .24);
   if (side === 0) { sfx('hero'); toast('EL RITUAL HA COMENZADO EN EL TEMPLO', 'good', spots[TEMP0]); track('ritual_start'); refreshPanel(); }
   else toast('EL RIVAL HA COMENZADO UN RITUAL EN SU TEMPLO', 'bad');
   return true;
@@ -62,19 +64,19 @@ export function startRitual(side) {
 export function summonGod(side) {
   const st = sideState[side];
   if (state !== 'play' || st.ritual.state !== 'done' || hasGod(side) || st.gold < UNITS.god.cost || popOf(side) >= capOf(side)) { if (side === 0) sfx('deny'); return false; }
-  st.gold -= UNITS.god.cost; st.godQ = { t: UNITS.god.time };
+  st.gold -= UNITS.god.cost; st.godQ = { t: UNITS.god.time, c: st.ritual.c };
   if (side === 0) { sfx('select'); track('god_summon'); refreshPanel(); }
   return true;
 }
 function updateTemple(side, dt) {
-  const st = sideState[side], r = st.ritual, tp = spots[TEMP0 + side];
+  const st = sideState[side], r = st.ritual, tp = spots[TEMP0 + cityOk(side, r.c)];
   if (r.state === 'ritual' && (r.t -= dt) <= 0) {
     r.state = 'done'; burst(spotPos(tp, 2), [0xffe9a0, 0xffffff, TEAM[side].c], 40, 4, 8, 1.6, .3); ping(spotPos(tp), '#e8c870');
     toast(side === 0 ? `¡TEMPLO CONSAGRADO! YA PUEDES INVOCAR A ${uname(0, 'god')}` : 'EL TEMPLO RIVAL ESTÁ CONSAGRADO', side === 0 ? 'good' : 'bad', side === 0 ? tp : null); sfx('win', side);
     if (side === 0) refreshPanel();
   }
   if (st.godQ && (st.godQ.t -= dt) <= 0) {
-    st.godQ = null; const u = spawnUnit(side, 'god', TEMP0); u.bounty = GAME.godBounty;
+    const gc = cityOk(side, st.godQ.c); st.godQ = null; const u = spawnUnit(side, 'god', TEMP0, gc); u.bounty = GAME.godBounty;
     burst(u.pos, [0xffe9a0, 0xffffff, TEAM[side].c], 40, 4, 9, 1.4, .3); ping(u.pos, '#e8c870');
     toast(side === 0 ? `¡${uname(0, 'god')} HA DESCENDIDO!` : `¡EL RIVAL HA INVOCADO A ${uname(1, 'god')}!`, side === 0 ? 'good' : 'bad', u.pos); sfx('hero', side);
     if (side === 0) refreshPanel();
@@ -88,8 +90,8 @@ function updateProduction(dt) {
     if (q.length) {
       q[0].t -= dt;
       if (q[0].t <= 0) {
-        const it = q.shift(), u = spawnUnit(side, it.type);
-        if (side === 0) { sfx('ready'); floatText(spotPos(spots[BARR0], 4.5), uname(0, it.type) + ' LISTO', '#8ad8f0', 9); refreshPanel(); }
+        const it = q.shift(), c = cityOk(side, it.c), u = spawnUnit(side, it.type, BARR0, c);
+        if (side === 0) { sfx('ready'); floatText(spotPos(spots[BARR0 + c], 4.5), uname(0, it.type) + ' LISTO', '#8ad8f0', 9); refreshPanel(); }
         burst(u.pos, [0xffffff, TEAM[side].l], 6, 1.5, 2, .4, .16);
       }
     }
@@ -98,7 +100,7 @@ function updateProduction(dt) {
       if (h.t <= 0) {
         st.heroQ.splice(i, 1);
         if (h.state === 'training') {
-          const u = spawnUnit(side, 'hero', ALT0);
+          const u = spawnUnit(side, 'hero', ALT0, cityOk(side, h.c));
           burst(u.pos, [0xffd23f, 0xffffff, TEAM[side].c], 24, 3, 6, 1, .26); ping(u.pos, '#e8c870');
           toast(side === 0 ? '¡TU HÉROE HA LLEGADO!' : 'EL RIVAL TIENE UN HÉROE', side === 0 ? 'good' : 'bad', side === 0 ? u.pos : null); sfx('hero', side);
         }
@@ -120,7 +122,7 @@ function clearWorld() {
 }
 // keepCivs: conserva las civilizaciones de la partida actual (reiniciar el mismo mapa)
 // consejos de la pantalla de carga: la regla de la geografía elegida o uno general
-const TIPS = ['Las tropas suben de rango al matar y se curan en tus regiones.', 'E activa el ataque-mover: avanzan peleando con lo que encuentren.', 'Asigna tropas a un héroe: forman delante de él y cargan juntos.',
+const TIPS = ['Las tropas suben de rango al matar y se curan en tus regiones.', 'A activa el ataque-mover: avanzan peleando con lo que encuentren.', 'Asigna tropas a un héroe: forman delante de él y cargan juntos.',
   'Los pueblos fortificados dan más oro, pero tienen veinte defensores.', 'La ciudadela da colosos: lentos, muy duros y cuerpo a cuerpo.', 'Desde la atalaya se ve muy lejos y su torre dispara más lejos.',
   'Cuantos más pueblos tienes, menos rinde cada uno: mejóralos.', 'Con el cuartel seleccionado, el clic derecho fija dónde salen las tropas.', 'El arco vence a la espada, la espada al jinete y el jinete al arco.',
   'El código de mapa (en la pausa) repite o comparte este mismo mapa.', 'Con varios rivales, todos luchan contra todos: deja que se desgasten.'];
@@ -137,8 +139,7 @@ function buildGame(s, keepCivs) {
     if (!keepCivs) { const sz = MAP_SIZES[S.mapSize] ? S.mapSize : 'n'; setPlayers(Math.max(2, Math.min(S.players || 2, MAX_PLAYERS[sz]))); }   // jugadores (según el tamaño del mapa)
     if (!keepCivs) resolveCivs(true);
     generate(s); resetFog(false); UGRID.resize();
-    const B = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, temple: buildTemple, town: buildTown };
-    for (const sp of spots) B[sp.kind](sp);
+    for (const sp of spots) BUILD[sp.kind](sp);
     for (const f of forts) buildWalls(f);
     setupRules(); setupAmbient();
     spawnGuards(); makeThumbs();
@@ -146,7 +147,7 @@ function buildGame(s, keepCivs) {
     fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 4.4 : sp.kind === 'town' ? 2.6 : 3.2));
     sideState.length = 0; for (const sd of players()) sideState.push({ gold: GAME.startGold, queue: [], heroQ: [], ritual: { state: 'none', t: 0 }, godQ: null, dead: false });
     sideState[0].ai = S.aiPlayer ? makeAI(0, S.aiPlayer.diff, S.aiPlayer.brain) : null; for (let sd = 1; sd < NP; sd++) sideState[sd].ai = makeAI(sd, S.diff, S.aiRival);   // el bando 0 lo juega la IA solo en pruebas
-    elapsed = 0; resetEvents(); S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
+    elapsed = 0; lastFallen = null; S.city = null; resetEvents(); S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
     focusOn(spots[BASE0].x, spots[BASE0].z, true);
     $('mt').textContent = GAME.towns; $('cap').textContent = capOf(0);
     updateCtx(); syncDiff();
@@ -169,10 +170,12 @@ export function endGame(win, surrender = false) {
   sfx(win ? 'win' : 'lost'); track('game_end', { win, surrender, seconds: Math.round(elapsed), diff: S.diff });
 }
 export const miniPings = [];
-export function toast(msg, kind = '', pos = null) {   // avisos en columna, arriba a la derecha; con posición se pueden pulsar para ir allí
-  const f = $('feed'), d = document.createElement('div'); d.textContent = msg; d.className = kind; f.prepend(d);
-  if (pos) { const p = { x: pos.x, z: pos.z }; d.classList.add('go'); d.title = 'Ir allí'; d.addEventListener('pointerdown', () => focusOn(p.x, p.z)); miniPings.push({ x: p.x, z: p.z, t: 0, c: kind === 'bad' ? '#d83a4a' : kind === 'good' ? '#e8c870' : '#f4f4e8' }); }
-  while (f.children.length > 4) f.lastChild.remove(); setTimeout(() => d.remove(), 4500);
+export function toast() {}   // sin avisos de texto en pantalla (la única excepción es el cartel de ciudad conquistada)
+// cartel grande en el centro: solo cuando se conquista una ciudad
+let bannerT = 0;
+export function banner(title, sub, col) {
+  const b = $('banner'); b.innerHTML = `<b style="color:${col}">${title}</b><span>${sub}</span>`; b.hidden = false;
+  clearTimeout(bannerT); bannerT = setTimeout(() => { b.hidden = true; }, 3200);
 }
 export const TOWN_LV = { cost: [0, 120, 220], inc: [1, 1.5, 2] };
 // pueblos que no dan oro: campamento, ciudadela y atalaya (dan tropas o defensa)
@@ -228,10 +231,11 @@ function castleDefense(dt) {
     for (const sh of f.shooters) {
       if ((sh.cd -= dt) > 0) continue;
       let best = null, bd = GAME.wallRange;
-      for (const u of UGRID.near(sh.x, sh.z, bd, _nearWall)) if (u.side !== f.side) { const d = Math.hypot(u.pos.x - sh.x, u.pos.z - sh.z); if (d < bd) { bd = d; best = u; } }
+      const own = spots[f.side].side;   // las murallas disparan para quien tenga la ciudad
+      for (const u of UGRID.near(sh.x, sh.z, bd, _nearWall)) if (u.side !== own) { const d = Math.hypot(u.pos.x - sh.x, u.pos.z - sh.z); if (d < bd) { bd = d; best = u; } }
       if (!best) { sh.cd = .35; continue; }
       sh.cd = GAME.wallCd; const from = new THREE.Vector3(sh.x, Math.round(f.h) + 2.2, sh.z);
-      shoot(from, best.pos, 0); damage({ side: f.side, vis: seenAt(from), def: {} }, best, GAME.wallDmg);
+      shoot(from, best.pos, 0); damage({ side: own, vis: seenAt(from), def: {} }, best, GAME.wallDmg);
     }
   }
 }
@@ -278,15 +282,33 @@ export function updateGame(dt) {
     if (a.t >= 1) { dropBox(a.m); arrows.splice(i, 1); }
   }
   alarm.cool -= dt;
-  if (spots[BASE0].hp <= 0) { endGame(false); return; }
-  for (let sd = 1; sd < NP; sd++) if (!sideState[sd].dead && spots[sd].hp <= 0) eliminate(sd);
+  for (let c = 0; c < NP; c++) if (spots[c].hp <= 0) conquer(c);
+  for (const sd of players()) if (!sideState[sd].dead && !citiesOf(sd).length) eliminate(sd);
+  if (sideState[0].dead) { endGame(false); return; }
   if (players().every(sd => sd === 0 || sideState[sd].dead)) endGame(true);
 }
-// un rival cuya fortaleza cae queda fuera: sus tropas se rinden (desaparecen) y sus pueblos vuelven a ser neutrales
+// ciudad conquistada: la fortaleza, el cuartel, el salón de héroes, el templo y las murallas pasan a quien la tomó (conservan su civilización:
+// desde ella se reclutan sus tropas). El oro es uno solo por bando. Quien se queda sin ciudades queda fuera
+const BUILD = { base: buildCastle, barracks: buildBarracks, altar: buildAltar, temple: buildTemple, town: buildTown };
+function conquer(c) {
+  const b = spots[c], old = b.side, by = b.lastBy;
+  if (by == null || by === old || by >= NP || sideState[by]?.dead) { b.hp = 1; return; }   // solo la conquista un jugador
+  lastFallen = b;
+  for (let k = 0; k < 3; k++) burst(spotPos(b, 2 + k * 2), [0xd4cde2, TEAM[old].c, 0xffa03a, 0x3a2a4a], 14, 6, 6, 1.4, .45);
+  for (const s of [b, spots[BARR0 + c], spots[ALT0 + c], spots[TEMP0 + c]]) {
+    s.side = by; world.remove(s.group); world.remove(s.shadow); const i = decos.indexOf(s.shadow); if (i >= 0) decos.splice(i, 1); BUILD[s.kind](s);
+  }
+  b.hp = GAME.baseHp * .5; b.lastBy = null;
+  for (const k of ['barracks', 'altar', 'temple']) { const f = S.rallyFlag[k + c]; if (f) { world.remove(f); delete S.rallyFlag[k + c]; delete S.rally[k + c]; } }
+  if (S.city === c && by !== 0) { S.city = null; if (S.selBld) S.selBld = null; }
+  if (NP > 2 && players().filter(sd => citiesOf(sd).length).length > 1) banner(`¡${civOf(c).name} HA SIDO CONQUISTADA!`, `AHORA ES DE ${by === 0 ? 'TU IMPERIO' : civOf(by).name}`, TEAM[by].css);
+  sfx(by === 0 ? 'win' : old === 0 ? 'lost' : 'capture'); updateCtx();
+}
+// un rival que se queda sin ciudades queda fuera: sus tropas se rinden (desaparecen) y sus pueblos vuelven a ser neutrales
 let lastFallen = null;
 export const alivePlayers = () => players().filter(sd => !sideState[sd]?.dead);
 function eliminate(sd) {
-  const st = sideState[sd]; st.dead = true; st.ai = null; st.queue = []; st.heroQ = []; st.godQ = null; lastFallen = spots[sd];
+  const st = sideState[sd]; st.dead = true; st.ai = null; st.queue = []; st.heroQ = []; st.godQ = null;
   for (let k = 0; k < 3; k++) burst(spotPos(spots[sd], 2 + k * 2), [0xd4cde2, TEAM[sd].c, 0xffa03a, 0x3a2a4a], 14, 6, 6, 1.4, .45);
   for (const u of [...units]) if (u.side === sd && !u.dead) { u.hp = 0; kill(u, { side: NEU, vis: false, def: {} }); }
   for (const s of spots) if (s.kind === 'town' && s.owner === sd) setOwner(s, -1);

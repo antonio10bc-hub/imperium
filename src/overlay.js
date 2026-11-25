@@ -5,7 +5,8 @@ import { ALT0, BARR0, BASE1, CFG, GAME, RANKS, TEAM, TEMP0, UNITS } from './conf
 import { uname } from './civs.js';
 import { exploredAt, visibleAt } from './fog.js';
 import { state } from './game.js';
-import { RALLY_BLD, drag, groundAt, mouse, pickEnemy, pickSpot, pickUnit, project } from './input.js';
+import { RALLY_BLD, drag, groundAt, mouse, pickEnemy, pickSpot, pickTreasure, pickUnit, project } from './input.js';
+import { curCity } from './hud.js';
 import { GEOT, cellOf, spots, surfY } from './map.js';
 import { camera, canvas, gl, target } from './render.js';
 import { $, S } from './state.js';
@@ -89,14 +90,26 @@ function orderLines() {
     if (!scr(u.pos.x, u.pos.y + .3, u.pos.z, LA) || !scr(x, surfY(x, z) + .1, z, LB)) continue;
     dashLine(LA.x, LA.y, LB.x, LB.y, c); ends.set(Math.round(LB.x / 4) + ',' + Math.round(LB.y / 4), [LB.x, LB.y, c]);
   }
-  const rb = { barracks: BARR0, altar: ALT0, temple: TEMP0 }[S.selBld], rp = S.rally[S.selBld];
-  if (rb != null && rp) { const b = spots[rb], c = RALLY_BLD[S.selBld]; if (scr(b.x, b.y + .5, b.z, LA) && scr(rp.x, surfY(rp.x, rp.z) + .1, rp.z, LB)) { dashLine(LA.x, LA.y, LB.x, LB.y, c); ends.set('rally', [LB.x, LB.y, c]); } }
+  const rb = { barracks: BARR0, altar: ALT0, temple: TEMP0 }[S.selBld], rp = S.rally[S.selBld + curCity()];
+  if (rb != null && rp) { const b = spots[rb + curCity()], c = RALLY_BLD[S.selBld]; if (scr(b.x, b.y + .5, b.z, LA) && scr(rp.x, surfY(rp.x, rp.z) + .1, rp.z, LB)) { dashLine(LA.x, LA.y, LB.x, LB.y, c); ends.set('rally', [LB.x, LB.y, c]); } }
   octx.globalAlpha = 1;
   for (const [x, y, c] of ends.values()) { octx.fillStyle = '#0f0f1b'; octx.fillRect(x - 4, y - 4, 8, 8); octx.fillStyle = c; octx.fillRect(x - 2.5, y - 2.5, 5, 5); }   // marca en cada destino
+}
+// vados o bajíos cortados (crecida o marea alta): una X pequeña y discreta sobre cada paso; parpadea mientras el agua sube
+const _g = new THREE.Vector3(), _gp = {};
+function drawGateMarks() {
+  const c = R.cycle, g = R.gates[0]; if (state !== 'play' || !c || !g?.marks || c.phase === 'open') return;
+  const a = c.phase === 'warn' ? .35 + .35 * Math.sin(performance.now() / 160) : .75;
+  octx.globalAlpha = a; octx.lineWidth = 2;
+  for (const m of g.marks) { if (!exploredAt(m.x, m.z)) continue; const q = project(_g.set(m.x, surfY(m.x, m.z) + .6, m.z), _gp); if (!q.vis) continue;
+    octx.strokeStyle = '#0f0f1b'; octx.lineWidth = 4; octx.beginPath(); octx.moveTo(q.x - 5, q.y - 5); octx.lineTo(q.x + 5, q.y + 5); octx.moveTo(q.x + 5, q.y - 5); octx.lineTo(q.x - 5, q.y + 5); octx.stroke();
+    octx.strokeStyle = '#e86a5a'; octx.lineWidth = 2; octx.stroke(); }
+  octx.globalAlpha = 1; octx.lineWidth = 1;
 }
 export function drawOverlay(dt) {
   octx.clearRect(0, 0, S.VW, S.VH);
   drawWeather(octx, S.VW, S.VH, dt);
+  drawGateMarks();
   if (state === 'play') { const rt = ruleTimer(); if (rt) label(S.VW / 2, 62, rt, '#0f0f1b', rt.startsWith('¡') ? '#ff9a6a' : '#e8c870', 9); }   // contador de mareas, crecidas o volcán
   const showUI = state !== 'menu';
   for (const s of spots) {
@@ -114,15 +127,15 @@ export function drawOverlay(dt) {
       if (seenT && own < 0 && (s.prog[0] > 0 || s.prog[1] > 0)) { const sd = s.prog[0] >= s.prog[1] ? 0 : 1; bar(top.x, top.y + 6, 50, 5, s.prog[sd], TEAM[sd].css); }
       if (seenT && own >= 0 && s.lose > 0) bar(top.x, top.y + 6, 50, 5, 1 - s.lose, TEAM[own].css);
     } else {
-      const q = s.kind === 'barracks' ? sideState[s.side].queue[0] : null, h = s.kind === 'altar' ? sideState[s.side].heroQ.find(e => e.state === 'training') : null;
+      const st = sideState[s.side], mine = e => e && (e.c ?? s.side) === s.civ, q = s.kind === 'barracks' && mine(st.queue[0]) ? st.queue[0] : null, h = s.kind === 'altar' ? st.heroQ.find(e => e.state === 'training' && mine(e)) : null;
       if (s.side === 0 && state === 'play') {   // tus edificios con acciones: reclutar tropas y el héroe
         const ic = project(spotPos(s, s.kind === 'barracks' ? 4.6 : 5.2), tmpQ);
-        actionIcon(ic.x, ic.y - 6, s.kind === 'barracks' ? 'sword' : s.kind === 'temple' ? 'god' : 'hero', S.selBld === s.kind ? '#f4f4e8' : '#e8c870');
+        actionIcon(ic.x, ic.y - 6, s.kind === 'barracks' ? 'sword' : s.kind === 'temple' ? 'god' : 'hero', S.selBld === s.kind && s.civ === curCity() ? '#f4f4e8' : '#e8c870');
       }
-      if (s.side === 0 && S.selBld === s.kind) continue;
+      if (s.side === 0 && S.selBld === s.kind && s.civ === curCity()) continue;
       if (s.side === 0 && q) bar(top.x, top.y + 6, 44, 4, 1 - q.t / UNITS[q.type].time, '#e8c870');
       if (s.side === 0 && h?.state === 'training') bar(top.x, top.y + 6, 44, 4, 1 - h.t / UNITS.hero.time, '#e8c870');
-      if (s.kind === 'temple' && s.side === 0) { const st = sideState[0]; if (st.ritual?.state === 'ritual') bar(top.x, top.y + 6, 44, 4, 1 - st.ritual.t / GAME.ritualTime, '#ffe9a0'); else if (st.godQ) bar(top.x, top.y + 6, 44, 4, 1 - st.godQ.t / UNITS.god.time, '#ffe9a0'); }
+      if (s.kind === 'temple' && s.side === 0 && (st.ritual?.c ?? 0) === s.civ) { if (st.ritual?.state === 'ritual') bar(top.x, top.y + 6, 44, 4, 1 - st.ritual.t / GAME.ritualTime, '#ffe9a0'); else if (st.godQ) bar(top.x, top.y + 6, 44, 4, 1 - st.godQ.t / UNITS.god.time, '#ffe9a0'); }
     }
   }
   for (const b of R.bridges) {   // puentes: sitio para construir (icono) o puente en pie
@@ -141,7 +154,7 @@ export function drawOverlay(dt) {
     if (hero || sel.has(u) || u.hp < u.maxHp) {
       const k = u.hp / u.maxHp;
       bar(t.x, t.y, hero ? 40 : 20, hero ? 4 : 3, k, k > .5 ? '#9ad86a' : k > .25 ? '#e8c870' : '#d83a4a');
-      if (god) label(t.x, t.y - 4, uname(u.side, 'god'), '#ffe9a0', '#0f0f1b', 7);
+      if (god) label(t.x, t.y - 4, uname(u.civ ?? u.side, 'god'), '#ffe9a0', '#0f0f1b', 7);
       else if (hero) label(t.x, t.y - 4, u.chargeT > 0 ? '¡CARGA!' : 'HÉROE', u.chargeT > 0 ? '#e8c870' : TEAM[u.side].css, u.chargeT > 0 ? '#0f0f1b' : '#fff', 7);
     }
     let px = t.x - (hero ? 26 : 16);
@@ -185,6 +198,7 @@ const CUR = {
   rally: makeCursor(['2........', '2333.....', '233333...', '2333333..', '23333....', '2........', '2........', '2........', '2........', '22.......'], { 2: '#8a5a34', 3: '#3a6ad8' }, 0, 9, 'pointer'),
   assign: makeCursor(['1..1..1', '11.1.11', '1111111', '1111111', '2222222'], { 1: '#e8c870', 2: '#c07a40' }, 3, 2, 'pointer'),
   chop: makeCursor(['....3333...', '...331333..', '...3333332.', '....33.22..', '......22...', '.....22....', '....22.....', '...22......', '..22.......', '.22........', '22.........'], { 1: '#f4f4e8', 2: '#8a5a34', 3: '#c8ccd8' }, 6, 2, 'pointer'),   // hacha: talar el bosque
+  loot: makeCursor(['..1111..', '.122221.', '12233221', '11111111', '13344331', '13344331', '13333331', '11111111'], { 1: '#5a3418', 2: '#8a5a34', 3: '#7a4a24', 4: '#ffd23f' }, 4, 4, 'pointer'),   // cofre: recoger el tesoro
   move: makeCursor(['1.......', '11......', '121.....', '1221....', '12221...', '122221..', '1222111.', '121.....', '11......'], { 1: '#f4f4e8', 2: '#9ad86a' }, 0, 0, 'default'),
 };
 function hoverCursor() {
@@ -192,6 +206,7 @@ function hoverCursor() {
   if (S.amode && has) return CUR.attack;
   if (S.selBld in RALLY_BLD) { const sp = pickSpot(x, y); return sp ? 'pointer' : CUR.rally; }
   if (has && pickEnemy(x, y)) return CUR.attack;
+  if (pickTreasure(x, y)) return has ? CUR.loot : 'pointer';   // cofre: ir a por él
   const own = pickUnit(x, y, 0);
   if (own) return has && own.type === 'hero' && [...sel].some(u => u !== own && u.type !== 'hero') ? CUR.assign : 'pointer';
   const sp = pickSpot(x, y);
