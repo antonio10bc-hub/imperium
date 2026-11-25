@@ -9,7 +9,7 @@ import { chromium } from 'playwright-core';
 import fs from 'fs';
 import path from 'path';
 const arg = (k, d) => process.argv.find(a => a.startsWith(`--${k}=`))?.split('=')[1] ?? d;
-const ROUNDS = +arg('rounds', 2), WORKERS = +arg('workers', 3), MIN = +arg('min', 25), ONLY = arg('only', 'civs,diff,pers').split(',');
+const ROUNDS = +arg('rounds', 2), WORKERS = +arg('workers', 3), MIN = +arg('min', 25), ONLY = arg('only', 'civs,diff,pers').split(','), FOCUS = arg('civs', '').split(',').filter(Boolean), OUT = arg('out', 'docs/balance.md');   // --civs: solo las parejas con alguna de estas civilizaciones · --out: dónde va el informe
 const CHROME = process.env.CHROME || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'google-chrome');
 const THREE = process.env.THREE ? fs.readFileSync(process.env.THREE) : null;
 const url = 'file://' + path.resolve(process.env.GAME || 'dist/imperium.html');   // GAME: otra copia del juego (para seguir compilando mientras corre)
@@ -21,6 +21,7 @@ let rs = 12345; const rnd = () => (rs = (rs * 16807) % 2147483647) / 2147483647;
 // lista de partidas: cada una con su mapa (geografía + semilla), civilizaciones, dificultad y personalidad de cada lado
 const jobs = [];
 if (ONLY.includes('civs')) for (let r = 0; r < ROUNDS; r++) for (let a = 0; a < CIVS.length; a++) for (let b = a + 1; b < CIVS.length; b++) {
+  if (FOCUS.length && !FOCUS.includes(CIVS[a]) && !FOCUS.includes(CIVS[b])) continue;
   const geo = GEOS[(a * 3 + b * 5 + r * 7) % GEOS.length], seed = 1 + (rnd() * 99999 | 0), pers = PERS[(a + b + r) % PERS.length];
   for (const [c0, c1] of [[CIVS[a], CIVS[b]], [CIVS[b], CIVS[a]]]) jobs.push({ set: 'civs', geo, seed, civs: [c0, c1], diff: ['hard', 'hard'], pers: [pers, pers] });
 }
@@ -100,5 +101,5 @@ if (pG.length) {
   for (const p of PERS) { const g = pG.filter(r => r.pers.includes(p) && r.pers[0] !== r.pers[1]), w = g.filter(r => r.winner >= 0 && r.pers[r.winner] === p).length; md += `| ${p} | ${g.length} | ${w} | ${pct(w, g.length)} | ${avg(g.map(r => r.min)).toFixed(1)} |\n`; }
 }
 const errs = results.filter(r => r.pageErrors?.length || r.errors).length; md += `\n---\nPartidas con errores en la página: ${errs}.\n`;
-fs.mkdirSync('docs', { recursive: true }); fs.writeFileSync('docs/balance.md', md);
-console.log(`listo: ${results.length} partidas en ${Math.round((Date.now() - t0) / 60000)} min · docs/balance.md`);
+fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, md);
+console.log(`listo: ${results.length} partidas en ${Math.round((Date.now() - t0) / 60000)} min · ${OUT}`);
