@@ -4,12 +4,12 @@ import { sfx } from './audio.js';
 import { orderMove } from './behavior.js';
 import { spotPos } from './buildings.js';
 import { alarm, assign, unassign } from './combat.js';
-import { ALT0, BARR0, BASE0, GAME, MD, MW, SIEGE, TEMP0, TYPES } from './config.js';
+import { GAME, MD, MW, SIEGE, TYPES } from './config.js';
 import { ping } from './effects.js';
 import { exploredAt, toggleFog } from './fog.js';
 import { enqueue, heroesOf, newGame, startGame, state, toast } from './game.js';
-import { closeMenu, openMenu, pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
-import { GEOT, HM, cellOf, spots, surfY } from './map.js';
+import { closeMenu, curCity, cycleBuilding, openMenu, pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
+import { GEOT, HM, cellOf, homeOf, spots, surfY } from './map.js';
 import { seed } from './noise.js';
 import { camera, canvas, part, world } from './render.js';
 import { $, S, track } from './state.js';
@@ -28,7 +28,17 @@ export function pickUnit(x, y, side) {
   for (const u of units) if (u.side === side && u.vis) { const d = Math.hypot(u.sx - x, u.sy - y) * (u.type === 'hero' ? .6 : 1); if (d < bd) { bd = d; best = u; } }
   return best;
 }
-export const pickEnemy = (x, y) => pickUnit(x, y, 1) || pickUnit(x, y, 2);
+export function pickEnemy(x, y) {   // cualquier tropa que no sea tuya: rivales, guardianes, bandidos y caravanas
+  let best = null, bd = 22;
+  for (const u of units) if (u.side !== 0 && u.vis) { const d = Math.hypot(u.sx - x, u.sy - y) * (u.type === 'hero' ? .6 : 1); if (d < bd) { bd = d; best = u; } }
+  return best;
+}
+// cofre del tesoro bajo el cursor (solo los que se ven)
+const _t = new THREE.Vector3(), _tp = {};
+export function pickTreasure(x, y) {
+  for (const t of R.treasures || []) if (!t.taken && t.g.visible) { project(_t.set(t.x, t.y + .5, t.z), _tp); if (_tp.vis && Math.hypot(_tp.x - x, _tp.y - y) < 20) return t; }
+  return null;
+}
 export function pickSpot(x, y) {
   let best = null, bd = 1e9;
   for (const s of [...spots, ...R.bridges]) if (s.vis) { const d = Math.hypot(s.sx - x, s.sy - y); if (d < s.pr && d < bd) { bd = d; best = s; } }
@@ -46,15 +56,15 @@ export function groundAt(x, y, loose) {
 // punto de reunión de cada edificio que produce (cuartel, salón de héroes y templo); su banderín lleva el color del icono del edificio
 export const RALLY_BLD = { barracks: '#8ad8f0', altar: '#e8c870', temple: '#f4f4e8' };
 function setRally(g) {
-  const k = S.selBld; S.rally[k] = g;
-  let f = S.rallyFlag[k];
-  if (!f) { f = S.rallyFlag[k] = new THREE.Group(); part(f, .1, 2, .1, 0x8a5a34, 0, 1, 0); part(f, .8, .5, .08, 0x2f7bff, .45, 1.7, 0); part(f, .3, .3, .1, parseInt(RALLY_BLD[k].slice(1), 16), .45, 1.7, .06, false); world.add(f); }
+  const k = S.selBld, key = k + curCity(); S.rally[key] = g;   // un punto de reunión por edificio y ciudad
+  let f = S.rallyFlag[key];
+  if (!f) { f = S.rallyFlag[key] = new THREE.Group(); part(f, .1, 2, .1, 0x8a5a34, 0, 1, 0); part(f, .8, .5, .08, 0x2f7bff, .45, 1.7, 0); part(f, .3, .3, .1, parseInt(RALLY_BLD[k].slice(1), 16), .45, 1.7, .06, false); world.add(f); }
   f.position.set(g.x, surfY(g.x, g.z), g.z);
   ping(f.position, '#3a6ad8'); sfx('cmd'); toast(`PUNTO DE REUNIÓN ${{ barracks: 'DEL CUARTEL', altar: 'DE LOS HÉROES', temple: 'DEL DIOS' }[k]} FIJADO`);
 }
 // orden sobre la fortaleza rival (asalto), un pueblo ajeno (conquista) o un punto del suelo (mover); la usan el mapa y el minimapa
 function orderTo(list, sp, g, attack) {
-  if (sp && sp.kind === 'base' && sp.side !== 0) { const tgt = spots[sp.side]; for (const u of list) u.order = { type: 'siege', s: tgt }; ping(spotPos(tgt), '#d83a4a'); sfx('cmd'); toast('¡AL ASALTO DE LA FORTALEZA!'); track('order', { type: 'siege' }); return; }
+  if (sp && sp.kind === 'base' && sp.side !== 0) { const tgt = sp; for (const u of list) u.order = { type: 'siege', s: tgt }; ping(spotPos(tgt), '#d83a4a'); sfx('cmd'); toast('¡AL ASALTO DE LA FORTALEZA!'); track('order', { type: 'siege' }); return; }
   if (sp && sp.kind === 'bridge' && sp.built) { for (const u of list) u.order = { type: 'demolish', b: sp }; ping(new THREE.Vector3(sp.x, sp.hb, sp.z), '#d83a4a'); sfx('cmd'); toast('¡A DERRIBAR EL PUENTE!'); return; }   // derribar un puente
   if (sp && sp.kind === 'town' && sp.owner !== 0) { const k = spots.indexOf(sp); for (const u of list) u.order = { type: 'capture', k }; ping(spotPos(sp), '#e8c870'); sfx('cmd'); track('order', { type: 'capture' }); return; }
   orderMove(list, g.x, g.z, true, attack); sfx('cmd'); track('order', { type: attack ? 'amove' : 'move' });
@@ -127,7 +137,7 @@ export function commandAt(x, z, attack = false) {
   if (S.selBld in RALLY_BLD) { setRally({ x, z }); return true; }
   if (!sel.size) return false;
   const list = commandList(); for (const u of list) unassign(u);
-  const sp = spots.find(s => (s.kind === 'town' || (s.kind === 'base' && s.side === 1)) && exploredAt(s.x, s.z) && Math.hypot(s.x - x, s.z - z) < (s.kind === 'base' ? 13 : 7));
+  const sp = spots.find(s => (s.kind === 'town' || (s.kind === 'base' && s.side !== 0)) && exploredAt(s.x, s.z) && Math.hypot(s.x - x, s.z - z) < (s.kind === 'base' ? 13 : 7));
   orderTo(list, sp, sp ? { x: sp.x, z: sp.z } : { x, z }, attack); return true;
 }
 // ---------- Cámara ----------
@@ -152,7 +162,7 @@ export function rayPlane(sx, sy, y) {
 export const keys = new Set();
 export function heroButton() {   // G: va pasando por tus héroes; sin héroes, al altar
   const hs = heroesOf(0), cur = hs.findIndex(u => sel.has(u)), h = hs.length ? hs[(cur + 1) % hs.length] : null;
-  if (h) { setSelection([h, ...h.escort], false); S.follow = h; S.focusGoal = null; } else { selectBuilding('altar'); focusOn(spots[ALT0].x, spots[ALT0].z); } }
+  if (h) { setSelection([h, ...h.escort], false); S.follow = h; S.focusGoal = null; } else cycleBuilding('altar'); }
 
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
 export function init() {
@@ -207,8 +217,8 @@ export function init() {
         else if (u) { if (d.shift && sel.has(u)) { sel.delete(u); updateCtx(); } else { setSelection([u], d.shift); if (!d.shift) { S.follow = u; S.focusGoal = null; } } }
         else {
           S.follow = null; const sp = pickSpot(e.clientX, e.clientY);
-          if (sp && sp.side === 0 && (sp.kind === 'barracks' || sp.kind === 'altar' || sp.kind === 'temple')) { selectBuilding(sp.kind); sfx('select'); }
-          else if (sp && sp.side === 0) { selectBuilding('barracks'); sfx('select'); }
+          if (sp && sp.side === 0 && (sp.kind === 'barracks' || sp.kind === 'altar' || sp.kind === 'temple')) { selectBuilding(sp.kind, sp.civ); sfx('select'); }
+          else if (sp && sp.side === 0 && sp.kind === 'base') { selectBuilding('barracks', sp.civ); sfx('select'); }
           else if (sp && (sp.kind === 'town' || sp.kind === 'base' || sp.kind === 'bridge')) { selectSpot(sp); sfx('select'); }
           else { S.selBld = null; setSelection([], d.shift); }
         }
@@ -230,23 +240,24 @@ export function init() {
     if (S.intro) { S.intro.t = S.intro.dur; keys.delete(k); return; }   // una tecla se salta la presentación
     if (S.menuOpen) { if (k === 'escape') closeMenu(); return; }   // con el menú abierto, el juego no recibe teclas
     if (/^f[1-5]$/.test(k)) { e.preventDefault(); pickGroup(+k[1] - 1); }
-    else if (k === '1' || k === '2' || k === '3') enqueue(0, TYPES[+k - 1]);
-    else if (k === '4' || k === '5') enqueue(0, SIEGE[+k - 4]);
-    else if (k === 'b') { selectBuilding('barracks'); focusOn(spots[BARR0].x, spots[BARR0].z); }
+    else if (k === '1' || k === '2' || k === '3') enqueue(0, TYPES[+k - 1], curCity());
+    else if (k === '4' || k === '5') enqueue(0, SIEGE[+k - 4], curCity());
+    else if (k === 'q') cycleBuilding('barracks');
+    else if (k === 'w') cycleBuilding('altar');
+    else if (k === 'e') cycleBuilding('temple');
     else if (k === 'g') heroButton();
-    else if (k === 't') { selectBuilding('temple'); focusOn(spots[TEMP0].x, spots[TEMP0].z); }
-    else if (k === 'h') { focusOn(spots[BASE0].x, spots[BASE0].z); selectSpot(spots[BASE0]); }   // tu fortaleza: muralla y puertas
+    else if (k === 'h') { const b = spots[homeOf(0)]; focusOn(b.x, b.z); selectSpot(b); }   // tu fortaleza: muralla y puertas
     else if (k === 'p') { S.paused = !S.paused; syncTools(); }
     else if (k === 'v') { S.speed = S.speed === 1 ? 2 : 1; syncTools(); }
     else if (k === ' ') { e.preventDefault(); if (alarm.pos) focusOn(alarm.pos.x, alarm.pos.z); }
     else if (k === 'n') toggleFog();
-    else if (k === 'e') { if (sel.size) { S.amode = !S.amode; sfx('select'); } }
     else if (k === 'escape') {   // por orden: cancela ataque-mover, quita la selección y, si no hay nada, abre el menú
       if (S.amode) S.amode = false;
       else if (sel.size || S.selBld || S.selSpot) { S.follow = null; setSelection([], false); }
       else openMenu();
     }
     else if (k === 'a' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setSelection(units.filter(u => u.side === 0), false); }
+    else if (k === 'a') { if (sel.size) { S.amode = !S.amode; sfx('select'); } }   // ataque-mover
   });
   addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
   addEventListener('blur', () => { keys.clear(); mouse.in = false; });

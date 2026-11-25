@@ -6,10 +6,9 @@ import { burst, floatText, ping, seenAt, takeBox } from './effects.js';
 import { elapsed, fields, toast } from './game.js';
 import { updateCtx } from './hud.js';
 import * as THREE from 'three';
-import { HM, gateList } from './map.js';
+import { HM, gateList, spots } from './map.js';
 import { bfs, nearestNode } from './nav.js';
 import { VCMAT, mat } from './render.js';
-import { $ } from './state.js';
 import { UGRID, _nearEn, alive, arrows, charging, followField, sel, setMax, sideState, spd, stepToward, unitGeo, units } from './units.js';
 import { geoDmg } from './rules.js';
 import { addMoment, statKill } from './stats.js';
@@ -20,8 +19,7 @@ export const corpses = [];
 export function raiseAlarm(loc, msg) {
   if (alarm.cool > 0) return;
   Object.assign(alarm, { t: 3, pos: loc.clone(), cool: 10 });
-  toast(msg + ' · ESPACIO', 'bad', loc); sfx('alarm');
-  const a = $('alarm'); a.classList.remove('on'); void a.offsetWidth; a.classList.add('on');
+  sfx('alarm');   // sin avisos en pantalla: ESPACIO lleva al último ataque
 }
 // tiñe la tropa del metal de su rango (variante de color de su plantilla) y le pone la cresta
 export function applyRank(u) {
@@ -84,7 +82,7 @@ export function kill(u, by) {
 }
 function hitBase(att, s) {
   const dmg = att.def.dmg * (att.def.bld || (RANGED(att.type) ? .6 : 1)) * (att.leader ? GAME.escortBonus : 1) * RANKS[att.rank].mul;
-  s.hp -= dmg; s.shake = .18;
+  s.hp -= dmg; s.shake = .18; s.lastBy = att.side;
   if (s.vis) floatText(spotPos(s, 7), '-' + Math.round(dmg), s.side === 0 ? '#d83a4a' : '#ffffff', 9);
   if (s.side === 0) raiseAlarm(spotPos(s), '¡TU CASTILLO ESTÁ BAJO ATAQUE!');
 }
@@ -98,8 +96,8 @@ export function bashGate(u, g, dt) {
   if (u.cd > 0) return; u.cd = u.def.cd;
   if (RANGED(u.type)) shoot(u.pos, new THREE.Vector3(g.x, HM[u.node] + 1, g.z), 1.1, u.type === 'catapult'); else u.lunge = 1;
   const dmg = u.def.dmg * (u.def.gate || (RANGED(u.type) ? .25 : .7)) * RANKS[u.rank].mul;
-  g.hp -= dmg; g.shake = .2; if (g.f.side === 0) raiseAlarm(new THREE.Vector3(g.x, 0, g.z), '¡ESTÁN DERRIBANDO UNA PUERTA!');
-  if (seenAt({ x: g.x, z: g.z })) { floatText(new THREE.Vector3(g.x, HM[u.node] + 3, g.z), '-' + Math.round(dmg), g.f.side === 0 ? '#d83a4a' : '#ffffff', 8); sfx('hit'); }
+  g.hp -= dmg; g.shake = .2; if (spots[g.f.side].side === 0) raiseAlarm(new THREE.Vector3(g.x, 0, g.z), '¡ESTÁN DERRIBANDO UNA PUERTA!');
+  if (seenAt({ x: g.x, z: g.z })) { floatText(new THREE.Vector3(g.x, HM[u.node] + 3, g.z), '-' + Math.round(dmg), spots[g.f.side].side === 0 ? '#d83a4a' : '#ffffff', 8); sfx('hit'); }
   if (g.hp <= 0) breakGate(g);
 }
 export function breakGate(g) {
@@ -108,7 +106,7 @@ export function breakGate(g) {
   toast(g.f.side === 0 ? '¡HAN DERRIBADO UNA PUERTA DE TU FORTALEZA!' : 'PUERTA ENEMIGA DERRIBADA', g.f.side === 0 ? 'bad' : 'good', p); addMoment(g.f.side === 0 ? 'DERRIBAN UNA PUERTA TUYA' : 'DERRIBAS UNA PUERTA');
 }
 export function repairGates(side) {
-  const st = sideState[side], broken = gateList.filter(g => g.f.side === side && g.hp < g.max);
+  const st = sideState[side], broken = gateList.filter(g => spots[g.f.side].side === side && g.hp < g.max);
   if (!broken.length || st.gold < GAME.gateRepair) { if (side === 0) sfx('deny'); return false; }
   st.gold -= GAME.gateRepair; for (const g of broken) { g.hp = g.max; for (const d of g.doors) d.visible = true; }
   if (side === 0) { sfx('capture'); toast('PUERTAS REPARADAS', 'good'); }
@@ -145,7 +143,7 @@ export function siege(u, s, dt) {
   if (d < 4.9 + u.def.range) {
     u.fwd.set(c.x - u.pos.x, 0, c.z - u.pos.z).normalize(); u.combatT = 2;
     if (u.cd <= 0) { u.cd = u.def.cd; if (RANGED(u.type)) shoot(u.pos, spotPos(s, 2), 1.1, u.type === 'catapult'); else u.lunge = 1; hitBase(u, s); }
-  } else followField(u, fields[s.side], dt);
+  } else followField(u, fields[s.civ ?? s.side], dt);
 }
 export function nearestEnemy(u, range) {
   let best = null, bd = range;

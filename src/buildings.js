@@ -7,10 +7,10 @@ import { burst, floatText, fxRand, ping, plume, seenAt } from './effects.js';
 import { visibleAt } from './fog.js';
 import { campSpawn, keepSpawn, toast, townIncNow } from './game.js';
 import { sideState, wallArcher } from './units.js';
-import { fortPt, forts, gateList, inGate, paintRegion, sideAt, spots, surfY, wallR } from './map.js';
+import { fortPt, gateList, inGate, paintRegion, sideAt, spots, surfY, wallR } from './map.js';
 import { hash } from './noise.js';
 import { BOX, bake, basic, discGeo, mat, part, ring, world } from './render.js';
-import { S, track } from './state.js';
+import { track } from './state.js';
 import { addMoment, statCapture } from './stats.js';
 
 // ---------- Edificios ----------
@@ -29,20 +29,20 @@ const camFace = (s, spread) => (hash(s.x | 0, 3, s.z | 0) - .5) * spread;
 const facing = (s, tx, tz) => Math.atan2(tx - s.x, tz - s.z);
 const local = (s, x, y, z) => s.group.localToWorld(new THREE.Vector3(x, y, z));
 export function buildCastle(s) {
-  const g = new THREE.Group(), f = forts[s.side];
-  civOf(s.side).castle(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c); bake(g);
+  const g = new THREE.Group(); s.civ ??= s.side;
+  civOf(s.civ).castle(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c); bake(g);
   placeSpot(s, g, camFace(s, .25)); s.hp = s.hp ?? GAME.baseHp;
 }
 export function buildBarracks(s) {
-  const g = new THREE.Group();
-  civOf(s.side).barracks(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c); bake(g);
-  s.sel = ring(g, 3, 3.3, 0xffe03a, .2); s.sel.visible = S.selBld === 'barracks' && s.side === 0;
+  const g = new THREE.Group(); s.civ ??= s.side;
+  civOf(s.civ).barracks(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c); bake(g);
+  s.sel = ring(g, 3, 3.3, 0xffe03a, .2); s.sel.visible = false;
   placeSpot(s, g, camFace(s, .4));
 }
 // salón de héroes: un cuartel especial (el cuartel de la civilización, con estandartes del bando y una corona dorada encima)
 export function buildAltar(s) {
-  const g = new THREE.Group(), inner = CIV.grp(g, 0, 0, 0, s.sc * .62), T = TEAM[s.side].c;
-  civOf(s.side).barracks(inner, T);
+  const g = new THREE.Group(), inner = CIV.grp(g, 0, 0, 0, s.sc * .62), T = TEAM[s.side].c; s.civ ??= s.side;
+  civOf(s.civ).barracks(inner, T);
   inner.updateMatrixWorld(true); const top = new THREE.Box3().setFromObject(inner).max.y;
   for (const sx of [-1.5, 1.5]) { part(g, .1, top + .9, .1, 0x5a3a24, sx, (top + .9) / 2, 1.3); part(g, .55, .8, .06, T, sx + .3, top + .2, 1.3); part(g, .2, .2, .2, 0xe8c050, sx, top + 1, 1.3); }
   part(g, .8, .2, .5, 0xe8c050, 0, top + .2, 0); for (const sx of [-.3, 0, .3]) part(g, .14, .3, .14, 0xe8c050, sx, top + .45, 0);   // corona
@@ -52,7 +52,7 @@ export function buildAltar(s) {
 }
 // templo de la civilización: tras el ritual se invoca en él al dios. Durante el ritual se alza una columna de luz
 export function buildTemple(s) {
-  const g = new THREE.Group(); civOf(s.side).map.altar(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c); bake(g);
+  const g = new THREE.Group(); s.civ ??= s.side; civOf(s.civ).map.altar(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c); bake(g);
   s.sel = ring(g, 2.9, 3.2, 0xffe03a, .2); s.sel.visible = false;
   s.beamMat = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
   s.beam = new THREE.Mesh(BOX, s.beamMat); s.beam.scale.set(1.3, 40, 1.3); s.beam.position.y = 20; s.beam.visible = false; g.add(s.beam);
@@ -62,8 +62,8 @@ export function buildTemple(s) {
 export function templeFx(dt, now) {
   for (const s of spots) {
     if (s.kind !== 'temple' || !s.beam || !s.group?.visible) continue;
-    const r = sideState[s.side].ritual, on = r?.state === 'ritual';
-    s.beam.visible = on || r?.state === 'done';
+    const r = sideState[s.side]?.ritual, here = (r?.c ?? s.side) === s.civ, on = here && r?.state === 'ritual';
+    s.beam.visible = on || (here && r?.state === 'done');
     if (!s.beam.visible) continue;
     s.beamMat.opacity = on ? .22 + Math.sin(now / 180) * .1 : .07 + Math.sin(now / 600) * .03;
     s.beam.scale.x = s.beam.scale.z = on ? 1.3 + Math.sin(now / 250) * .2 : .8;

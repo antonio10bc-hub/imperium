@@ -13,9 +13,9 @@ import { geoSlow, swampMounted } from './rules.js';
 // Cada combinación civilización + tipo + bando se construye una sola vez con cajas y se funde en una plantilla
 // (geometría con color por vértice + contorno). Cada tropa reutiliza esas geometrías: 2 mallas en lugar de ~50.
 const UNIT_TPL = new Map();
-function unitModel(type, side, body) {   // construye las piezas del modelo en body; devuelve la altura de la cresta de rango
+function unitModel(type, side, body, civ = side) {   // construye las piezas del modelo en body; devuelve la altura de la cresta de rango
   if (side < NEU && type in CIV_SLOT) {   // tropa de civilización
-    civOf(side)[type](body, TEAM[side].c);
+    civOf(civ)[type](body, TEAM[side].c);
     body.updateMatrixWorld(true); return new THREE.Box3().setFromObject(body).max.y + .16;
   }
   // modelo genérico: jinetes arqueros y guardianes neutrales
@@ -80,10 +80,10 @@ function unitModel(type, side, body) {   // construye las piezas del modelo en b
   }
   return crestY;
 }
-function unitTemplate(type, side) {
-  const civ = side < NEU && type in CIV_SLOT ? civOf(side).id : '-', key = civ + '|' + type + '|' + side;
+function unitTemplate(type, side, cv = side) {
+  const civ = side < NEU && type in CIV_SLOT ? civOf(cv).id : '-', key = civ + '|' + type + '|' + side;
   let t = UNIT_TPL.get(key); if (t) return t;
-  const body = new THREE.Group(), crestY = unitModel(type, side, body), { fill, hull } = collectParts(body);
+  const body = new THREE.Group(), crestY = unitModel(type, side, body, cv), { fill, hull } = collectParts(body);
   t = { crestY, team: TEAM[side].c, base: fill.map(m => m.material.color.getHex()), geo: [mergeBoxes(fill, body, true)], hull: mergeBoxes(hull, body, false) };
   UNIT_TPL.set(key, t); return t;
 }
@@ -97,8 +97,8 @@ export function unitGeo(t, rank) {
   g.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); g.boundingSphere = g0.boundingSphere;
   return (t.geo[rank] = g);
 }
-function buildUnit(type, side, parent = world) {
-  const t = unitTemplate(type, side), g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+function buildUnit(type, side, parent = world, civ = side) {
+  const t = unitTemplate(type, side, civ), g = new THREE.Group(), body = new THREE.Group(); g.add(body);
   const mesh = new THREE.Mesh(t.geo[0], VCMAT); body.add(mesh, new THREE.Mesh(t.hull, HULLMAT));
   const crest = new THREE.Group(); part(crest, .18, .18, .18, 0xffffff, 0, t.crestY, 0); crest.visible = false; body.add(crest);
   const sh = new THREE.Mesh(discGeo(.62, 20), basic(0x0f0f1b, .28)); sh.rotation.x = -Math.PI / 2; sh.position.y = .03; g.add(sh);
@@ -106,7 +106,7 @@ function buildUnit(type, side, parent = world) {
   // estandarte: el héroe lleva uno grande y una de cada cuatro tropas de su escolta, uno pequeño (color del bando con una franja del color de su civilización)
   let banner = null;
   if (side < NEU && (type === 'hero' || TYPES.includes(type))) {
-    const big = type === 'hero', H = big ? 3.4 : 2.3, fy = H - (big ? .45 : .3), fw = big ? 1 : .6, own = civOf(side).own ?? TEAM[side].l;
+    const big = type === 'hero', H = big ? 3.4 : 2.3, fy = H - (big ? .45 : .3), fw = big ? 1 : .6, own = civOf(civ).own ?? TEAM[side].l;
     banner = new THREE.Group(); part(banner, .06, H, .06, 0x5a3a24, 0, H / 2, 0, false); part(banner, .05, big ? .7 : .45, fw, TEAM[side].c, 0, fy, fw / 2, false); part(banner, .056, big ? .22 : .14, fw, own, 0, fy - (big ? .12 : .08), fw / 2, false);
     banner.position.set(-.26, 0, -.24); banner.visible = big; body.add(banner);
   }
@@ -180,18 +180,18 @@ const maxHpOf = u => Math.round(u.def.hp * (u.leader ? GAME.escortBonus : 1) * R
 export function setMax(u) { const old = u.maxHp; u.maxHp = maxHpOf(u); if (u.maxHp > old) u.hp += u.maxHp - old; else u.hp = Math.min(u.hp, u.maxHp); }
 // edificio que produce cada tipo de sitio: su punto de reunión está en S.rally[edificio]
 export const RALLY_OF = { [BARR0]: 'barracks', [ALT0]: 'altar', [TEMP0]: 'temple' };
-export function spawnUnit(side, type, at = BARR0) {
-  const b = spots[at + side], k = spots[side], ang = Math.atan2(k.z - b.z, k.x - b.x) + (Math.random() - .5) * 1.6;
-  const u = spawnAt(side, type, b.x + Math.cos(ang) * 2.8, b.z + Math.sin(ang) * 2.8, ang);
-  const r = S.rally[RALLY_OF[at]];
+export function spawnUnit(side, type, at = BARR0, city = side) {
+  const b = spots[at + city], k = spots[city], ang = Math.atan2(k.z - b.z, k.x - b.x) + (Math.random() - .5) * 1.6;
+  const u = spawnAt(side, type, b.x + Math.cos(ang) * 2.8, b.z + Math.sin(ang) * 2.8, ang, city);
+  const r = S.rally[RALLY_OF[at] + city];
   if (side === 0 && r) orderMove([u], r.x, r.z, false);   // punto de reunión del edificio (si tu bando lo lleva la IA, ella decide luego)
   return u;
 }
 // rid: sorteo propio de cada tropa para repartirla entre objetivos (la IA). No se usa el id: los dos bandos reclutan a la vez y cada uno acababa con ids de la misma paridad
-export function spawnAt(side, type, x, z, ang = Math.random() * 6.28) {
-  const def = defOf(side, type), n = nearestNode(x, z);
-  const parts = buildUnit(type, side);
-  const u = { id: ++uid, rid: Math.random(), side, type, def, hp: def.hp, maxHp: def.hp, node: n, pos: new THREE.Vector3(cellX(n), HM[n], cellZ(n)), fwd: new THREE.Vector3(Math.cos(ang), 0, Math.sin(ang)),
+export function spawnAt(side, type, x, z, ang = Math.random() * 6.28, civ = side) {   // civ: civilización de la tropa (la de la ciudad que la produce)
+  const def = defOf(civ, type), n = nearestNode(x, z);
+  const parts = buildUnit(type, side, world, civ);
+  const u = { id: ++uid, rid: Math.random(), side, civ, type, def, hp: def.hp, maxHp: def.hp, node: n, pos: new THREE.Vector3(cellX(n), HM[n], cellZ(n)), fwd: new THREE.Vector3(Math.cos(ang), 0, Math.sin(ang)),
     cd: 0, think: 0, enemy: null, bob: Math.random() * 6, lunge: 0, flash: 0, block: 0, order: null, leader: null, escort: [], combatT: 0, lastHit: -9, healT: 0,
     chargeT: 0, chargeCd: 6, kills: 0, rank: 0, ...parts };
   units.push(u); place(u);
@@ -210,14 +210,14 @@ export function place(u, dt = 0) {
 export const charging = u => (u.type === 'hero' ? u : u.leader)?.chargeT > 0;
 export const roadK = u => roadCell && roadCell[u.node] ? 1.35 : 1;   // los caminos dan velocidad
 const FOOT_HERO = new Set(['mexica', 'vikingos']);   // civilizaciones cuyo héroe va a pie
-const MOUNTED = u => u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.side < NEU && !FOOT_HERO.has(civOf(u.side).id));
+const MOUNTED = u => u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.side < NEU && !FOOT_HERO.has(civOf(u.civ ?? u.side).id));
 export const slowK = u => (GEOT && GEOT[u.node] === 2 ? (MOUNTED(u) ? swampMounted() : .6) : GEOT && GEOT[u.node] === 11 ? .8 : 1) * geoSlow(u);   // las dunas también frenan   // pantano y bajío: más lentos, sobre todo a caballo
 export const spd = u => (u.leader ? Math.max(u.def.speed, u.leader.def.speed) : u.def.speed) * (charging(u) ? 1.6 : 1) * roadK(u) * slowK(u);
 export function stepToward(u, tx, tz, s, dt) {
   const dx = tx - u.pos.x, dz = tz - u.pos.z, L = Math.hypot(dx, dz); if (L < 1e-4) return false;
   const st = Math.min(s * dt, L), nx = u.pos.x + dx / L * st, nz = u.pos.z + dz / L * st, b = cellOf(nx, nz), a = u.node;
   if (b !== a && !(walk[b] && inMain[b] && Math.abs(HM[a] - HM[b]) <= 1)) { u.block = 1; return false; }
-  if (b !== a && gateCell[b] >= 0) { const g = gateList[gateCell[b]]; if (g.hp > 0 && g.f.side !== u.side) { u.block = 1; u.gateHit = g; u.gateHitT = .5; return false; } }   // puerta cerrada de una fortaleza ajena: hay que derribarla
+  if (b !== a && gateCell[b] >= 0) { const g = gateList[gateCell[b]]; if (g.hp > 0 && spots[g.f.side].side !== u.side) { u.block = 1; u.gateHit = g; u.gateHitT = .5; return false; } }   // puerta cerrada de una fortaleza ajena: hay que derribarla
   u.pos.x = nx; u.pos.z = nz; u.node = b;
   u.fwd.x += (dx / L - u.fwd.x) * .35; u.fwd.z += (dz / L - u.fwd.z) * .35; u.fwd.normalize(); u.moving = true; return true;
 }

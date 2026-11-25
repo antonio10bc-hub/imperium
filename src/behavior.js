@@ -1,9 +1,8 @@
 // Comportamiento de las tropas: formaciones, órdenes, escolta, guardianes e IA de cada tropa.
 import * as THREE from 'three';
 import { sfx } from './audio.js';
-import { spotPos } from './buildings.js';
 import { bashGate, nearestEnemy, siege, strike } from './combat.js';
-import { BASE1, GAME, MD, MW, NEU, idx } from './config.js';
+import { BASE1, GAME, MD, MW, NEU, NP, idx } from './config.js';
 import { burst, floatText, ping, plume, streak } from './effects.js';
 import { aiUnit } from './ai.js';
 import { bonusOf } from './civs.js';
@@ -42,6 +41,11 @@ export function layout(list, shape, z0) {
     const zf = Math.max(z0, z - FS), half = (Math.min(cols, Math.max(1, inf)) - 1) / 2 * FS + FS * 1.25;
     hr.forEach((u, k) => { const sd = k % 2 ? 1 : -1, j = k >> 1, col = Math.floor(j / depth), row = j % depth; slots.set(u, [sd * (half + col * FS), zf - row * FS]); });
   }
+  // colosos (y cualquier otra tropa grande sin puesto): filas propias al frente del bloque, más separadas porque ocupan más
+  const big = list.filter(u => !slots.has(u) && u.type !== 'hero' && u.type !== 'god'), BS = FS * 2;
+  if (big.length) { let zf = z0; for (const [, z] of slots.values()) zf = Math.max(zf, z); zf += FS * 1.6;
+    const per = THREE.MathUtils.clamp(Math.ceil(Math.sqrt(big.length * 2)), 2, 6);
+    big.forEach((u, k) => { const r = Math.floor(k / per), n = Math.min(per, big.length - r * per), c = k % per; slots.set(u, [(c - (n - 1) / 2) * BS, zf + r * BS]); }); }
   heroes.forEach((u, k) => slots.set(u, [(k - (heroes.length - 1) / 2) * FS * 1.5, z0 - FS * 1.3]));
   gods.forEach((u, k) => slots.set(u, [(k - (gods.length - 1) / 2) * FS * 1.8, z0 - FS * 2.9]));   // el dios va detrás del héroe; el resto, delante
   return slots;
@@ -78,8 +82,8 @@ export function escortUnit(u, dt) {
   const h = u.leader;
   if ((u.think -= dt) <= 0) { u.think = .3; u.enemy = nearestEnemy(u, h.combatT > 0 ? u.def.aggro + 2 : 3.5); }
   if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
-  const foe = spots[1 - u.side];
-  if (h.combatT > 0 && h.pos.distanceTo(spotPos(foe)) < 10) { siege(u, foe, dt); return; }
+  if (h.combatT > 0) { let foe = null; for (let c = 0; c < NP; c++) { const s = spots[c]; if (s.side !== u.side && Math.hypot(h.pos.x - s.x, h.pos.z - s.z) < 10) foe = s; }   // fortaleza ajena junto al héroe: al asalto
+    if (foe) { siege(u, foe, dt); return; } }
   const [ox, oz] = formation(h).get(u) || [0, -2], fx = h.fwd.x, fz = h.fwd.z;
   const tx = h.pos.x + fz * ox + fx * oz, tz = h.pos.z - fx * ox + fz * oz, dist = Math.hypot(tx - u.pos.x, tz - u.pos.z);
   if (h.field && !slotOk(h.field, cellOf(tx, tz), Math.hypot(ox, oz) * 1.6 + 3)) {   // puesto inalcanzable: junto al héroe

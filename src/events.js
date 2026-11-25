@@ -7,7 +7,7 @@ import { applyRank, nearestEnemy, strike } from './combat.js';
 import { MD, MW, NEU, NP, TOWN0, players } from './config.js';
 import { ping } from './effects.js';
 import { capOf, capR, elapsed, fields, popOf, toast } from './game.js';
-import { spots } from './map.js';
+import { homeOf, spots } from './map.js';
 import { bfs, cellX, cellZ, inMain, nearestNode } from './nav.js';
 import { alive, followField, sel, setMax, sideState, spawnAt, units } from './units.js';
 
@@ -75,7 +75,7 @@ export function hireMercs(sd) {
   if (!ev.merc || ev.merc.hired[sd] || st.gold < MERC.cost || !mercRoom(sd)) return false;
   st.gold -= MERC.cost; ev.merc.hired[sd] = true;
   // llegan por el borde del mapa más cercano a tu castillo y van a esperar junto a él
-  const c = spots[sd], e = mercEntry(c), list = [];
+  const c = spots[homeOf(sd)], e = mercEntry(c), list = [];
   MERC.types.forEach((t, k) => { const u = spawnAt(sd, t, cellX(e) + (k % 2) * 1.2, cellZ(e) + (k >> 1) * 1.2, Math.atan2(c.z - cellZ(e), c.x - cellX(e))); u.rank = MERC.rank; setMax(u); u.hp = u.maxHp; applyRank(u); list.push(u); });
   orderMove(list, c.x, c.z, false);
   if (sd === 0) toast('MERCENARIOS CONTRATADOS: LLEGAN POR EL BORDE DEL MAPA', 'good', { x: cellX(e), z: cellZ(e) });

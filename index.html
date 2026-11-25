@@ -11,7 +11,7 @@
   <div class="hud" id="res"><img class="ic" data-ic="coin" data-c="#e8c870" alt=""><b id="gold">0</b><small id="rate">+0/S</small><img class="ic" data-ic="army" data-c="#f4f4e8" alt=""><span><span id="pop">0</span>/<span id="cap">30</span></span><span id="mt" hidden></span></div>
   <div class="hud" id="tug"><span class="t0" id="t0">TÚ</span><span id="terr"></span><span class="t1" id="t1">RIVAL</span><span class="cas">FORTALEZAS <b id="hp0" class="c0">100 %</b> · <b id="hp1" class="c1">100 %</b></span></div>
   <div class="hud" id="merc" hidden><span id="mercT"></span><button id="mercBtn" type="button">CONTRATAR</button></div>
-  <div class="hud" id="feed"></div>
+  <div id="banner" hidden></div>
   <div class="hud" id="heroes"></div>
   <div class="hud" id="ttools" aria-label="Controles táctiles">
     <button type="button" data-t="box" title="Arrastra un dedo para elegir tropas en un área">▢<span>ÁREA</span></button>
@@ -24,8 +24,8 @@
     <div id="panel"></div>
     <div id="tools">
       <button id="fBase" type="button" class="tl" title="Tu fortaleza"><img class="ic" data-ic="castle" data-c="#f4f4e8" alt=""><kbd>H</kbd></button>
-      <button id="fBarr" type="button" class="tl" title="Cuartel"><img class="ic" data-ic="house" data-c="#f4f4e8" alt=""><kbd>B</kbd></button>
-      <button id="fHero" type="button" class="tl" title="Héroe / altar"><img class="ic" data-ic="crown" data-c="#e8c870" alt=""><kbd>G</kbd></button>
+      <button id="fBarr" type="button" class="tl" title="Cuartel"><img class="ic" data-ic="house" data-c="#f4f4e8" alt=""><kbd>Q</kbd></button>
+      <button id="fHero" type="button" class="tl" title="Salón de héroes"><img class="ic" data-ic="crown" data-c="#e8c870" alt=""><kbd>W</kbd></button>
       <button id="fEnemy" type="button" class="tl" title="Fortaleza rival"><img class="ic" data-ic="target" data-c="#d83a4a" alt=""></button>
       <button id="spd" type="button" class="tl" title="Velocidad">×1<kbd>V</kbd></button>
       <button id="pz" type="button" class="tl" title="Pausa"><img class="ic" data-ic="pause" data-c="#f4f4e8" alt=""><kbd>P</kbd></button>
@@ -74,18 +74,19 @@
     <li>Cada mitad tiene una <b>ATALAYA</b>: no da oro, pero quien la conquista ve muy lejos alrededor y su torre dispara a quien se acerque.</li>
     <li>Elige el <b>MAPA</b>: catorce geografías (cordillera, istmo, archipiélago, barrancos, meseta, afluentes, delta, bosque, desierto, caldera, valle helado, cañón, costa y ruinas), y su <b>TAMAÑO</b>: pequeño (12 pueblos), normal (16) o grande (22). Con más espacio caben más <b>JUGADORES</b>: hasta 3 en el normal y hasta 5 en el grande, todos contra todos; ganas cuando caen todas las demás fortalezas. El <b>CÓDIGO DE MAPA</b> (en la pausa y al acabar) repite o comparte un mapa: escríbelo en el menú. Los pantanos y bajíos frenan, sobre todo a los jinetes; el bosque denso no se atraviesa; los arqueros desde dos niveles por encima llegan más lejos y hacen más daño; la cima de la meseta da oro doble.</li>
     <li>Cada geografía tiene su regla. <b>CORDILLERA</b>: atalayas en los puertos, la nieve frena y desde lo alto se ve más lejos. <b>ISTMO</b>: la ciudadela guarda el paso. <b>ARCHIPIÉLAGO</b>: la marea cubre los bajíos a ratos. <b>BARRANCOS</b>: desde arriba se golpea más fuerte y en el fondo nadie se ve de lejos. <b>MESETA</b>: tres rampas estrechas. <b>AFLUENTES</b>: dos ríos se juntan en el centro y las crecidas cierran los vados. <b>DELTA</b>: los pantanos ocultan a las tropas y atascan a los jinetes. <b>BOSQUE</b>: clic derecho en el bosque para talarlo (las sendas de bosque claro caen antes y llevan a claros con tesoros); entre árboles las flechas hacen menos daño. <b>DESIERTO</b>: lejos del agua y de los caminos se pasa sed; los oasis dan más oro. <b>CALDERA</b>: el volcán gigante entra en erupción y las fumarolas de la orilla dan oro. <b>VALLE HELADO</b>: el hielo se rompe si hay muchas tropas encima. <b>CAÑÓN</b>: una garganta con tres puentes (de piedra, fortificado y colgante): clic derecho con tropas para derribarlos, se reconstruyen con oro y el fortificado se conquista y dispara. <b>COSTA</b>: las fortalezas en lo alto del acantilado, unidas al llano por pocas rampas. <b>RUINAS</b>: calles estrechas y tesoros para el primero que llegue.</li>
-    <li>El <b>CLIMA</b> cambia según la geografía: niebla en el delta y las ruinas, tormentas de arena en el desierto, nieve en la cordillera y el valle helado, ceniza en la caldera y lluvia en el resto. Mientras dura, todos ven un poco menos.</li>
+    <li>El <b>CLIMA</b> cambia en algunas geografías: tormentas de arena en el desierto, nieve en la cordillera y el valle helado y ceniza en la caldera. Mientras dura, todos ven un poco menos.</li>
+    <li>Con más de dos jugadores, al derribar una <b>FORTALEZA</b> rival la ciudad pasa a ser tuya: su cuartel, su salón de héroes y su templo reclutan las tropas de esa civilización con tu mismo oro. Quien se queda sin ciudades queda fuera.</li>
     <li>Elige tu <b>CIVILIZACIÓN</b> y la del rival en el menú (o al azar). Comparten las reglas, pero cada una tiene una <b>VENTAJA</b> propia: legiones romanas más resistentes, comercio cartaginés, ballestas Han, conquista rápida mexica, carros egipcios y furia gala.</li>
     <li>Cada dos minutos, más o menos, pasa algo: <b>BANDIDOS</b> que asaltan los pueblos de quien más territorio tiene, <b>MERCENARIOS</b> veteranos que se pueden contratar durante 45 s (llegan por el borde del mapa y esperan junto a tu castillo) o una <b>CARAVANA</b> de tres carros que cruza el mapa: cada carro da 50 de oro a quien lo detenga.</li>
     <li>Tu límite de tropas crece con tu territorio: 30 de base y 6 más por cada pueblo o campamento (hasta 100).</li>
     <li>Las murallas de tu fortaleza disparan flechas a los enemigos que se acercan. Puedes tener hasta 3 <b>HÉROES</b>; <b>G</b> pasa de uno a otro.</li>
-    <li>En el <b>TEMPLO</b> (tecla <b>T</b>) comienza el ritual: cuesta 400 de oro y dura un minuto. Después podrás invocar al <b>DIOS</b> de tu civilización (uno por bando): flota, golpea cuerpo a cuerpo y, asignado a un héroe, va detrás de él curando a su escolta.</li>
+    <li>En el <b>TEMPLO</b> (tecla <b>E</b>) comienza el ritual: cuesta 400 de oro y dura un minuto. Después podrás invocar al <b>DIOS</b> de tu civilización (uno por bando): flota, golpea cuerpo a cuerpo y, asignado a un héroe, va detrás de él curando a su escolta.</li>
     <li>Con el cuartel, el salón de héroes o el templo seleccionados, el <b>CLIC DERECHO</b> en el mapa fija a dónde van sus tropas al salir.</li>
     <li>Invoca un <b>HÉROE</b> en el salón de héroes. Asígnale hasta 50 tropas: formarán delante de él en bloque, línea o cuña.</li>
     <li>La niebla de guerra oculta lo que no has explorado. Las tropas suben de rango al matar y se curan en tus regiones.</li>
   </ul>
   <div class="ctl tonly"><b>TOCAR</b> tropa o edificio: seleccionar · con algo seleccionado, tocar el mapa: mover, atacar, conquistar, asaltar o talar<br><b>MANTENER</b> sobre una tropa: todas las de ese tipo · sobre el mapa: avanzar atacando<br><b>UN DEDO</b> mover la cámara · <b>DOS DEDOS</b> zoom · <b>▢ ÁREA</b> elegir tropas arrastrando · <b>⚑ TODOS</b> todo el ejército · <b>⛶</b> pantalla completa</div>
-  <div class="ctl monly"><b>IZQ</b> seleccionar · arrastrar caja · doble clic: mismo tipo<br><b>DER</b> mover, atacar o conquistar · sobre tu héroe: asignar tropas · también en el minimapa<br><b>E</b> ataque-mover · <b>WASD</b>, borde o <b>DER+ARRASTRAR</b>: cámara · <b>RUEDA</b> zoom<br><b>1 2 3</b> reclutar · <b>B</b> cuartel · <b>G</b> héroe · <b>T</b> templo · <b>H</b> base · <b>F1–F5</b> grupos · <b>ESPACIO</b> alerta · <b>P</b> pausa · <b>V</b> velocidad · <b>N</b> quitar o poner la niebla de guerra · <b>ESC</b> menú</div>
+  <div class="ctl monly"><b>IZQ</b> seleccionar · arrastrar caja · doble clic: mismo tipo<br><b>DER</b> mover, atacar o conquistar · sobre tu héroe: asignar tropas · también en el minimapa<br><b>A</b> ataque-mover · <b>FLECHAS</b>, borde o <b>DER+ARRASTRAR</b>: cámara · <b>RUEDA</b> zoom<br><b>1 2 3</b> reclutar · <b>Q</b> cuartel · <b>W</b> salón de héroes · <b>E</b> templo (otra vez: siguiente ciudad) · <b>G</b> héroes · <b>H</b> base · <b>F1–F5</b> grupos · <b>ESPACIO</b> alerta · <b>P</b> pausa · <b>V</b> velocidad · <b>N</b> quitar o poner la niebla de guerra · <b>ESC</b> menú</div>
   <button id="howBack" type="button">VOLVER</button>
 </div></div>
 <div id="menu" class="overlay" hidden><div class="card">

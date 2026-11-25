@@ -52,7 +52,7 @@ export function setupRules() {
     const cells = [];
     for (let z = 1; z < MD - 1; z++) for (let x = 1; x < MW - 1; x++) { const i = idx(x, z);
       if (on.tides ? GEOT[i] === 2 && HM[i] === 1 && inK('archipielago', i) : GEOT[i] === 13 && inK('afluentes', i)) cells.push(i); }
-    if (cells.length) { const g = { cells, open: true, layer: waterLayer(cells) }; R.gates.push(g); R.cycle = { phase: 'open', t: on.tides ? 100 : 140 }; }
+    if (cells.length) { const g = { cells, open: true, layer: waterLayer(cells), marks: gateMarks(cells) }; R.gates.push(g); R.cycle = { phase: 'open', t: on.tides ? 100 : 140 }; }
   }
   for (const b of bridgeSites) { const br = makeBridge(b); R.bridges.push(br); if (b.built) { br.built = true; br.group.visible = true; } }
   R.breaks = [];
@@ -61,6 +61,12 @@ export function setupRules() {
     const [x, z] = geoR.volcano, y = HM[idx(Math.floor(x), Math.floor(z))]; R.volcano = { x, z, y: y + 1, t: 150, phase: 'calm' };
     const lava = R.lava = new THREE.Mesh(new THREE.BoxGeometry(5.5, .3, 5.5), new THREE.MeshBasicMaterial({ color: 0xff7a1a })); lava.position.set(Math.floor(x) + .5, y + .12, Math.floor(z) + .5); lava.userData.own = true; world.add(lava); R.meshes.push(lava);
   }
+}
+// centro de cada paso (vado o bajío) para marcarlo con una X pequeña mientras está cortado
+function gateMarks(cells) {
+  const B = new Map();
+  for (const i of cells) { const x = i % MW, z = (i / MW) | 0, k = ((x / 14) | 0) + ',' + ((z / 14) | 0); let b = B.get(k); if (!b) B.set(k, b = { x: 0, z: 0, n: 0 }); b.x += x + .5; b.z += z + .5; b.n++; }
+  return [...B.values()].filter(b => b.n >= 6).map(b => ({ x: b.x / b.n, z: b.z / b.n }));
 }
 // distancia (en casillas, sin obstáculos) al agua, a los oasis y a las fortalezas, hasta r
 function wetMap(r) {
