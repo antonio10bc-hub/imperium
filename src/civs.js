@@ -400,14 +400,14 @@ export const BONUS = {
   roma: { name: 'LEGIONES', text: 'espadas con +25 % de vida y +5 % de daño', unit: { sword: { mul: { hp: 1.25, dmg: 1.05 } } } },
   cartago: { name: 'COMERCIO', text: 'sus pueblos dan +25 % de oro', income: 1.25 },
   china: { name: 'BALLESTAS', text: 'arqueros con +2 de alcance', unit: { bow: { add: { range: 2 } } } },
-  mexica: { name: 'GUERRA FLORIDA', text: 'conquistan pueblos un 50 % más rápido y espadas con +8 % de vida', capture: 1.5, unit: { sword: { mul: { hp: 1.08 } } } },
+  mexica: { name: 'GUERRA FLORIDA', text: 'conquistan pueblos un 45 % más rápido', capture: 1.45 },
   egipto: { name: 'CARROS', text: 'jinetes un 10 % más rápidos y con +10 % de daño', unit: { horse: { mul: { speed: 1.1, dmg: 1.1 } } } },
-  galos: { name: 'FURIA', text: 'espadas con +15 % de daño y carga del héroe cada 14 s', unit: { sword: { mul: { dmg: 1.15 } } }, chargeCd: 14 },
-  grecia: { name: 'FALANGE', text: 'espadas con +18 % de vida, pero un 10 % más lentas', unit: { sword: { mul: { hp: 1.18, speed: .9 } } } },
+  galos: { name: 'FURIA', text: 'espadas con +20 % de daño y carga del héroe cada 14 s', unit: { sword: { mul: { dmg: 1.2 } } }, chargeCd: 14 },
+  grecia: { name: 'FALANGE', text: 'espadas con +12 % de vida, pero un 10 % más lentas', unit: { sword: { mul: { hp: 1.12, speed: .9 } } } },
   vikingos: { name: 'SAQUEO', text: 'espadas con +5 % de daño y conquistan pueblos un 25 % más rápido', unit: { sword: { mul: { dmg: 1.05 } } }, capture: 1.25 },
   persia: { name: 'INMORTALES', text: 'espadas y arqueros con +15 % de vida', unit: { sword: { mul: { hp: 1.15 } }, bow: { mul: { hp: 1.15 } } } },
   mongoles: { name: 'ESTEPA', text: 'jinetes un 25 % más rápidos y con +8 % de vida', unit: { horse: { mul: { speed: 1.25, hp: 1.08 } } } },
-  japon: { name: 'BUSHIDO', text: 'jinetes con +20 % de vida', unit: { horse: { mul: { hp: 1.2 } } } },
+  japon: { name: 'BUSHIDO', text: 'jinetes con +25 % de vida y +5 % de daño', unit: { horse: { mul: { hp: 1.25, dmg: 1.05 } } } },
 };
 export const bonusOf = side => (side === 0 || side === 1) ? BONUS[civOf(side).id] || {} : {};
 // estadísticas de una tropa con la ventaja de su civilización (los neutrales usan las comunes)
