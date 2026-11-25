@@ -165,15 +165,37 @@ const deg = (P, i) => { const L = P.mode.length, o = Math.floor(i / L); return P
 const chordOf = (P, d) => [deg(P, d), deg(P, d + 2), deg(P, d + 4)];
 
 // ---------- Ambiente ----------
+// Ruido largo (12 s, estéreo, cada canal distinto) para que no se oiga el bucle; el final se funde con el principio.
+// marrón: grave y redondo (viento, oleaje); rosa: más aire (lluvia, arena)
+let ambBuf = null;
+function ambNoise() {
+  if (ambBuf) return ambBuf;
+  const R = ac.sampleRate, L = R * 12, X = R / 2 | 0; ambBuf = ac.createBuffer(4, L, R);
+  for (let c = 0; c < 4; c++) { const d = ambBuf.getChannelData(c), brown = c < 2; let y = 0, b0 = 0, b1 = 0, b2 = 0;
+    for (let i = 0; i < L; i++) { const w = Math.random() * 2 - 1;
+      if (brown) { y = (y + .02 * w) / 1.02; d[i] = y * 3.5; } else { b0 = .99765 * b0 + w * .099; b1 = .963 * b1 + w * .2965; b2 = .57 * b2 + w * 1.0526; d[i] = (b0 + b1 + b2 + w * .1848) * .12; } }
+    for (let i = 0; i < X; i++) { const k = i / X; d[i] = d[i] * k + d[L - X + i] * (1 - k); } }
+  return ambBuf;
+}
+// fondo de cada geografía: [tipo de ruido, filtro, frecuencia, Q, volumen, cuánto respira el filtro (ráfagas), cuánto respira el volumen]
+const AMB = { wind: ['brown', 'lowpass', 420, .5, .05, 260, .45], waves: ['brown', 'lowpass', 520, .4, .06, 180, .6], rain: ['pink', 'lowpass', 2600, .3, .012, 300, .1], sand: ['pink', 'bandpass', 1300, .5, .02, 400, .4] };
 let amb = null;
-const AMB = { wind: ['bandpass', 520, .6, .04, .025], waves: ['lowpass', 650, .7, .055, .04], rain: ['lowpass', 1600, .4, .007, 0], sand: ['bandpass', 1500, .7, .05, .02] };
 export function setAmbience(kind, level = 1) {
   if (!S.soundOn || !audio()) return;
-  if (!amb) { const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
-    s.buffer = noiseBuf; s.loop = true; g.gain.value = 0; lg.gain.value = 0; lfo.frequency.value = .13; s.connect(f).connect(g).connect(sfxBus); lfo.connect(lg).connect(g.gain); s.start(); lfo.start(); amb = { f, g, lg }; }
+  if (!amb) {   // dos capas (marrón y rosa) que se cruzan; dos osciladores lentos de periodos que no coinciden dan ráfagas irregulares
+    const buf = ambNoise(), mk = (c0) => { const sp = ac.createChannelSplitter(4), mg = ac.createChannelMerger(2), s = ac.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(sp); sp.connect(mg, c0, 0); sp.connect(mg, c0 + 1, 1); s.start(0, Math.random() * 10); return mg; };
+    const f = ac.createBiquadFilter(), g = ac.createGain(), gb = ac.createGain(), gp = ac.createGain(), fm = ac.createGain(), am = ac.createGain(), base = ac.createGain();
+    mk(0).connect(gb).connect(f); mk(2).connect(gp).connect(f); gb.gain.value = 0; gp.gain.value = 0;
+    base.gain.value = 1; f.connect(base).connect(g).connect(sfxBus); g.gain.value = 0; fm.gain.value = 0; am.gain.value = 0; fm.connect(f.frequency); am.connect(base.gain);
+    for (const hz of [.047, .113, .29]) { const o = ac.createOscillator(), k = ac.createGain(); o.frequency.value = hz * (.9 + Math.random() * .2); k.gain.value = hz > .2 ? .3 : 1; o.connect(k); k.connect(fm); k.connect(am); o.start(); }
+    amb = { f, g, gb, gp, fm, am };
+  }
   const P = AMB[kind], t = ac.currentTime;
-  if (!P) { amb.g.gain.setTargetAtTime(0, t, .8); amb.lg.gain.setTargetAtTime(0, t, .8); return; }
-  amb.f.type = P[0]; amb.f.frequency.setTargetAtTime(P[1], t, .6); amb.f.Q.value = P[2]; amb.g.gain.setTargetAtTime(P[3] * level, t, .8); amb.lg.gain.setTargetAtTime(P[4] * level, t, .8);
+  if (!P) { amb.g.gain.setTargetAtTime(0, t, 1.2); return; }
+  const [n, type, fr, q, vol, fmod, amod] = P;
+  amb.f.type = type; amb.f.frequency.setTargetAtTime(fr, t, 1); amb.f.Q.setTargetAtTime(q, t, 1);
+  amb.gb.gain.setTargetAtTime(n === 'brown' ? 1 : 0, t, 1.5); amb.gp.gain.setTargetAtTime(n === 'pink' ? 1 : 0, t, 1.5);
+  amb.fm.gain.setTargetAtTime(fmod / 2.3, t, 1); amb.am.gain.setTargetAtTime(amod / 2.3, t, 1); amb.g.gain.setTargetAtTime(vol * level, t, 1.2);
 }
 
 // ---------- Efectos ----------
