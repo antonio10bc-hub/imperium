@@ -119,10 +119,11 @@ const TEXT = {
 function updateCycle(dt) {
   const c = R.cycle, g = R.gates[0], tx = TEXT[R.on.tides ? 'tides' : 'floods'];
   c.t -= dt;
-  if (c.phase === 'warn') { g.layer.visible = true; g.layer.material.opacity = .25 + .25 * Math.sin(performance.now() / 160); }   // el agua empieza a asomar
+  if (c.phase === 'warn') { g.layer.visible = true; g.layer.material.opacity = .25 + .25 * Math.sin(performance.now() / 160);   // el agua empieza a asomar
+    if ((c.fx = (c.fx ?? 0) - dt) <= 0) { c.fx = .3; for (const m of g.marks || []) if (exploredAt(m.x, m.z)) burst(new THREE.Vector3(m.x + (Math.random() - .5) * 6, HM[idx(m.x | 0, m.z | 0)] + .4, m.z + (Math.random() - .5) * 6), [0xffffff, 0xbfe4f4, 0x5fb0d4], 3, 1.5, 2.5, .5, .18); } }   // espuma: el agua sube
   if (c.t > 0) return;
   if (c.phase === 'open') { c.phase = 'warn'; c.t = 10; toast(tx.warn, 'bad'); sfx('warn'); }
-  else if (c.phase === 'warn') { c.phase = 'closed'; c.t = R.on.tides ? 45 : 60; setGate(g, false); toast(tx.close, 'bad'); }
+  else if (c.phase === 'warn') { c.phase = 'closed'; c.t = R.on.tides ? 45 : 60; setGate(g, false); toast(tx.close, 'bad'); for (const m of g.marks || []) if (exploredAt(m.x, m.z)) { burst(new THREE.Vector3(m.x, HM[idx(m.x | 0, m.z | 0)] + .6, m.z), [0xffffff, 0xbfe4f4, 0x5fb0d4], 16, 3, 4, .8, .24); plume(new THREE.Vector3(m.x, 1, m.z), 0xe8f0f8, 1.2, 1.2, 1, -.3); } }
   else { c.phase = 'open'; c.t = (R.on.tides ? 100 : 130) + Math.random() * 40; setGate(g, true); toast(tx.open, 'good'); }
 }
 
@@ -189,7 +190,7 @@ export function hitBridge(u, b, dt) {
   if (u.cd > 0) return;
   u.cd = u.def.cd; u.lunge = 1;
   if (lastBridge(b)) { if (u.side === 0 && !b.toldLast) { b.toldLast = true; toast('ES EL ÚLTIMO PUENTE: NO SE PUEDE DERRIBAR', 'bad', b); } u.order = null; return; }
-  b.hp -= u.def.dmg * (RANGED(u.type) ? .35 : 1) * (u.type === 'hero' || u.type === 'god' || u.type === 'titan' ? 1.5 : 1);
+  b.hitAt = performance.now(); b.hp -= u.def.dmg * (RANGED(u.type) ? .35 : 1) * (u.type === 'hero' || u.type === 'god' || u.type === 'titan' ? 1.5 : 1);
   burst(new THREE.Vector3(ex + (b.x - ex) * .1, b.hb + .6, b.z + (Math.random() - .5) * 2), b.style === 'rope' ? [0x8a5a34, 0xc8b080] : [0xb0aca0, 0x8e8a80, 0x8a5a34], 3, 2, 3, .5, .16);
   if (b.hp <= 0) breakBridge(u.side, b);
 }
@@ -236,14 +237,15 @@ function updateIce(dt) {
       if (b.t <= 0) { b.phase = 'broken'; b.t = 90; b.gate = { cells: b.cells, open: true, layer: waterLayer(b.cells, 0x3a7aa8) }; setGate(b.gate, false, true); burst(new THREE.Vector3(b.x, 1.2, b.z), [0xffffff, 0xbcd8e8, 0x3a7aa8], 40, 4, 5, 1, .26); sfx('lost'); } }
     else if (b.t <= 0) { setGate(b.gate, true); world.remove(b.gate.layer); b.gate.layer.geometry.dispose(); b.gate.layer.material.dispose(); R.breaks.splice(k, 1); }
   }
-  if ((R.iceT = (R.iceT ?? 0) - dt) > 0) return; R.iceT = .5;
+  if ((R.iceT = (R.iceT ?? 0) - dt) > 0) return; R.iceT = .5; R.iceRisk = [];
   for (const u of units) {
     if (u.dead || (GEOT[u.node] !== 6 && GEOT[u.node] !== 15) || R.breaks.some(b => Math.hypot(b.x - u.pos.x, b.z - u.pos.z) < 10)) continue;
-    const on = UGRID.near(u.pos.x, u.pos.z, 5, _near).filter(o => (GEOT[o.node] === 6 || GEOT[o.node] === 15) && Math.hypot(o.pos.x - u.pos.x, o.pos.z - u.pos.z) < 5);
-    if (on.length < (GEOT[u.node] === 15 ? 5 : 10)) continue;   // el hielo fino aguanta la mitad
+    const on = UGRID.near(u.pos.x, u.pos.z, 5, _near).filter(o => (GEOT[o.node] === 6 || GEOT[o.node] === 15) && Math.hypot(o.pos.x - u.pos.x, o.pos.z - u.pos.z) < 5), thr = GEOT[u.node] === 15 ? 5 : 10;
+    if (on.length < thr) { if (on.length >= thr * .6 && !R.iceRisk.some(p => Math.hypot(p.x - u.pos.x, p.z - u.pos.z) < 6)) R.iceRisk.push({ x: u.pos.x, z: u.pos.z }); continue; }   // cerca del límite: aviso amarillo
+    // el hielo fino aguanta la mitad
     const cx = Math.floor(u.pos.x), cz = Math.floor(u.pos.z), cells = [];
     for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const x = cx + dx, z = cz + dz; if (x >= 0 && z >= 0 && x < MW && z < MD && dx * dx + dz * dz <= 36 && (GEOT[idx(x, z)] === 6 || GEOT[idx(x, z)] === 15)) cells.push(idx(x, z)); }
-    R.breaks.push({ x: u.pos.x, z: u.pos.z, cells, t: 2, phase: 'crack' }); if (exploredAt(u.pos.x, u.pos.z)) sfx('crack');
+    R.breaks.push({ x: u.pos.x, z: u.pos.z, cells, t: 3, phase: 'crack' }); if (exploredAt(u.pos.x, u.pos.z)) sfx('crack');
     if (on.some(o => o.side === 0) || u.vis) toast('¡EL HIELO SE AGRIETA! SALID DE AHÍ', 'bad', u.pos);
   }
 }
@@ -367,16 +369,13 @@ function launchRock(top) {
   if (!to) return;
   const m = new THREE.Group(); part(m, 2.6, 2.2, 2.4, 0x3a3034, 0, 0, 0); part(m, 1.8, 1.6, 2.8, 0x4a4448, .4, .5, -.2); part(m, 2.2, 1.4, 1.6, 0x2e282c, -.5, -.4, .5);
   part(m, .5, .5, 2.9, 0xff7a1a, .9, .2, 0, false); part(m, 2.7, .4, .5, 0xffa03a, 0, -.3, 1.05, false); bake(m); m.position.copy(top); world.add(m); R.meshes.push(m);
-  const mark = new THREE.Mesh(new THREE.RingGeometry(ROCK_R - .6, ROCK_R, 40), new THREE.MeshBasicMaterial({ color: 0xd83a4a, transparent: true, opacity: .7, depthWrite: false, side: THREE.DoubleSide }));
-  mark.rotation.x = -Math.PI / 2; mark.position.set(to.x, to.y + .15, to.z); world.add(mark); R.meshes.push(mark);
-  R.rock = { m, mark, to, t: ROCK_T, v: new THREE.Vector3((to.x - top.x) / ROCK_T, (to.y - top.y + 4.5 * ROCK_T * ROCK_T) / ROCK_T, (to.z - top.z) / ROCK_T) };
+  R.rock = { m, to, t: ROCK_T, v: new THREE.Vector3((to.x - top.x) / ROCK_T, (to.y - top.y + 4.5 * ROCK_T * ROCK_T) / ROCK_T, (to.z - top.z) / ROCK_T) };
 }
 function updateRock(dt) {
   const r = R.rock; r.t -= dt; r.v.y -= 9 * dt; r.m.position.addScaledVector(r.v, dt); r.m.rotation.x += dt * 1.5; r.m.rotation.z += dt;
-  r.mark.material.opacity = .45 + .35 * Math.sin(performance.now() / 90); r.mark.scale.setScalar(1 + Math.max(0, r.t) * .08);
   if ((r.tr = (r.tr ?? 0) - dt) <= 0) { r.tr = .04; plume(r.m.position.clone(), Math.random() < .5 ? 0x3a3438 : 0xff7a1a, 1.2, 1.2, .5, -.2, true); }
   if (r.t > 0) return;
-  world.remove(r.mark); r.mark.geometry.dispose(); r.mark.material.dispose(); R.rock = null;
+  R.rock = null;
   const p = r.to; r.m.position.set(p.x, p.y + .9, p.z); r.m.rotation.set(.2, Math.random() * 6, -.15);   // se queda clavada donde cae
   burst(p.clone().setY(p.y + 1), [0xff7a1a, 0xffc83a, 0x3a3034, 0x6a6266], 60, 8, 9, 1.4, .45, true);
   for (let k = 0; k < 10; k++) { const a = k / 10 * 6.28; plume(p.clone().add(new THREE.Vector3(Math.cos(a) * 3, 1, Math.sin(a) * 3)), 0x56565c, 2.4, 2.4, 1.6, -.4, true); }
@@ -413,6 +412,29 @@ function updateTsunami(dt) {
   if (T.phase === 'calm') { T.phase = 'warn'; T.t = TSU.warn; sfx('rumble'); }
   else if (T.phase === 'warn') { T.phase = 'wave'; T.t = TSU.in + TSU.hold + TSU.out; T.n++; sfx('rumble'); }
   else { T.phase = 'calm'; T.t = 220 + Math.random() * 100; if (R.tsuMesh) R.tsuMesh.g.visible = false; }
+}
+
+// ---------- avisos en el terreno ----------
+// Cada cambio del escenario que va a pasar (o está pasando) se marca en el suelo con una zona que late y un aviso con texto:
+// rojo = peligro (hace daño o mata) · amarillo = cambia el terreno pero no hace daño. La capa 2D los dibuja (overlay.js)
+// tipos: disc {x, z, r} · rect {x0, z0, x1, z1} · edge (solo el borde de un rect, para lo que se puede romper)
+export function warnZones() {
+  const W = [], s = t => `${Math.max(0, Math.ceil(t))} S`;
+  const v = R.volcano; if (v && v.phase !== 'calm') W.push({ type: 'disc', x: v.x, z: v.z, r: 32, danger: true, label: v.phase === 'warn' ? `¡ERUPCIÓN EN ${s(v.t)}!` : '¡LLUEVE LAVA!' });
+  if (R.rock) W.push({ type: 'disc', x: R.rock.to.x, z: R.rock.to.z, r: ROCK_R, danger: true, label: `¡CAE UNA ROCA! ${s(R.rock.t)}`, strong: true });
+  const ts = R.tsunami; if (ts && ts.phase !== 'calm') W.push({ type: 'rect', x0: 0, z0: MD / 2, x1: MW, z1: MD, danger: true, label: ts.phase === 'warn' ? `¡TSUNAMI EN ${s(ts.t)}! SAL DE AQUÍ` : '¡TSUNAMI!', lx: MW / 2, lz: MD * .62, fixed: true });
+  const c = R.cycle, g = R.gates[0];
+  if (c && g?.marks && c.phase !== 'open') { const tide = R.on.tides, txt = c.phase === 'warn' ? `${tide ? 'LA MAREA CUBRE' : 'SE CIERRA'} EN ${s(c.t)}` : `${tide ? 'CUBIERTO' : 'CERRADO'} · ${s(c.t)}`;
+    for (const m of g.marks) W.push({ type: 'disc', x: m.x, z: m.z, r: 4.5, danger: false, label: txt, cross: c.phase === 'closed' }); }
+  for (const b of R.breaks || []) W.push(b.phase === 'crack' ? { type: 'disc', x: b.x, z: b.z, r: 6.5, danger: true, label: `¡EL HIELO SE ROMPE! ${s(b.t)}`, strong: true } : { type: 'disc', x: b.x, z: b.z, r: 6.5, danger: false, label: `HIELO ROTO · ${s(b.t)}` });
+  for (const p of R.iceRisk || []) W.push({ type: 'disc', x: p.x, z: p.z, r: 5, danger: false, label: 'EL HIELO CRUJE: DEMASIADAS TROPAS' });
+  for (const b of R.bridges) {
+    const box = { x0: b.x0, z0: b.z0, x1: b.x1, z1: b.z1, y: b.hb };
+    if (!b.built) { if (b.breakable) W.push({ type: 'rect', ...box, danger: false, label: `PUENTE ROTO · REPARAR ${BRIDGE_COST}`, cross: true }); }
+    else if (b.breakable && performance.now() - (b.hitAt || -1e9) < 2500) W.push({ type: 'rect', ...box, danger: true, label: `¡SE ROMPE! ${Math.max(0, Math.round(b.hp / b.maxHp * 100))} %`, strong: true });
+    else if (b.breakable && !lastBridge(b)) W.push({ type: 'edge', ...box, danger: false });   // se puede derribar
+  }
+  return W;
 }
 
 // contador de la regla con tiempo de la geografía (marea, crecida, volcán), para la pantalla y la pausa

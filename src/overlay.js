@@ -14,7 +14,7 @@ import { showTip, uiTipOn } from './hud.js';
 import { townIncNow } from './game.js';
 import { civOf } from './civs.js';
 import { floats, pings, sel, sideState, units } from './units.js';
-import { BRIDGE_COST, R, hiddenFrom, ruleTimer } from './rules.js';
+import { BRIDGE_COST, R, hiddenFrom, ruleTimer, warnZones } from './rules.js';
 import { drawWeather } from './ambient.js';
 
 let curScale = 0, curLines = CFG.lines;
@@ -101,21 +101,48 @@ function orderLines() {
   octx.globalAlpha = 1;
   for (const [x, y, c] of ends.values()) { octx.fillStyle = '#0f0f1b'; octx.fillRect(x - 4, y - 4, 8, 8); octx.fillStyle = c; octx.fillRect(x - 2.5, y - 2.5, 5, 5); }   // marca en cada destino
 }
-// vados o bajíos cortados (crecida o marea alta): una X pequeña y discreta sobre cada paso; parpadea mientras el agua sube
-const _g = new THREE.Vector3(), _gp = {};
-function drawGateMarks() {
-  const c = R.cycle, g = R.gates[0]; if (state !== 'play' || !c || !g?.marks || c.phase === 'open') return;
-  const a = c.phase === 'warn' ? .35 + .35 * Math.sin(performance.now() / 160) : .75;
-  octx.globalAlpha = a; octx.lineWidth = 2;
-  for (const m of g.marks) { if (!exploredAt(m.x, m.z)) continue; const q = project(_g.set(m.x, surfY(m.x, m.z) + .6, m.z), _gp); if (!q.vis) continue;
-    octx.strokeStyle = '#0f0f1b'; octx.lineWidth = 4; octx.beginPath(); octx.moveTo(q.x - 5, q.y - 5); octx.lineTo(q.x + 5, q.y + 5); octx.moveTo(q.x + 5, q.y - 5); octx.lineTo(q.x - 5, q.y + 5); octx.stroke();
-    octx.strokeStyle = '#e86a5a'; octx.lineWidth = 2; octx.stroke(); }
-  octx.globalAlpha = 1; octx.lineWidth = 1;
+// avisos de cambios del escenario (rules.js · warnZones): zona en el suelo que late (relleno + borde) y un cartel con triángulo de aviso.
+// Rojo = peligro · amarillo = el terreno cambia sin hacer daño
+const _g = new THREE.Vector3(), _gp = {}, _ga = {}, _gb = {};
+const WC = { red: ['255,58,58', '#ff3a3a', '#fff'], yellow: ['255,210,63', '#ffd23f', '#0f0f1b'] };
+function warnSign(x, y, text, danger) {
+  const [, col, fg] = WC[danger ? 'red' : 'yellow'];
+  octx.fillStyle = '#0f0f1b'; octx.beginPath(); octx.moveTo(x, y - 22); octx.lineTo(x + 13, y + 1); octx.lineTo(x - 13, y + 1); octx.closePath(); octx.fill();
+  octx.fillStyle = col; octx.beginPath(); octx.moveTo(x, y - 18); octx.lineTo(x + 9.5, y - 1.5); octx.lineTo(x - 9.5, y - 1.5); octx.closePath(); octx.fill();
+  octx.fillStyle = '#0f0f1b'; octx.fillRect(x - 1.2, y - 13, 2.4, 6.5); octx.fillRect(x - 1.2, y - 5, 2.4, 2.2);
+  if (text) label(x, y + 18, text, col, fg, 7);
+}
+function drawWarnings() {
+  if (state !== 'play') return;
+  const now = performance.now(), pulse = .5 + .5 * Math.sin(now / 170), signs = [];   // signs: carteles ya puestos (uno por grupo cercano)
+  for (const w of warnZones()) {
+    const [rgb, col] = WC[w.danger ? 'red' : 'yellow'], fa = (w.strong ? .24 : w.danger ? .18 : .14) + pulse * (w.strong ? .2 : .12), ea = .55 + pulse * .4;
+    let lx, ly, show = false;
+    if (w.type === 'disc') {
+      if (!exploredAt(w.x, w.z)) continue;
+      const y = Math.max(0, surfY(w.x, w.z)) + .2, c = project(_g.set(w.x, y, w.z), _gp); if (!c.vis && Math.abs(c.x - S.VW / 2) > S.VW) continue;
+      const e = project(_g.set(w.x + w.r, y, w.z), _ga), s2 = project(_g.set(w.x, y, w.z + w.r), _gb), rx = Math.hypot(e.x - c.x, e.y - c.y), ry = Math.hypot(s2.x - c.x, s2.y - c.y);
+      octx.beginPath(); octx.ellipse(c.x, c.y, rx, ry, 0, 0, 7);
+      octx.fillStyle = `rgba(${rgb},${fa})`; octx.fill(); octx.lineWidth = 3; octx.strokeStyle = `rgba(15,15,27,${ea * .7})`; octx.stroke(); octx.lineWidth = 2; octx.strokeStyle = `rgba(${rgb},${ea})`; octx.stroke();
+      if (w.cross) { const k = Math.min(rx, ry) * .45; octx.lineWidth = 4; octx.strokeStyle = '#0f0f1b'; octx.beginPath(); octx.moveTo(c.x - k, c.y - k); octx.lineTo(c.x + k, c.y + k); octx.moveTo(c.x + k, c.y - k); octx.lineTo(c.x - k, c.y + k); octx.stroke(); octx.lineWidth = 2; octx.strokeStyle = col; octx.stroke(); }
+      if (ry > 90) { lx = c.x; ly = c.y; } else { lx = c.x; ly = c.y - ry - 6; } show = c.vis;   // zona grande: el cartel en el centro
+    } else {
+      const y = w.y ?? 2, P = [[w.x0, w.z0], [w.x1, w.z0], [w.x1, w.z1], [w.x0, w.z1]].map(([x, z]) => { const q = project(_g.set(x, y, z), {}); return [q.x, q.y]; });
+      octx.beginPath(); P.forEach(([x, z], i) => i ? octx.lineTo(x, z) : octx.moveTo(x, z)); octx.closePath();
+      if (!w.fixed && !exploredAt((w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2)) continue;
+      if (w.type === 'edge') { octx.setLineDash([5, 4]); octx.lineWidth = 2; octx.strokeStyle = `rgba(${rgb},.7)`; octx.stroke(); octx.setLineDash([]); continue; }
+      octx.fillStyle = `rgba(${rgb},${fa})`; octx.fill(); octx.lineWidth = 3; octx.strokeStyle = `rgba(${rgb},${ea})`; octx.stroke();
+      if (w.cross) { const cx = (P[0][0] + P[2][0]) / 2, cy = (P[0][1] + P[2][1]) / 2, k = 8; octx.lineWidth = 4; octx.strokeStyle = '#0f0f1b'; octx.beginPath(); octx.moveTo(cx - k, cy - k); octx.lineTo(cx + k, cy + k); octx.moveTo(cx + k, cy - k); octx.lineTo(cx - k, cy + k); octx.stroke(); octx.lineWidth = 2; octx.strokeStyle = col; octx.stroke(); }
+      const q = project(_g.set(w.lx ?? (w.x0 + w.x1) / 2, y + 1, w.lz ?? (w.z0 + w.z1) / 2), _gp); lx = q.x; ly = q.y - 14; show = q.vis;
+    }
+    if (show && w.label && !signs.some(([x, y]) => Math.abs(x - lx) < 170 && Math.abs(y - ly) < 70)) { signs.push([lx, ly]); warnSign(lx, ly, w.label, w.danger); }
+  }
+  octx.lineWidth = 1;
 }
 export function drawOverlay(dt) {
   octx.clearRect(0, 0, S.VW, S.VH);
   drawWeather(octx, S.VW, S.VH, dt);
-  drawGateMarks();
+  drawWarnings();
   if (state === 'play') { const rt = ruleTimer(); if (rt) label(S.VW / 2, 62, rt, '#0f0f1b', rt.startsWith('¡') ? '#ff9a6a' : '#e8c870', 9); }   // contador de mareas, crecidas o volcán
   const showUI = state !== 'menu';
   for (const s of spots) {
@@ -150,7 +177,7 @@ export function drawOverlay(dt) {
   }
   for (const b of R.bridges) {   // puentes: sitio para construir (icono) o puente en pie
     const c = project(_h.set(b.x, 1, b.z), tmpP); b.sx = c.x; b.sy = c.y; b.vis = c.vis && state === 'play' && exploredAt(b.x, b.z); b.pr = 26;
-    if (b.vis && showUI && !b.built) { actionIcon(c.x, c.y - 10, 'bridge', S.selSpot === b ? '#f4f4e8' : '#e8c870'); label(c.x, c.y + 12, 'PUENTE · ' + BRIDGE_COST, '#0f0f1b', '#e8c870', 7); }
+    if (b.vis && showUI && !b.built) { actionIcon(c.x, c.y - 10, 'bridge', S.selSpot === b ? '#f4f4e8' : '#e8c870'); if (!b.breakable) label(c.x, c.y + 12, 'PUENTE · ' + BRIDGE_COST, '#0f0f1b', '#e8c870', 7); }   // el roto lo explica su aviso
   }
   for (const j of R.jobs) { const c = project(_h.set(j.x, j.y + 2.5, j.z), tmpP); if (c.vis && showUI) bar(c.x, c.y, 44, 5, j.t / j.need, '#9ad86a'); }   // tala en curso
   if (state === 'play' && showUI) orderLines();
