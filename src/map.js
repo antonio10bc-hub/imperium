@@ -294,29 +294,32 @@ export function generate(newSeed, tries = 0) {
   // el mismo número de pueblos en cada mitad (con más de dos jugadores, en la zona de cada fortaleza)
   const zoneOf = (x, z) => { if (NP === 2) return x >= MW / 2 ? 1 : 0; let b = 0, bd = 1e9; for (const f of forts) { const d = Math.hypot(f.x - x, f.z - z); if (d < bd) { bd = d; b = f.side; } } return b; };
   const halves = players().map(h => pool.filter(i => zoneOf(cellX(i), cellZ(i)) === h));
-  while (spots.filter(s => s.kind === 'town').length < GAME.towns) {
-    const cnt = players().map(h => spots.filter(s => s.kind === 'town' && zoneOf(s.x, s.z) === h).length), half = cnt.indexOf(Math.min(...cnt));
-    let bi = -1, bs = -1;
-    for (const i of halves[half]) { const x = cellX(i), z = cellZ(i); let m = 1e9; for (const s of spots) m = Math.min(m, (s.x - x) ** 2 + (s.z - z) ** 2); if (m > bs) { bs = m; bi = i; } }
-    if (bi < 0) break;
-    addTown(cellX(bi), cellZ(bi));
+  // por rondas: todas las zonas eligen a la vez (frente a los pueblos ya puestos), para que ninguna se quede siempre con los mejores huecos
+  for (let guard = 0; spots.filter(s => s.kind === 'town').length < GAME.towns && guard < 99; guard++) {
+    const cnt = players().map(h => spots.filter(s => s.kind === 'town' && zoneOf(s.x, s.z) === h).length), lo = Math.min(...cnt), picks = [];
+    for (const half of players()) { if (cnt[half] !== lo) continue;
+      let bi = -1, bs = -1;
+      for (const i of halves[half]) { const x = cellX(i), z = cellZ(i); let m = 1e9; for (const s of spots) m = Math.min(m, (s.x - x) ** 2 + (s.z - z) ** 2); if (m > bs) { bs = m; bi = i; } }
+      if (bi >= 0) picks.push(bi); }
+    if (!picks.length) break;
+    for (const bi of picks) if (spots.filter(s => s.kind === 'town').length < GAME.towns) addTown(cellX(bi), cellZ(bi));
   }
   const plain = s => s.kind === 'town' && !s.camp && !s.keep && !s.watch && !s.fortified && !s.special;
   // el pueblo más céntrico del mapa es la ciudadela: guardada por colosos neutrales, da colosos a quien la conquiste
-  if (!spots.some(s => s.keep)) { const cs = spots.filter(plain).sort((a, b) => Math.hypot(a.x - MW / 2, (a.z - MD / 2) * 1.2) - Math.hypot(b.x - MW / 2, (b.z - MD / 2) * 1.2)), c = cs.slice(0, 4).find(s => siteOK(s.x, s.z, 14)) || cs[0];
+  // los sitios especiales se eligen para que queden a la misma distancia POR CAMINO de cada fortaleza (antes la ciudadela, la atalaya y el campamento del oeste quedaban más lejos)
+  const fd = forts.map(f => bfs([nearestNode(f.x, f.z)])), dist = (sd, s) => fd[sd][nearestNode(s.x, s.z)], spread = s => { const d = players().map(sd => dist(sd, s)); return Math.max(...d) - Math.min(...d); };
+  const pairUp = (A, B) => { let best = null, bv = 1e9; A.slice(0, 5).forEach((a, i) => B.slice(0, 5).forEach((b, j) => { const v = Math.abs(dist(0, a) - dist(1, b)) + (i + j) * 6; if (v < bv) { bv = v; best = [a, b]; } })); return best || [A[0], B[0]]; };
+  if (!spots.some(s => s.keep)) { const cs = spots.filter(plain).sort((a, b) => Math.hypot(a.x - MW / 2, (a.z - MD / 2) * 1.2) - Math.hypot(b.x - MW / 2, (b.z - MD / 2) * 1.2)).slice(0, 10), ok = cs.filter(s => siteOK(s.x, s.z, 14));
+    const c = (ok.length ? ok : cs).map((s, i) => [s, spread(s) + i * 2]).sort((a, b) => a[1] - b[1])[0]?.[0];
     if (c) c.keep = true; }
   for (const c of spots) if (c.keep && !c.name.startsWith('CIUDADELA')) c.name = 'CIUDADELA DE ' + c.name;
   // dos pueblos (uno a cada lado del río, cerca del centro) son campamentos con guardianes neutrales
-  for (const half of [0, 1]) {
-    const c = spots.filter(s => plain(s) && (s.x < MW / 2) === !half).sort((a, b) => (Math.abs(a.x - MW / 2) + Math.abs(a.z - MD / 2) * .5) - (Math.abs(b.x - MW / 2) + Math.abs(b.z - MD / 2) * .5))[0];
-    if (c) { c.camp = true; c.name = 'CAMPAMENTO ' + c.name; }
-  }
+  { const cen = s => Math.abs(s.x - MW / 2) + Math.abs(s.z - MD / 2) * .5, side = h => spots.filter(s => plain(s) && (s.x < MW / 2) === !h).sort((a, b) => cen(a) - cen(b));
+    for (const c of pairUp(side(0), side(1))) if (c) { c.camp = true; c.name = 'CAMPAMENTO ' + c.name; } }
   // en cada mitad, una atalaya: el pueblo pequeño más metido en la franja central (lejos de los bordes de arriba y abajo y de las fortalezas)
-  for (const half of spots.some(s => s.watch) ? [] : [0, 1]) {
-    const f = forts[half], score = s => Math.abs(s.z - MD / 2) * 1.6 + Math.abs(s.x - MW / 2) * .6 - Math.min(60, Math.hypot(s.x - f.x, s.z - f.z)) * .5;
-    const c = spots.filter(s => plain(s) && (s.x < MW / 2) === !half && s.z > MD * .2 && s.z < MD * .8).sort((a, b) => score(a) - score(b))[0];
-    if (c) c.watch = true;
-  }
+  if (!spots.some(s => s.watch)) { const cand = half => { const f = forts[half], score = s => Math.abs(s.z - MD / 2) * 1.6 + Math.abs(s.x - MW / 2) * .6 - Math.min(60, Math.hypot(s.x - f.x, s.z - f.z)) * .5;
+      return spots.filter(s => plain(s) && (s.x < MW / 2) === !half && s.z > MD * .2 && s.z < MD * .8).sort((a, b) => score(a) - score(b)); };
+    for (const c of pairUp(cand(0), cand(1))) if (c) c.watch = true; }
   for (const c of spots) if (c.watch && !c.name.startsWith('ATALAYA')) c.name = 'ATALAYA DE ' + c.name;
   // un 25 % de los pueblos neutrales son fortificados: más grandes, con muchos defensores y el doble de oro
   // el mismo número de fortificados en la zona de cada jugador (antes se alternaban empezando por el oeste: con un número impar, el oeste tenía uno más y salía perdiendo)
