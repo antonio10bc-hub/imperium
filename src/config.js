@@ -42,9 +42,10 @@ export const GAME = { startGold: 220, income: 1, townIncome: 1.3, townDecay: .08
   gateHp: 2400, gateLvlHp: 900, gateRepair: 80 };
 // muralla mejorable (desde la fortaleza): los arqueros de las almenas pasan a bronce, plata y oro; más daño, alcance y cadencia, y puertas más duras
 export const WALL_LV = { cost: [0, 150, 260, 420], dmg: [1, 1.3, 1.6, 2], range: [0, 1, 2, 3], cd: [1, .9, .8, .7] };
-// dificultad: fácil usa la IA simple con menos oro; normal y difícil, la IA smart con el mismo oro que el jugador (difícil decide más a menudo y concentra el fuego)
+// dificultad: fácil usa la IA simple con menos oro; normal, la IA smart con el mismo oro que el jugador; difícil decide más a menudo, concentra el fuego, contrarresta casi siempre,
+// mejora antes sus pueblos, retira antes a sus heridos y tiene un 12 % más de oro (sin eso empataba con normal en la simulación)
 // plan: segundos entre decisiones de la IA smart · focus: cada tropa elige objetivo en vez de atacar al más cercano
-export const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, brain: 'simple', label: 'FÁCIL' }, normal: { inc: 1, attackAt: 6, hero: true, brain: 'smart', plan: 1, focus: false, label: 'NORMAL' }, hard: { inc: 1, attackAt: 5, hero: true, brain: 'smart', plan: .5, focus: true, label: 'DIFÍCIL' } };
+export const DIFF = { easy: { inc: .7, attackAt: 7, hero: false, brain: 'simple', label: 'FÁCIL' }, normal: { inc: 1, attackAt: 6, hero: true, brain: 'smart', plan: 1, focus: false, label: 'NORMAL' }, hard: { inc: 1.12, attackAt: 5, hero: true, brain: 'smart', plan: .5, focus: true, counter: .9, eco: .7, retreat: .38, label: 'DIFÍCIL' } };
 // sitios: fortalezas, cuarteles, salones de héroes (ALT) y templos (TEMP) de cada bando; después, los pueblos
 // jugadores en la partida (2 a 5) y posición de cada edificio en spots: castillos, cuarteles, salones de héroes y templos (uno por jugador), y después los pueblos
 export let NP = 2;

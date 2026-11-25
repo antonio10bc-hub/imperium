@@ -84,10 +84,10 @@ function simpleUnit(u, dt, A) {
   // Cada tropa se compromete con su objetivo y solo lo replantea cada pocos segundos o al conquistarlo (antes lo cambiaba a cada paso y se quedaba clavada a medio camino)
   const valid = t => t >= TOWN0 && spots[t] && spots[t].owner !== side && !(spots[t].guards > 0 && ((spots[t].fortified && u.armyN < 24) || (spots[t].keep && u.armyN < 14)));
   if ((u.aiReT = (u.aiReT ?? 0) - dt) <= 0 || !valid(u.aiT)) {
-    u.aiReT = 5 + (u.id % 5); u.armyN = units.filter(o => o.side === side && o.type !== 'hero').length;
+    u.aiReT = 5 + (u.rid * 5 | 0); u.armyN = units.filter(o => o.side === side && o.type !== 'hero').length;
     let bt = -1, bv = 1e9, st = -1, sv = 1e9;
     for (let t = TOWN0; t < spots.length; t++) if (valid(t)) { const v = fields[t][u.node]; if (v < bv) { st = bt; sv = bv; bt = t; bv = v; } else if (v < sv) { st = t; sv = v; } }
-    u.aiT = u.id % 2 && st >= 0 && sv < bv * 2.5 + 20 ? st : bt; u.aiV = u.aiT === st ? sv : bv;
+    u.aiT = u.rid < .5 && st >= 0 && sv < bv * 2.5 + 20 ? st : bt; u.aiV = u.aiT === st ? sv : bv;
   }
   const bs = spots[u.aiT];
   if (bs && (u.aiV < 90 || u.type !== 'hero')) spreadTo(u, bs.x, bs.z, fields[u.aiT], 0, 0, dt, capR(bs) - .8);   // dentro del círculo de conquista, sin amontonarse
@@ -137,7 +137,7 @@ function smartPlan(A) {
   else if (wantSiege && !saving && st.queue.length < 2 && st.gold >= UNITS[wantSiege].cost) enqueue(side, wantSiege);
   else if (!saving && !hold && st.queue.length < 2 && st.gold >= UNITS[A.next].cost && enqueue(side, A.next)) {
     const top = ['sword', 'bow', 'horse', 'harcher', 'titan'].sort((a, b) => foeCount[b] - foeCount[a])[0];
-    A.next = off(A, 'counter') ? TYPES[Math.random() * 3 | 0] : P.horse && Math.random() < P.horse ? 'horse' : foeCount[top] > 0 && Math.random() < .7 ? COUNTER[top] : TYPES.slice().sort((a, b) => own(a) - own(b))[0];
+    A.next = off(A, 'counter') ? TYPES[Math.random() * 3 | 0] : P.horse && Math.random() < P.horse ? 'horse' : foeCount[top] > 0 && Math.random() < (A.Df.counter ?? .7) ? COUNTER[top] : TYPES.slice().sort((a, b) => own(a) - own(b))[0];
   }
   // muralla y puertas: el defensivo mejora pronto; todos reparan las puertas rotas cuando no hay enemigos encima
   if (nearW === 0 && st.gold > 150 && gateList.some(g => g.f.side === side && g.hp < g.max * .5)) repairGates(side);
@@ -153,7 +153,7 @@ function smartPlan(A) {
   // --- mercenarios: si hay oferta y le sobra oro, los contrata
   if (ev.merc && !ev.merc.hired[side] && st.gold >= MERC.cost + 60 && !saving) hireMercs(side);
   // --- mejoras: con oro de sobra, primero los pueblos que más rinden y sin enemigos cerca
-  const upAt = (off(A, 'eco') ? (foeW > myW ? 420 : 320) : foeW > myW * 1.2 ? 400 : 140) * P.up;   // una mejora se amortiza en ~80 s: si no va por detrás, mejora pronto
+  const upAt = (off(A, 'eco') ? (foeW > myW ? 420 : 320) : foeW > myW * 1.2 ? 400 : 140) * P.up * (A.Df.eco ?? 1);   // una mejora se amortiza en ~80 s: si no va por detrás, mejora pronto
   if (!saving && st.gold > upAt) {
     const t = spots.filter(s => s.kind === 'town' && !noGold(s) && s.owner === side && s.lvl < 3 && memNear(A, s.x, s.z, 16, 10) === 0).sort((a, b) => townInc(b) - townInc(a) || a.lvl - b.lvl)[0];
     if (t) upgradeTown(side, t);
@@ -225,7 +225,7 @@ function smartUnit(u, dt, A) {
   if (u.leader) return escortUnit(u, dt);
   if (u.aiJob && aiJobStep(u, dt)) return;
   const side = u.side, k = u.hp / u.maxHp;
-  if (k < .3 && u.type !== 'hero') u.retreat = true; else if (k > .85) u.retreat = false;
+  if (k < (A.Df.retreat ?? .3) && u.type !== 'hero') u.retreat = true; else if (k > .85) u.retreat = false;
   if ((u.think -= dt) <= 0) { u.think = .3; const r = u.retreat ? 1.8 : u.def.aggro; u.enemy = A.Df.focus && !u.retreat ? pickTarget(u, r) : nearestEnemy(u, r); }
   if (alive(u.enemy) && strike(u, u.enemy, dt)) return;
   if (u.retreat && off(A, 'heal')) { const h = spots[side]; spreadTo(u, h.x, h.z, fields[side], 3.5, 1.15, dt); return; }
@@ -240,16 +240,16 @@ function smartUnit(u, dt, A) {
   const def = A.roles.get(u);
   if (def != null) { const s = spots[def]; spreadTo(u, s.x, s.z, fields[def], 2.5, 1, dt); return; }
   const home = spots[side];
-  if (A.stance === 'defend' || (A.P.garrison && u.type !== 'hero' && !u.def.siege && (u.id % 100) / 100 < A.P.garrison)) { spreadTo(u, home.x, home.z, fields[side], 3.5, 1.15, dt); return; }   // guarnición del defensivo
+  if (A.stance === 'defend' || (A.P.garrison && u.type !== 'hero' && !u.def.siege && u.rid < A.P.garrison)) { spreadTo(u, home.x, home.z, fields[side], 3.5, 1.15, dt); return; }   // guarnición del defensivo
   if (u.def.siege) { const n = units.filter(o => o.side === side && !o.def.siege && o.type !== 'hero').length;   // el asedio va a la fortaleza rival con el ejército; si no, espera en casa
     if (n >= 8) siege(u, spots[targetBase(side, u)], dt); else spreadTo(u, home.x, home.z, fields[side], 3.5, 1.15, dt); return; }
   // como la IA original: la mitad al objetivo más cercano y la otra mitad al segundo, pero sin meterse donde sabe que no puede ganar
   const valid = t => t >= TOWN0 && spots[t] && spots[t].owner !== side && !A.blocked?.has(t) && !(spots[t].guards > 0 && ((spots[t].fortified && u.armyN < 24) || (spots[t].keep && u.armyN < 14)));
   if ((u.aiReT = (u.aiReT ?? 0) - dt) <= 0 || !valid(u.aiT)) {
-    u.aiReT = 5 + (u.id % 5); u.armyN = units.filter(o => o.side === side && o.type !== 'hero').length;
+    u.aiReT = 5 + (u.rid * 5 | 0); u.armyN = units.filter(o => o.side === side && o.type !== 'hero').length;
     let bt = -1, bv = 1e9, st = -1, sv = 1e9;
     for (let t = TOWN0; t < spots.length; t++) if (valid(t)) { const v = fields[t][u.node]; if (v < bv) { st = bt; sv = bv; bt = t; bv = v; } else if (v < sv) { st = t; sv = v; } }
-    u.aiT = u.id % 2 && st >= 0 && sv < bv * 2.5 + 20 && !A.concentrate ? st : bt; u.aiV = u.aiT === st ? sv : bv;
+    u.aiT = u.rid < .5 && st >= 0 && sv < bv * 2.5 + 20 && !A.concentrate ? st : bt; u.aiV = u.aiT === st ? sv : bv;
   }
   const bs = spots[u.aiT];
   if (bs && (u.aiV < 90 || u.type !== 'hero')) spreadTo(u, bs.x, bs.z, fields[u.aiT], 0, 0, dt, capR(bs) - .8);

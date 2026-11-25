@@ -187,10 +187,11 @@ export function spawnUnit(side, type, at = BARR0) {
   if (side === 0 && r) orderMove([u], r.x, r.z, false);   // punto de reunión del edificio (si tu bando lo lleva la IA, ella decide luego)
   return u;
 }
+// rid: sorteo propio de cada tropa para repartirla entre objetivos (la IA). No se usa el id: los dos bandos reclutan a la vez y cada uno acababa con ids de la misma paridad
 export function spawnAt(side, type, x, z, ang = Math.random() * 6.28) {
   const def = defOf(side, type), n = nearestNode(x, z);
   const parts = buildUnit(type, side);
-  const u = { id: ++uid, side, type, def, hp: def.hp, maxHp: def.hp, node: n, pos: new THREE.Vector3(cellX(n), HM[n], cellZ(n)), fwd: new THREE.Vector3(Math.cos(ang), 0, Math.sin(ang)),
+  const u = { id: ++uid, rid: Math.random(), side, type, def, hp: def.hp, maxHp: def.hp, node: n, pos: new THREE.Vector3(cellX(n), HM[n], cellZ(n)), fwd: new THREE.Vector3(Math.cos(ang), 0, Math.sin(ang)),
     cd: 0, think: 0, enemy: null, bob: Math.random() * 6, lunge: 0, flash: 0, block: 0, order: null, leader: null, escort: [], combatT: 0, lastHit: -9, healT: 0,
     chargeT: 0, chargeCd: 6, kills: 0, rank: 0, ...parts };
   units.push(u); place(u);
