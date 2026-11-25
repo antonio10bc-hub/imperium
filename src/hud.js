@@ -99,7 +99,7 @@ function panelContent() {
     let info, act = '';
     if (r.state === 'none') {
       info = `<div class="note g">COMIENZA EL RITUAL PARA PODER INVOCAR A ${god}.</div><div class="note">DURA ${GAME.ritualTime} S. LUEGO, ${god} SE INVOCA AQUÍ.</div>`;
-      act = `<button type="button" class="y" data-act="ritual" ${st.gold < GAME.ritualCost ? 'disabled' : ''}>COMENZAR RITUAL · ${GAME.ritualCost} ORO</button>`;
+      act = `<button type="button" class="y" data-act="ritual" ${st.gold < GAME.ritualCost ? 'disabled' : ''}>COMENZAR RITUAL · ${GAME.ritualCost} ORO <kbd>1</kbd></button>`;
     } else if (r.state === 'ritual') {
       info = `<div class="hpb"><b style="width:${pct(1 - r.t / GAME.ritualTime)};background:var(--yellow)"></b><span>RITUAL ${Math.ceil(r.t)} S</span></div><div class="note">CUANDO TERMINE PODRÁS INVOCAR A ${god}.</div>`;
     } else {
@@ -107,13 +107,13 @@ function panelContent() {
       info = st.godQ ? `<div class="hpb"><b style="width:${pct(1 - st.godQ.t / d.time)};background:var(--yellow)"></b><span>DESCIENDE EN ${Math.ceil(st.godQ.t)} S</span></div>`
         : g ? `<div class="note g">${god} YA LUCHA A TU LADO.</div>` : `<div class="note g">FLOTA, GOLPEA CUERPO A CUERPO Y CURA A LA ESCOLTA DE SU HÉROE.</div>`;
       info += `<div class="note">UN DIOS POR BANDO. ASÍGNALO A UN HÉROE: IRÁ DETRÁS DE ÉL.</div><div class="note">CLIC DERECHO EN EL MAPA: DÓNDE APARECE.</div>`;
-      act = g ? `<button type="button" data-act="god">SELECCIONAR</button>` : st.godQ ? '' : `<button type="button" class="y" data-act="summonGod" ${st.gold < d.cost || popOf(0) >= capOf(0) ? 'disabled' : ''}>INVOCAR · ${d.cost} ORO</button>`;
+      act = g ? `<button type="button" data-act="god">SELECCIONAR</button>` : st.godQ ? '' : `<button type="button" class="y" data-act="summonGod" ${st.gold < d.cost || popOf(0) >= capOf(0) ? 'disabled' : ''}>INVOCAR · ${d.cost} ORO <kbd>1</kbd></button>`;
     }
     return `<div class="ph"><h3>TEMPLO${cn}</h3><em>${r.state === 'done' ? 'CONSAGRADO' : r.state === 'ritual' ? 'RITUAL EN CURSO' : 'SIN CONSAGRAR'}</em></div><img class="big" alt="" src="${THUMB.god || ''}"><div class="info">${info}</div>${act ? `<div class="act">${act}</div>` : ''}`;
   }
   if (S.selBld === 'altar') {
     const n = heroCount(0), alive = heroesOf(0).length, tr = st.heroQ.filter(h => h.state === 'training'), dead = st.heroQ.filter(h => h.state === 'dead');
-    let btn = n < GAME.maxHeroes ? `<button type="button" class="y" data-act="summon" ${st.gold < UNITS.hero.cost ? 'disabled' : ''}>INVOCAR · ${UNITS.hero.cost} ORO</button>` : `<button type="button" disabled>MÁXIMO ${GAME.maxHeroes} HÉROES</button>`;
+    let btn = n < GAME.maxHeroes ? `<button type="button" class="y" data-act="summon" ${st.gold < UNITS.hero.cost ? 'disabled' : ''}>INVOCAR · ${UNITS.hero.cost} ORO <kbd>1</kbd></button>` : `<button type="button" disabled>MÁXIMO ${GAME.maxHeroes} HÉROES</button>`;
     if (alive) btn = `<button type="button" data-act="hero">SELECCIONAR</button>` + btn;
     const note = `HÉROES ${n}/${GAME.maxHeroes}` + (tr.length ? ` · LLEGA EN ${Math.ceil(tr[0].t)} S` : '') + (dead.length ? ` · VUELVE EN ${Math.ceil(dead[0].t)} S` : '');
     return `<div class="ph"><h3>SALÓN DE HÉROES${cn}</h3><em>${note}</em></div><img class="big" alt="" src="${THUMB.hero || ''}"><div class="info"><div class="note">MÁS FUERTE, CARGA CONTRA EL ENEMIGO.</div><div class="note">HASTA ${GAME.escortMax} TROPAS EN FORMACIÓN.</div><div class="note">CLIC DERECHO EN EL MAPA: A DÓNDE VA AL LLEGAR.</div></div><div class="act">${btn}</div>`;

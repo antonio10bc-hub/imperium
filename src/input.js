@@ -7,14 +7,14 @@ import { alarm, assign, unassign } from './combat.js';
 import { GAME, MD, MW, SIEGE, TYPES } from './config.js';
 import { ping } from './effects.js';
 import { exploredAt, toggleFog } from './fog.js';
-import { enqueue, heroesOf, newGame, startGame, state, toast } from './game.js';
+import { enqueue, heroesOf, newGame, startGame, startRitual, state, summonGod, summonHero, toast } from './game.js';
 import { closeMenu, curCity, cycleBuilding, saveGroup, selectGroup, openMenu, pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
 import { GEOT, HM, cellOf, gateList, homeOf, spots, surfY } from './map.js';
 import { bfs, nearestNode } from './nav.js';
 import { seed } from './noise.js';
 import { camera, canvas, part, world } from './render.js';
 import { $, S, track } from './state.js';
-import { sel, units } from './units.js';
+import { sel, sideState, units } from './units.js';
 import { R, startChop } from './rules.js';
 import { arrowHits } from './overlay.js';
 
@@ -254,9 +254,10 @@ export function init() {
     const dg = /^Digit[1-9]$/.test(e.code) ? +e.code[5] : 0;
     if (/^f[1-5]$/.test(k)) { e.preventDefault(); pickGroup(+k[1] - 1); }
     else if (dg && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveGroup(dg); }   // CTRL + número: guarda la selección como grupo
-    else if (dg && S.selBld !== 'barracks' && selectGroup(dg)) {}   // número: ese grupo (con el cuartel seleccionado, recluta)
-    else if (dg >= 1 && dg <= 3) enqueue(0, TYPES[dg - 1], curCity());
-    else if (dg === 4 || dg === 5) enqueue(0, SIEGE[dg - 4], curCity());
+    else if (dg && S.selBld === 'barracks') { if (dg <= 3) enqueue(0, TYPES[dg - 1], curCity()); else if (dg <= 5) enqueue(0, SIEGE[dg - 4], curCity()); }   // números: lo que produce el edificio seleccionado
+    else if (dg === 1 && S.selBld === 'altar') summonHero(0, curCity());
+    else if (dg === 1 && S.selBld === 'temple') { if (sideState[0].ritual.state === 'none') startRitual(0, curCity()); else summonGod(0); }
+    else if (dg && !S.selBld) selectGroup(dg);   // sin edificio seleccionado: los grupos guardados
     else if (k === 'q') cycleBuilding('barracks');
     else if (k === 'w') cycleBuilding('altar');
     else if (k === 'e') cycleBuilding('temple');
