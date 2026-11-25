@@ -1,11 +1,12 @@
 // Reglas propias de cada geografía: lo que hace que cada mapa se juegue distinto.
 // · Río: dos puentes que se pueden construir con oro.          · Cordillera: la nieve frena; desde lo alto se ve más lejos.
-// · Archipiélago: mareas que cubren y descubren los bajíos.    · Barrancos: emboscadas desde arriba; en el fondo no se ve a nadie de lejos.
+// · Archipiélago: mareas que cubren y descubren los bajíos.    · Barrancos: en el fondo no se ve a nadie de lejos.
 // · Afluentes: crecidas que cierran los vados un rato.        · Delta: los pantanos ocultan a las tropas y atascan a los jinetes.
 // · Bosque: se puede talar el bosque denso; dentro, cobertura contra flechas.
 // · Desierto: lejos del agua y de los caminos, las tropas pasan sed.   · Caldera: el volcán entra en erupción de vez en cuando.
 // · Valle helado: el hielo se rompe si hay demasiadas tropas encima.  · Cañón: tres puentes que se pueden destruir y reparar.
-// · Ruinas: tesoros por las calles para el primero que llegue.   · Costa: dos niveles unidos por pocas rampas.
+// · Ruinas: tesoros por las calles para el primero que llegue.   · Costa: dos niveles unidos por pocas rampas y, a veces, un tsunami.
+// · Caldera: en cada erupción, además, una roca enorme cae en un punto del mapa sin edificios.
 // (Istmo y cordillera colocan además la ciudadela y las atalayas en sus pasos; la meseta tiene tres rampas estrechas.)
 import * as THREE from 'three';
 import { sfx } from './audio.js';
@@ -40,7 +41,8 @@ export function setupRules() {
   on.canyon = has('barrancos'); on.swamp = has('delta');
   on.chop = has('bosque'); on.cover = has('bosque');
   on.thirst = has('oasis'); on.volcano = has('lago') && !!geoR?.volcano;
-  on.ice = has('helado'); on.treasures = has('ruinas') || has('bosque');
+  on.ice = has('helado'); on.treasures = has('ruinas') || has('bosque'); on.tsunami = has('costa');
+  R.tsunami = on.tsunami ? { phase: 'calm', t: 200 + Math.random() * 60, n: 0 } : null; R.rock = null; R.tsuMesh = null;
   // casillas donde las tropas se ocultan: el fondo de los barrancos y los pantanos del delta
   if (on.canyon || on.swamp) { R.hide = new Uint8Array(N); for (let i = 0; i < N; i++) if ((on.canyon && HM[i] === 1 && inK('barrancos', i)) || (on.swamp && GEOT[i] === 2 && inK('delta', i))) R.hide[i] = 1; }
   // cobertura: junto al bosque denso o entre árboles
@@ -294,10 +296,9 @@ function updateJobs(dt) {
 }
 
 // ---------- reglas que afectan a cada tropa ----------
-// multiplica el daño: emboscada desde lo alto en los barrancos; cobertura contra flechas en el bosque
+// multiplica el daño: cobertura contra flechas en el bosque
 export function geoDmg(att, tgt) {
   let k = 1;
-  if (R.on.canyon && att.node != null && HM[att.node] - HM[tgt.node] >= 2 && (!R.half.barrancos || R.half.barrancos(tgt.pos.x, tgt.pos.z))) k *= 1.25;
   if (R.cover && RANGED(att.type) && R.cover[tgt.node]) k *= .7;
   return k;
 }
@@ -348,8 +349,70 @@ function updateVolcano(dt) {
   }
   if (v.t > 0) return;
   if (v.phase === 'calm') { v.phase = 'warn'; v.t = 8; toast('¡EL VOLCÁN RUGE! VA A ENTRAR EN ERUPCIÓN', 'bad', v); sfx('rumble'); }
-  else if (v.phase === 'warn') { v.phase = 'erupt'; v.t = 7; toast('¡ERUPCIÓN! LEJOS DEL VOLCÁN', 'bad', v); sfx('rumble'); }
+  else if (v.phase === 'warn') { v.phase = 'erupt'; v.t = 7; toast('¡ERUPCIÓN! LEJOS DEL VOLCÁN', 'bad', v); sfx('rumble'); launchRock(top); }
   else { v.phase = 'calm'; v.t = 160 + Math.random() * 60; }
+}
+
+// roca gigante del volcán: sale del cráter al empezar la erupción y cae en un punto de tierra lejos de pueblos, fortalezas y puentes.
+// Una marca roja en el suelo avisa de dónde caerá; al caer hiere mucho a todo el que pille (de cualquier bando) y se queda en el mapa
+const ROCK_R = 6, ROCK_DMG = 150, ROCK_T = 3.6;
+function launchRock(top) {
+  let to = null;
+  for (let k = 0; k < 400 && !to; k++) {
+    const x = 4 + Math.random() * (MW - 8), z = 4 + Math.random() * (MD - 8), i = idx(x | 0, z | 0);
+    if (HM[i] < 1 || [1, 5, 10, 16, 17, 18].includes(GEOT[i]) || Math.hypot(x - R.volcano.x, z - R.volcano.z) < 22) continue;
+    if (spots.some(s => Math.hypot(s.x - x, s.z - z) < (s.kind === 'base' ? 26 : 13)) || R.bridges.some(b => Math.hypot(b.x - x, b.z - z) < 10)) continue;
+    to = new THREE.Vector3(x, HM[i], z);
+  }
+  if (!to) return;
+  const m = new THREE.Group(); part(m, 2.6, 2.2, 2.4, 0x3a3034, 0, 0, 0); part(m, 1.8, 1.6, 2.8, 0x4a4448, .4, .5, -.2); part(m, 2.2, 1.4, 1.6, 0x2e282c, -.5, -.4, .5);
+  part(m, .5, .5, 2.9, 0xff7a1a, .9, .2, 0, false); part(m, 2.7, .4, .5, 0xffa03a, 0, -.3, 1.05, false); bake(m); m.position.copy(top); world.add(m); R.meshes.push(m);
+  const mark = new THREE.Mesh(new THREE.RingGeometry(ROCK_R - .6, ROCK_R, 40), new THREE.MeshBasicMaterial({ color: 0xd83a4a, transparent: true, opacity: .7, depthWrite: false, side: THREE.DoubleSide }));
+  mark.rotation.x = -Math.PI / 2; mark.position.set(to.x, to.y + .15, to.z); world.add(mark); R.meshes.push(mark);
+  R.rock = { m, mark, to, t: ROCK_T, v: new THREE.Vector3((to.x - top.x) / ROCK_T, (to.y - top.y + 4.5 * ROCK_T * ROCK_T) / ROCK_T, (to.z - top.z) / ROCK_T) };
+}
+function updateRock(dt) {
+  const r = R.rock; r.t -= dt; r.v.y -= 9 * dt; r.m.position.addScaledVector(r.v, dt); r.m.rotation.x += dt * 1.5; r.m.rotation.z += dt;
+  r.mark.material.opacity = .45 + .35 * Math.sin(performance.now() / 90); r.mark.scale.setScalar(1 + Math.max(0, r.t) * .08);
+  if ((r.tr = (r.tr ?? 0) - dt) <= 0) { r.tr = .04; plume(r.m.position.clone(), Math.random() < .5 ? 0x3a3438 : 0xff7a1a, 1.2, 1.2, .5, -.2, true); }
+  if (r.t > 0) return;
+  world.remove(r.mark); r.mark.geometry.dispose(); r.mark.material.dispose(); R.rock = null;
+  const p = r.to; r.m.position.set(p.x, p.y + .9, p.z); r.m.rotation.set(.2, Math.random() * 6, -.15);   // se queda clavada donde cae
+  burst(p.clone().setY(p.y + 1), [0xff7a1a, 0xffc83a, 0x3a3034, 0x6a6266], 60, 8, 9, 1.4, .45, true);
+  for (let k = 0; k < 10; k++) { const a = k / 10 * 6.28; plume(p.clone().add(new THREE.Vector3(Math.cos(a) * 3, 1, Math.sin(a) * 3)), 0x56565c, 2.4, 2.4, 1.6, -.4, true); }
+  sfx('rumble');
+  for (const u of UGRID.near(p.x, p.z, ROCK_R, _near)) if (Math.hypot(u.pos.x - p.x, u.pos.z - p.z) < ROCK_R) damage({ side: NEU, vis: u.vis, def: {} }, u, ROCK_DMG);
+}
+// ---------- tsunami (costa) ----------
+// cada pocos minutos el mar se retira y llega una ola que cubre la mitad del mapa del lado del mar: quita el 90 % de la vida a quien pille
+const TSU = { warn: 10, in: 4, hold: 1.2, out: 4 };
+function tsunamiMesh() {
+  if (R.tsuMesh) return R.tsuMesh;
+  const g = new THREE.Group(), water = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x3f86c8, transparent: true, opacity: .62, depthWrite: false }));
+  const foam = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xf4f8ff, transparent: true, opacity: .85, depthWrite: false }));
+  g.add(water, foam); g.visible = false; world.add(g); R.meshes.push(g); R.tsuMesh = { g, water, foam }; return R.tsuMesh;
+}
+function setWave(front) {   // agua desde el borde del mar (z = MD) hasta front
+  const w = tsunamiMesh(), d = Math.max(.1, MD + 8 - front);
+  w.g.visible = true; w.water.scale.set(MW + 16, 6, d); w.water.position.set(MW / 2, 2, front + d / 2);
+  w.foam.scale.set(MW + 16, 6.6, 1.6); w.foam.position.set(MW / 2, 2.3, front + .8);
+}
+function updateTsunami(dt) {
+  const T = R.tsunami; T.t -= dt;
+  if (T.phase === 'warn' && (T.fx = (T.fx ?? 0) - dt) <= 0) { T.fx = .25; for (let k = 0; k < 4; k++) plume(new THREE.Vector3(Math.random() * MW, 1, MD - 2 - Math.random() * 6), 0xe8f0f8, 1.4, 1.4, 1.2, -.3, true); }   // el mar se agita
+  if (T.phase === 'wave') {
+    const e = TSU.in + TSU.hold + TSU.out - T.t, mid = MD * .5, k = e < TSU.in ? 1 - Math.pow(1 - e / TSU.in, 2) : e < TSU.in + TSU.hold ? 1 : Math.max(0, 1 - (e - TSU.in - TSU.hold) / TSU.out);
+    const front = MD + 6 - (MD + 6 - mid) * k; setWave(front);
+    if (e < TSU.in + TSU.hold) for (const u of units) if (!u.dead && u.tsu !== T.n && u.pos.z > front) {   // la ola pasa por encima: 90 % de la vida
+      u.tsu = T.n; damage({ side: NEU, vis: u.vis, def: {} }, u, u.hp * .9);
+      if (u.vis) burst(u.pos.clone().setY(u.pos.y + 1), [0xf4f8ff, 0x8ac8f0], 6, 2.5, 3, .5, .2);
+    }
+    if ((T.fx = (T.fx ?? 0) - dt) <= 0 && e < TSU.in + TSU.hold) { T.fx = .08; for (let k = 0; k < 3; k++) burst(new THREE.Vector3(Math.random() * MW, 4.5, front), [0xffffff, 0xbfe4f4], 3, 2, 3, .6, .25, true); }
+  }
+  if (T.t > 0) return;
+  if (T.phase === 'calm') { T.phase = 'warn'; T.t = TSU.warn; sfx('rumble'); }
+  else if (T.phase === 'warn') { T.phase = 'wave'; T.t = TSU.in + TSU.hold + TSU.out; T.n++; sfx('rumble'); }
+  else { T.phase = 'calm'; T.t = 220 + Math.random() * 100; if (R.tsuMesh) R.tsuMesh.g.visible = false; }
 }
 
 // contador de la regla con tiempo de la geografía (marea, crecida, volcán), para la pantalla y la pausa
@@ -357,6 +420,7 @@ const mmss = t => { t = Math.max(0, Math.ceil(t)); return `${t / 60 | 0}:${Strin
 export function ruleTimer() {
   const c = R.cycle;
   if (c) { const tide = R.on.tides; return c.phase === 'open' ? `${tide ? 'MAREA ALTA' : 'CRECIDA'} EN ${mmss(c.t + 10)}` : c.phase === 'warn' ? `${tide ? '¡LA MAREA SUBE!' : '¡EL RÍO CRECE!'} ${mmss(c.t)}` : `${tide ? 'MAREA BAJA' : 'LOS VADOS SE ABREN'} EN ${mmss(c.t)}`; }
+  const ts = R.tsunami; if (ts) return ts.phase === 'calm' ? `TSUNAMI EN ~${mmss(ts.t + TSU.warn)}` : ts.phase === 'warn' ? `¡TSUNAMI! SAL DE LA MITAD DEL MAR ${mmss(ts.t)}` : '¡TSUNAMI!';
   const v = R.volcano; if (v) return v.phase === 'calm' ? `ERUPCIÓN EN ~${mmss(v.t + 8)}` : v.phase === 'warn' ? '¡EL VOLCÁN RUGE!' : '¡ERUPCIÓN!';
   return '';
 }
@@ -366,6 +430,8 @@ export function drawRulesMini(c) {
   const g = R.gates[0], ph = R.cycle?.phase;
   if (g && (ph === 'warn' || ph === 'closed') && (ph === 'closed' || blink)) { c.fillStyle = ph === 'warn' ? '#ffe06a' : '#3a8ad8'; for (let k = 0; k < g.cells.length; k += 3) { const i = g.cells[k], x = i % MW, z = (i / MW) | 0; if (exploredAt(x, z)) c.fillRect(x - 1, z - 1, 3, 3); } }
   const v = R.volcano; if (v && v.phase !== 'calm' && exploredAt(v.x, v.z)) { c.strokeStyle = blink ? '#ff7a1a' : '#d83a4a'; c.lineWidth = 3; c.beginPath(); c.arc(v.x, v.z, 34, 0, 7); c.stroke(); }
+  if (R.rock && blink) { c.strokeStyle = '#d83a4a'; c.lineWidth = 3; c.beginPath(); c.arc(R.rock.to.x, R.rock.to.z, ROCK_R + 2, 0, 7); c.stroke(); }
+  if (R.tsunami && R.tsunami.phase !== 'calm' && (R.tsunami.phase === 'wave' || blink)) { c.fillStyle = 'rgba(58,138,216,.35)'; c.fillRect(0, MD / 2, MW, MD / 2); }
   for (const b of R.breaks || []) if (b.phase === 'crack' && blink && exploredAt(b.x, b.z)) { c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.arc(b.x, b.z, 8, 0, 7); c.stroke(); }
 }
 export function updateRules(dt) {
@@ -374,6 +440,8 @@ export function updateRules(dt) {
   if (R.hide && (R.hideT = (R.hideT ?? 0) - dt) <= 0) { R.hideT = .3; updateHide(); }
   if (R.wet && (R.thirstT = (R.thirstT ?? 0) - dt) <= 0) { R.thirstT = 1; updateThirst(); }
   if (R.volcano) updateVolcano(dt);
+  if (R.rock) updateRock(dt);
+  if (R.tsunami) updateTsunami(dt);
   for (const b of R.bridges) if (b.style === 'fort' && b.built) updateFortBridge(b, dt);
   if (R.on.ice) updateIce(dt);
   if (R.treasures && (R.trT = (R.trT ?? 0) - dt) <= 0) { R.trT = .25; updateTreasures(); }

@@ -251,11 +251,11 @@ export const GEO = (() => {
   // una frase para el menú: qué hace especial a cada geografía
   const DESC = { cordillera: 'Una muralla de montañas con tres puertos vigilados. Desde las cumbres se ve lejos, pero la nieve frena.',
     istmo: 'Un solo paso de tierra entre dos mares. La ciudadela lo guarda.', archipielago: 'Islas unidas por bajíos que la marea cubre cada pocos minutos.',
-    barrancos: 'Gargantas y mesetas: desde arriba se golpea más fuerte y en el fondo nadie te ve llegar.', meseta: 'Una gran meseta de oro doble con solo tres rampas estrechas.',
+    barrancos: 'Gargantas y mesetas: en el fondo nadie te ve llegar.', meseta: 'Una gran meseta de oro doble con solo tres rampas estrechas.',
     afluentes: 'Dos ríos se juntan en el centro. Las crecidas cierran los vados.', delta: 'Canales y pantanos que ocultan a las tropas y atascan a los jinetes.',
     bosque: 'Un bosque cerrado: tala sendas para avanzar y encontrar los claros escondidos.', oasis: 'Dunas y sed. Pocos oasis, muy valiosos.',
-    lago: 'Un lago con un volcán gigante en el centro que entra en erupción.', helado: 'Lagos helados: el hielo se rompe si cargas demasiadas tropas encima.',
-    canon: 'Una garganta seca con una isla fortificada en el centro. Quien controle los puentes, controla el mapa.', costa: 'Las fortalezas en lo alto del acantilado y pocas rampas hasta el llano.',
+    lago: 'Un lago con un volcán gigante en el centro: en cada erupción lanza una roca enorme.', helado: 'Lagos helados: el hielo se rompe si cargas demasiadas tropas encima.',
+    canon: 'Una garganta seca con una isla fortificada en el centro. Quien controle los puentes, controla el mapa.', costa: 'Las fortalezas en lo alto del acantilado y pocas rampas hasta el llano. A veces llega un tsunami.',
     ruinas: 'Restos de una ciudad antigua, con tesoros escondidos entre los muros.', };
   const NAME = { ...LIST, rio: 'RÍO' };   // el río clásico ya no se elige, pero queda como mapa de reserva
   return { build, LIST, NAME, DESC, keys: Object.keys(LIST) };
