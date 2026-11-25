@@ -13,7 +13,7 @@ export function resetStats() { STATS.t = 0; STATS.samples = []; STATS.per = play
 const stOf = sd => STATS.per[sd];
 export function statKill(u, by) {
   if (u.side < NEU && stOf(u.side)) stOf(u.side).lost++;
-  if (by?.side != null && by.side < NEU && stOf(by.side)) stOf(by.side).kills++;
+  if (by?.side != null && by.side < NEU && stOf(by.side)) { const p = stOf(by.side), k = by.type || (by.def && Object.keys(by.def).length ? 'otro' : 'torre'); p.kills++; (p.by ??= {})[k] = (p.by[k] || 0) + 1; }   // bajas por quién las causa
   if (by && by.side === 0 && by.type === 'hero' && (!STATS.mvp || by.kills >= STATS.mvp.kills)) STATS.mvp = { kills: by.kills + (u.type === 'hero' ? 3 : 1), rank: by.rank };
 }
 export const statMade = sd => { if (stOf(sd)) stOf(sd).made++; };

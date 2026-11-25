@@ -82,7 +82,7 @@ function updateTemple(side, dt) {
   }
 }
 function updateProduction(dt) {
-  for (const side of players()) {
+  for (const side of (globalThis.__REV ? players().reverse() : players())) {
     if (sideState[side].dead) continue;
     updateTemple(side, dt);
     const st = sideState[side], q = st.queue;
@@ -290,7 +290,7 @@ export function updateGame(dt) {
   for (const sd of players()) if (!sideState[sd].dead) sideState[sd].gold += incomeOf(sd) * dt * (sideState[sd].ai?.inc ?? 1);
   updateAIs(dt); updateProduction(dt); updateEvents(dt); updateRules(dt); updateWeather(dt);
   UGRID.rebuild();
-  for (const u of [...units]) if (!u.dead) updateUnit(u, dt);
+  { const L = [...units]; if (globalThis.__REV) L.reverse(); for (const u of L) if (!u.dead) updateUnit(u, dt); }
   updateTowns(dt); castleDefense(dt);
   for (let i = arrows.length - 1; i >= 0; i--) {
     const a = arrows[i]; a.t += dt * (a.sp || 4); const k = Math.min(1, a.t);

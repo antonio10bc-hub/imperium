@@ -45,7 +45,7 @@ export function makeAI(side, diff, brain, persona) {
   return { side, brain: brain || Df.brain, inc: Df.inc, Df, pk, P: PERSONAS[pk], stance: 'defend', next: 'sword', planT: 0, phase: 'gather', target: -1, targetT: 0, retreatT: 0, mem: new Map(), roles: new Map(), blocked: new Set() };
 }
 export function updateAIs(dt) {
-  for (const sd of players()) { const A = sideState[sd]?.ai; if (!A) continue; if (A.brain === 'simple') simplePlan(A); else if ((A.planT -= dt) <= 0) { A.planT = A.Df.plan; smartPlan(A); } }
+  for (const sd of (globalThis.__REV ? players().reverse() : players())) { const A = sideState[sd]?.ai; if (!A) continue; if (A.brain === 'simple') simplePlan(A); else if ((A.planT -= dt) <= 0) { A.planT = A.Df.plan; smartPlan(A); } }
 }
 export function aiUnit(u, dt) { const A = sideState[u.side].ai; return A.brain === 'simple' ? simpleUnit(u, dt, A) : smartUnit(u, dt, A); }
 
