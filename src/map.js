@@ -319,13 +319,11 @@ export function generate(newSeed, tries = 0) {
   }
   for (const c of spots) if (c.watch && !c.name.startsWith('ATALAYA')) c.name = 'ATALAYA DE ' + c.name;
   // un 25 % de los pueblos neutrales son fortificados: más grandes, con muchos defensores y el doble de oro
-  const nFort = Math.round(spots.filter(plain).length * .25);
-  for (let k = 0; k < nFort; k++) {
-    const half = k % 2, f = forts[half];
-    const cand0 = spots.filter(s => plain(s) && (s.x >= MW / 2) === !!half && Math.hypot(s.x - f.x, s.z - f.z) > 55), big = cand0.filter(s => siteOK(s.x, s.z, 12)), cand = big.length ? big : cand0;   // los grandes, donde cabe su explanada
-    const c = cand[(rng() * cand.length) | 0]; if (!c) continue;
-    c.fortified = true;
-  }
+  // el mismo número de fortificados en la zona de cada jugador (antes se alternaban empezando por el oeste: con un número impar, el oeste tenía uno más y salía perdiendo)
+  const inZone = (s, h) => NP === 2 ? (s.x >= MW / 2) === !!h : zoneOf(s.x, s.z) === h;
+  const fcand = players().map(h => { const f = forts[h], c0 = spots.filter(s => plain(s) && inZone(s, h) && Math.hypot(s.x - f.x, s.z - f.z) > (NP > 2 ? 45 : 55)), big = c0.filter(s => siteOK(s.x, s.z, 12)); return big.length >= 2 ? big : c0; });   // los grandes, donde cabe su explanada
+  const perZone = Math.min(Math.floor(Math.min(...players().map(h => spots.filter(s => plain(s) && inZone(s, h)).length)) * .25 + .5), ...fcand.map(c => c.length));
+  for (const c of fcand) for (let k = 0; k < perZone; k++) { const j = (rng() * c.length) | 0; c.splice(j, 1)[0].fortified = true; }
   for (const c of spots) if (c.kind === 'town' && (geoR?.fumaroles || []).some(([fx, fz]) => Math.hypot(fx - c.x, fz - c.z) < 26)) c.fumarole = true;   // caldera: los pueblos junto a una fumarola dan más oro
   for (const c of spots) if ((c.fortified || c.keep) && !(c.keep && (scen === 'istmo' || (geoR?.confluence && scen !== 'canon')))) { const fl = flats.find(q => q.kind === 'town' && q.x === c.x && q.z === c.z); if (fl) { fl.r0 = c.keep ? 10 : 8; fl.r1 = c.keep ? 14 : 12; } }   // los grandes, sobre una explanada mayor (salvo la ciudadela de un paso o de una confluencia, que no lo ensancha)
   computeHM(); buildNav();

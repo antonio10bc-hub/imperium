@@ -397,16 +397,16 @@ export const CIVS = CIV.list;
 // Ventaja propia de cada civilización (el resto de reglas es común). unit: por tipo de tropa, mul multiplica y add suma estadísticas;
 // income multiplica el oro de sus pueblos, capture la velocidad de conquista y chargeCd son los segundos entre cargas del héroe
 export const BONUS = {
-  roma: { name: 'LEGIONES', text: 'espadas con +20 % de vida', unit: { sword: { mul: { hp: 1.2 } } } },
-  cartago: { name: 'COMERCIO', text: 'sus pueblos dan +30 % de oro', income: 1.3 },
-  china: { name: 'BALLESTAS', text: 'arqueros con +1,5 de alcance', unit: { bow: { add: { range: 1.5 } } } },
-  mexica: { name: 'GUERRA FLORIDA', text: 'conquistan pueblos un 40 % más rápido', capture: 1.4 },
-  egipto: { name: 'CARROS', text: 'jinetes un 15 % más rápidos y con +15 % de daño', unit: { horse: { mul: { speed: 1.15, dmg: 1.15 } } } },
+  roma: { name: 'LEGIONES', text: 'espadas con +25 % de vida y +5 % de daño', unit: { sword: { mul: { hp: 1.25, dmg: 1.05 } } } },
+  cartago: { name: 'COMERCIO', text: 'sus pueblos dan +25 % de oro', income: 1.25 },
+  china: { name: 'BALLESTAS', text: 'arqueros con +2 de alcance', unit: { bow: { add: { range: 2 } } } },
+  mexica: { name: 'GUERRA FLORIDA', text: 'conquistan pueblos un 50 % más rápido y espadas con +8 % de vida', capture: 1.5, unit: { sword: { mul: { hp: 1.08 } } } },
+  egipto: { name: 'CARROS', text: 'jinetes un 10 % más rápidos y con +10 % de daño', unit: { horse: { mul: { speed: 1.1, dmg: 1.1 } } } },
   galos: { name: 'FURIA', text: 'espadas con +15 % de daño y carga del héroe cada 14 s', unit: { sword: { mul: { dmg: 1.15 } } }, chargeCd: 14 },
-  grecia: { name: 'FALANGE', text: 'espadas con +25 % de vida, pero un 10 % más lentas', unit: { sword: { mul: { hp: 1.25, speed: .9 } } } },
-  vikingos: { name: 'SAQUEO', text: 'espadas con +10 % de daño y conquistan pueblos un 25 % más rápido', unit: { sword: { mul: { dmg: 1.1 } } }, capture: 1.25 },
+  grecia: { name: 'FALANGE', text: 'espadas con +18 % de vida, pero un 10 % más lentas', unit: { sword: { mul: { hp: 1.18, speed: .9 } } } },
+  vikingos: { name: 'SAQUEO', text: 'espadas con +5 % de daño y conquistan pueblos un 25 % más rápido', unit: { sword: { mul: { dmg: 1.05 } } }, capture: 1.25 },
   persia: { name: 'INMORTALES', text: 'espadas y arqueros con +15 % de vida', unit: { sword: { mul: { hp: 1.15 } }, bow: { mul: { hp: 1.15 } } } },
-  mongoles: { name: 'ESTEPA', text: 'jinetes un 25 % más rápidos', unit: { horse: { mul: { speed: 1.25 } } } },
+  mongoles: { name: 'ESTEPA', text: 'jinetes un 25 % más rápidos y con +8 % de vida', unit: { horse: { mul: { speed: 1.25, hp: 1.08 } } } },
   japon: { name: 'BUSHIDO', text: 'jinetes con +20 % de vida', unit: { horse: { mul: { hp: 1.2 } } } },
 };
 export const bonusOf = side => (side === 0 || side === 1) ? BONUS[civOf(side).id] || {} : {};
