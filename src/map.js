@@ -542,7 +542,7 @@ function buildOutside() {
     L.box(x + S2 / 2, (h - 6) / 2, z + S2 / 2, S2, h + 6, S2, col);
   }
   if (!L.nv) return;
-  meshes.push(L.build(new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: grad })));
+  meshes.push(L.build(terrainMat(false)));   // con la niebla de guerra de la orilla más cercana (la textura de la niebla se estira hasta el borde): fuera solo se ve lo que está junto a lo explorado
   ocean.position.y = sea ? -.06 : -5;
 }
 
