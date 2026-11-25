@@ -4,7 +4,7 @@ import { rngOf } from './noise.js';
 
 // ---------- Geografías ----------
 // Diez generadores de terreno irregulares (más el río clásico). Trabajan en unidades de 192×128 (la mitad del mapa) sobre la rejilla completa,
-// así que las formas salen al doble de tamaño y los acantilados siguen siendo de verdad. Tipos de casilla: 0 normal · 1 bosque denso (no se cruza) · 2 pantano o bajío (lento) · 3 arena · 4 oasis
+// así que las formas salen al doble de tamaño y los acantilados siguen siendo de verdad. Tipos de casilla: 0 normal · 1 bosque denso (no se cruza) · 18 cumbre de la cordillera (no se pisa) · 2 pantano o bajío (lento) · 3 arena · 4 oasis
 export const GEO = (() => {
   const W = 192, H = 128;
   const hsh = (x, z, s) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263) ^ Math.imul(s | 0, 2246822519); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };
@@ -36,8 +36,10 @@ export const GEO = (() => {
       const pz = scatter(r, 3, 26, [0, 12, 1, H - 12]).map(p => p[1]).sort((a, b) => a - b), pass = pz.map(z => [cx(z), z]); M.div = cx;
       M.each((x, z) => { const d = Math.abs(x - cx(z)); let h = 2 + Math.max(0, fbm(x * .05, z * .05, s + 2) - .5) * 6;
         const spur = Math.pow(1 - Math.abs(2 * fbm(x * .03, z * .03, s + 3) - 1), 3) * 5 * Math.max(0, 1 - d / 40);
-        h += sm(1 - (d - 2) / wd(z)) * (6 + fbm(x * .09, z * .09, s + 4) * 3) + spur;
-        for (const [px, p] of pass) { const k = sm(1 - (Math.abs(z - p - (fbm(x * .05, 1, s + 5) - .5) * 8) - 2.5) / 5) * sm(1 - (Math.abs(x - px) - 10) / 20); h = h * (1 - k) + Math.min(h, 3) * k; }
+        const rk = sm(1 - (d - 2) / wd(z)); h += rk * (6 + fbm(x * .09, z * .09, s + 4) * 3) + spur;
+        let open = 0; for (const [px, p] of pass) { const k = sm(1 - (Math.abs(z - p - (fbm(x * .05, 1, s + 5) - .5) * 8) - 2.5) / 5) * sm(1 - (Math.abs(x - px) - 10) / 20); open = Math.max(open, k); h = h * (1 - k) + Math.min(h, 3) * k; }
+        // núcleo de la sierra: cumbres nevadas altas y picudas (18 = cumbre, no se pisa); solo se cruza por los puertos
+        if (rk > .5 && open < .15) { const peak = Math.pow(1 - Math.abs(2 * fbm(x * .11, z * .11, s + 14, 3) - 1), 3); return [10 + rk * 5 + peak * 9 + hsh(x * 2, z * 2, s + 15) * 1.5, 18]; }
         return [h, 0]; });
       return pass;
     },
@@ -226,7 +228,8 @@ export const GEO = (() => {
   const LIST = { cordillera: 'CORDILLERA', istmo: 'ISTMO', archipielago: 'ARCHIPIÉLAGO', barrancos: 'BARRANCOS', meseta: 'MESETA', afluentes: 'AFLUENTES', delta: 'DELTA', bosque: 'BOSQUE', oasis: 'DESIERTO', lago: 'CALDERA', helado: 'VALLE HELADO', canon: 'CAÑÓN', costa: 'COSTA', ruinas: 'RUINAS' };
   function build(id, seed) {
     const r = rngOf(seed), s = seed % 997, F = fortsFor(r), HMg = new Float32Array(MW * MD), TTg = new Uint8Array(MW * MD);
-    const M = { each(fn) { for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, o = fn((gx + .5) * W / MW, (gz + .5) * H / MD, HMg[i], TTg[i]); if (o) { HMg[i] = Math.min(12, Math.round(o[0])); TTg[i] = o[1]; } } } };
+    // alturas hasta 12; las cumbres de la cordillera (18) pueden subir hasta 26
+    const M = { each(fn) { for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) { const i = gz * MW + gx, o = fn((gx + .5) * W / MW, (gz + .5) * H / MD, HMg[i], TTg[i]); if (o) { HMg[i] = Math.min(o[1] === 18 ? 26 : 12, Math.round(o[0])); TTg[i] = o[1]; } } } };
     const passes = GEN[id](M, r, s, F) || [];
     // la fortaleza no puede tapar un río, un lago ni un rasgo especial: si su explanada los toca, se busca el sitio limpio más cercano en su lado
     const at = (x, z) => { const gx = Math.floor(x * MW / W), gz = Math.floor(z * MD / H); return gx < 0 || gz < 0 || gx >= MW || gz >= MD ? -1 : gz * MW + gx; };
