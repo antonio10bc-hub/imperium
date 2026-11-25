@@ -157,10 +157,10 @@ function buildGame(s, keepCivs) {
     S.genFails = 0;
   }
 }
-// presentación al empezar: la cámara viaja desde la fortaleza rival hasta la tuya mientras aparece el duelo de civilizaciones (un clic o una tecla la saltan)
+// presentación al empezar: la cámara empieza muy alta sobre tu ciudad y desciende hasta ella mientras aparece el duelo de civilizaciones (un clic o una tecla la saltan)
 function startIntro() {
-  const me = spots[BASE0], foe = spots[NP === 2 ? BASE1 : 1], d = S.camDist;
-  S.intro = { t: 0, dur: 3.4, a: { x: foe.x, z: foe.z, d: Math.max(90, d * 1.6) }, b: { x: me.x, z: me.z, d } };
+  const me = spots[BASE0], d = S.camDist;
+  S.intro = { t: 0, dur: 3.4, a: { x: me.x, z: me.z, d: 230 }, b: { x: me.x, z: me.z, d } };
   const v = $('vs'); v.innerHTML = `<b style="color:${TEAM[0].css}">${civOf(0).name}</b><i>CONTRA</i><b style="color:${TEAM[1].css}">${players().slice(1).map(sd => civOf(sd).name).join(' · ')}</b><small>${GEO.NAME[scen]}</small>${players().slice(1).map(sd => sideState[sd]?.ai ? `<em style="color:${TEAM[sd].css}">${leaderOf(sd)} · ${sideState[sd].ai.P?.name || ''}</em>` : '').join('')}`;
   for (const sd of players().slice(1)) if (sideState[sd]?.ai?.P) toast(`LÍDER RIVAL: ${leaderOf(sd)} (${civOf(sd).name}) · ${sideState[sd].ai.P.name}`, 'bad');
   v.hidden = false; v.classList.remove('go'); void v.offsetWidth; v.classList.add('go'); S.fade = 0;

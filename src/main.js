@@ -70,8 +70,8 @@ function frameBody(now) {
   }
   scene.fog.near = S.camDist * 1.4; scene.fog.far = S.camDist * 3.6;
   applyRes(CFG.lines);
-  if (S.intro) {   // presentación: la cámara vuela de la fortaleza rival a la tuya (la partida espera)
-    const I = S.intro; I.t += dt; const k = Math.min(1, I.t / I.dur), e = k * k * (3 - 2 * k);
+  if (S.intro) {   // presentación: la cámara desciende desde muy alto sobre tu ciudad (la partida espera)
+    const I = S.intro; I.t += dt; const k = Math.min(1, I.t / I.dur), e = 1 - Math.pow(1 - k, 3);   // frena al llegar
     camT.x = I.a.x + (I.b.x - I.a.x) * e; camT.z = I.a.z + (I.b.z - I.a.z) * e; S.camGoal = S.camDist = I.a.d + (I.b.d - I.a.d) * e; S.focusGoal = null;
     if (k >= 1 || state !== 'play') endIntro();
   }
