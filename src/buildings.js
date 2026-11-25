@@ -273,10 +273,10 @@ export function setOwner(s, sd) {
     floatText(spotPos(s, s.watch ? 11 : 5.5), sd === 0 ? gain : 'PUEBLO PERDIDO', sd === 0 ? '#e8c870' : '#d83a4a', 10);
     if (sd === 0) floatText(spotPos(s, 3.4), `+${GAME.capTown} TROPAS`, '#8ad8f0', 9);
     toast(sd === 0 ? `¡${s.name} ES TUYO! ${gain} · +${GAME.capTown} TROPAS` : `EL RIVAL HA TOMADO ${s.name}`, sd === 0 ? 'good' : 'bad', s);
-    sfx(sd === 0 ? 'capture' : 'deny'); if (sd === 0) track('town_captured');
+    sfx('capture', sd); if (sd === 0) track('town_captured');
   } else {
     burst(spotPos(s, 1), [0xffffff, TEAM[prev].c], 14, 3, 4, .8, .22); ping(p, '#ffffff');
     toast(prev === 0 ? `HAS PERDIDO ${s.name}` : `${s.name} YA NO ES DEL RIVAL`, prev === 0 ? 'bad' : 'good', s);
-    sfx(prev === 0 ? 'lost' : 'ready');
+    sfx(prev === 0 ? 'lost' : 'ui');
   }
 }

@@ -203,11 +203,11 @@ export function syncTools() { $('spd').firstChild.textContent = '×' + S.speed; 
 export function openMenu() {
   if (state !== 'play' || S.menuOpen) return;
   S.menuOpen = true; S.pausedBefore = S.paused; S.paused = true; S.amode = false; $('mCode').textContent = mapCode(); { const rt = ruleTimer(); $('mRule').textContent = (GEO.DESC[scen] || '') + (rt ? ' · ' + rt : ''); }   // la regla del mapa (y su próximo cambio) en la pausa
-  $('menu').hidden = false; syncTools(); sfx('select'); $('mResume').focus();
+  $('menu').hidden = false; syncTools(); sfx('ui'); $('mResume').focus();
 }
 export function closeMenu() {
   if (!S.menuOpen) return;
-  S.menuOpen = false; S.paused = S.pausedBefore; $('menu').hidden = true; syncTools(); sfx('select');
+  S.menuOpen = false; S.paused = S.pausedBefore; $('menu').hidden = true; syncTools(); sfx('ui');
 }
 export function syncDiff() { document.querySelectorAll('.diff button[data-d]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.d === S.diff))); }
 
@@ -265,10 +265,10 @@ export function init() {
   $('spd').addEventListener('click', () => { S.speed = S.speed === 1 ? 2 : 1; syncTools(); });
   $('pz').addEventListener('click', () => { S.paused = !S.paused; syncTools(); });
   $('menuBtn').addEventListener('click', openMenu);
-  $('mercBtn').addEventListener('click', () => { if (hireMercs(0)) { sfx('capture'); updateHud(); } else sfx('deny'); });
+  $('mercBtn').addEventListener('click', () => { if (hireMercs(0)) { sfx('gold'); updateHud(); } else sfx('deny'); });
   $('mResume').addEventListener('click', closeMenu);
   for (const [b, t] of [['mCopy', 'mCode'], ['eCopy', 'eCode']]) $(b).addEventListener('click', () => {   // copia el código del mapa
-    const c = $(t).textContent; navigator.clipboard?.writeText(c).then(() => { $(b).textContent = 'COPIADO'; setTimeout(() => { $(b).textContent = 'COPIAR'; }, 1500); }, () => {}); sfx('select'); });
+    const c = $(t).textContent; navigator.clipboard?.writeText(c).then(() => { $(b).textContent = 'COPIADO'; setTimeout(() => { $(b).textContent = 'COPIAR'; }, 1500); }, () => {}); sfx('ui'); });
   $('mRestart').addEventListener('click', () => { track('menu_restart'); S.pendingStart = true; newGame(seed, true); });   // misma semilla y mismas civilizaciones
   $('mSurrender').addEventListener('click', () => { track('menu_surrender'); endGame(false, true); });
   $('mQuit').addEventListener('click', () => { track('menu_quit'); newGame(1 + Math.floor(Math.random() * 99999)); });

@@ -65,7 +65,7 @@ export function toggleFog() {
   fogOn = !fogOn;
   if (fogOn) updateFog(true);
   else { fogData.fill(255); fogTex.needsUpdate = true; markMiniDirty(); for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; showRuleProps(); for (const u of units) u.g.visible = true; refreshKnownTowns(true); }
-  toast(fogOn ? 'NIEBLA DE GUERRA: SÍ · N' : 'NIEBLA DE GUERRA: NO · N'); sfx('select');
+  toast(fogOn ? 'NIEBLA DE GUERRA: SÍ · N' : 'NIEBLA DE GUERRA: NO · N'); sfx('ui');
 }
 export function resetFog(on) { ensureFogSize(); fogOn = on; explored.fill(0); expF.fill(0); fogData.fill(255); if (on) updateFog(true); else { fogTex.needsUpdate = true; for (const sp of spots) if (sp.group) sp.group.visible = true; for (const d of decos) d.visible = true; showRuleProps(); } }
 // sin niebla: puentes, cofres y lava se ven siempre (si existen)

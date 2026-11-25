@@ -113,7 +113,7 @@ function geoRender(key) {
 const civOpts = () => ['random', ...CIVS.map(c => c.id)];
 function setCiv(sd, val, dir) {
   civPick[sd] = val; try { localStorage.setItem('imperium-civs', JSON.stringify(civPick)); } catch (e) {}
-  S.menuDirty = true; sfx('select'); showPortraits(sd, dir);
+  S.menuDirty = true; sfx('ui'); showPortraits(sd, dir);
 }
 // cambia el contenido de una casilla con un deslizamiento suave: lo viejo sale hacia un lado y lo nuevo entra desde el otro
 function swapStage(stage, node, dir) {
@@ -148,7 +148,7 @@ function showGeo(dir = 0) {
 function setGeo(v, dir, keepCode = false) {
   if (!keepCode) { S.codeSeed = null; $('mapCode').value = ''; $('mapCode').className = ''; }
   S.wantScen = v; try { localStorage.setItem('imperium-geo', v); } catch (e) {}
-  sfx('select'); S.menuDirty = true; showGeo(dir);
+  sfx('ui'); S.menuDirty = true; showGeo(dir);
 }
 
 // tamaño del mapa: pequeño, normal o grande
@@ -156,13 +156,13 @@ export function setSize(k, quiet = false) {
   S.mapSize = k; try { localStorage.setItem('imperium-size', k); } catch (e) {}
   document.querySelectorAll('#start [data-size]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === k)));
   setPlayersPick(Math.min(S.players || 2, MAX_PLAYERS[k] || 2), true);   // pequeño: 2 · normal: hasta 3 · grande: hasta 5
-  if (!quiet) { sfx('select'); S.menuDirty = true; }
+  if (!quiet) { sfx('ui'); S.menuDirty = true; }
 }
 // jugadores en la partida (todos contra todos); los que no caben en el tamaño elegido salen desactivados
 export function setPlayersPick(n, quiet = false) {
   const max = MAX_PLAYERS[S.mapSize] || 2; n = Math.max(2, Math.min(n, max)); S.players = n; try { localStorage.setItem('imperium-players', n); } catch (e) {}
   document.querySelectorAll('#start [data-players]').forEach(b => { const v = +b.dataset.players; b.setAttribute('aria-pressed', String(v === n)); b.disabled = v > max; b.title = v > max ? 'Necesita un mapa más grande' : ''; });
-  if (!quiet) { sfx('select'); S.menuDirty = true; }
+  if (!quiet) { sfx('ui'); S.menuDirty = true; }
 }
 export function init() {
   document.querySelectorAll('#start [data-players]').forEach(b => b.addEventListener('click', () => setPlayersPick(+b.dataset.players)));
@@ -180,9 +180,9 @@ export function init() {
     else S.codeSeed = null;
     el.className = !el.value.trim() ? '' : c ? 'ok' : 'bad';
   });
-  $('howBtn').addEventListener('click', () => { sfx('select'); $('start').hidden = true; $('how').hidden = false; });
-  $('howBack').addEventListener('click', () => { sfx('select'); $('how').hidden = true; $('start').hidden = false; });
+  $('howBtn').addEventListener('click', () => { sfx('ui'); $('start').hidden = true; $('how').hidden = false; });
+  $('howBack').addEventListener('click', () => { sfx('ui'); $('how').hidden = true; $('start').hidden = false; });
   $('again').addEventListener('click', () => newGame(1 + Math.floor(Math.random() * 99999)));
   $('againSame').addEventListener('click', () => { S.pendingStart = true; newGame(seed, true); });   // revancha: mismo mapa y mismas civilizaciones
-  document.querySelectorAll('.diff button[data-d]').forEach(b => b.addEventListener('click', () => { S.diff = b.dataset.d; try { localStorage.setItem('imperium-diff', S.diff); } catch (e) {} syncDiff(); sfx('select'); })); resize();
+  document.querySelectorAll('.diff button[data-d]').forEach(b => b.addEventListener('click', () => { S.diff = b.dataset.d; try { localStorage.setItem('imperium-diff', S.diff); } catch (e) {} syncDiff(); sfx('ui'); })); resize();
 }

@@ -109,7 +109,7 @@ export function repairGates(side) {
   const st = sideState[side], broken = gateList.filter(g => spots[g.f.side].side === side && g.hp < g.max);
   if (!broken.length || st.gold < GAME.gateRepair) { if (side === 0) sfx('deny'); return false; }
   st.gold -= GAME.gateRepair; for (const g of broken) { g.hp = g.max; for (const d of g.doors) d.visible = true; }
-  if (side === 0) { sfx('capture'); toast('PUERTAS REPARADAS', 'good'); }
+  if (side === 0) { sfx('build'); toast('PUERTAS REPARADAS', 'good'); }
   return true;
 }
 // catapulta: la piedra cae en un área y hiere a todos los enemigos cercanos

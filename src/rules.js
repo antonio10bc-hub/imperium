@@ -119,7 +119,7 @@ function updateCycle(dt) {
   c.t -= dt;
   if (c.phase === 'warn') { g.layer.visible = true; g.layer.material.opacity = .25 + .25 * Math.sin(performance.now() / 160); }   // el agua empieza a asomar
   if (c.t > 0) return;
-  if (c.phase === 'open') { c.phase = 'warn'; c.t = 10; toast(tx.warn, 'bad'); sfx('deny'); }
+  if (c.phase === 'open') { c.phase = 'warn'; c.t = 10; toast(tx.warn, 'bad'); sfx('warn'); }
   else if (c.phase === 'warn') { c.phase = 'closed'; c.t = R.on.tides ? 45 : 60; setGate(g, false); toast(tx.close, 'bad'); }
   else { c.phase = 'open'; c.t = (R.on.tides ? 100 : 130) + Math.random() * 40; setGate(g, true); toast(tx.open, 'good'); }
 }
@@ -169,7 +169,7 @@ export function buildBridge(side, b) {
   if (b.built || st.gold < BRIDGE_COST) { if (side === 0) sfx('deny'); return false; }
   st.gold -= BRIDGE_COST; setBridge(b, true);
   burst(new THREE.Vector3(b.x, b.hb + .5, b.z), [0x8a5a34, 0xffffff, 0xe8c870], 24, 3, 5, 1, .25); ping(new THREE.Vector3(b.x, b.hb, b.z), '#e8c870');
-  toast(side === 0 ? (b.breakable ? '¡PUENTE REPARADO!' : '¡PUENTE CONSTRUIDO!') : 'EL RIVAL HA CONSTRUIDO UN PUENTE', side === 0 ? 'good' : 'bad', b); sfx('capture');
+  toast(side === 0 ? (b.breakable ? '¡PUENTE REPARADO!' : '¡PUENTE CONSTRUIDO!') : 'EL RIVAL HA CONSTRUIDO UN PUENTE', side === 0 ? 'good' : 'bad', b); sfx('build', side);
   return true;
 }
 // el último puente en pie del cañón no se puede derribar (si no, el mapa quedaría partido)
@@ -199,7 +199,7 @@ export function breakBridge(side, b) {
   for (let k = 0; k < 34; k++) { const m = takeBox(cols[k % cols.length]), sz = .3 + Math.random() * .5; m.visible = exploredAt(b.x, b.z); m.scale.set(sz * (1 + Math.random()), sz * .6, sz); m.position.set(b.x0 + Math.random() * (b.x1 - b.x0), b.hb + .3, b.z + (Math.random() - .5) * (b.z1 - b.z0));
     R.debris.push({ m, v: new THREE.Vector3((Math.random() - .5) * 3, 1 + Math.random() * 3, (Math.random() - .5) * 3), r: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6), t: 3 }); }
   burst(new THREE.Vector3(b.x, b.hb, b.z), cols, 24, 4, 4, 1.2, .3, true); plume(new THREE.Vector3(b.x, b.hb, b.z), 0x8a8a86, 2.2, 2, 1.5, -.6, true);
-  toast(side === 0 ? '¡HAS DERRIBADO EL PUENTE!' : side === 1 ? '¡EL RIVAL HA DERRIBADO UN PUENTE!' : 'UN PUENTE SE HA DERRUMBADO', side === 0 ? 'good' : 'bad', b); sfx('lost');
+  toast(side === 0 ? '¡HAS DERRIBADO EL PUENTE!' : side === 1 ? '¡EL RIVAL HA DERRIBADO UN PUENTE!' : 'UN PUENTE SE HA DERRUMBADO', side === 0 ? 'good' : 'bad', b); sfx('demolish', side);
   return true;
 }
 // puente fortificado: se conquista quedándose en el tablero sin enemigos; sus torres disparan a los enemigos de su dueño

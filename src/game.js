@@ -35,10 +35,10 @@ export function enqueue(side, type, c) {
   if (state !== 'play') return false;
   if (st.gold < def.cost || st.queue.length >= GAME.queueMax || popOf(side) >= capOf(side)) { if (side === 0) sfx('deny'); return false; }
   st.gold -= def.cost; st.queue.push({ type, t: def.time, c: cityOk(side, c) });
-  if (side === 0) { sfx('select'); track('unit_queued', { type }); refreshPanel(); }
+  if (side === 0) { sfx('train'); track('unit_queued', { type }); refreshPanel(); }
   return true;
 }
-export function cancelQueue(i) { const st = sideState[0], q = st.queue[i]; if (!q) return; st.gold += UNITS[q.type].cost; st.queue.splice(i, 1); sfx('deny'); refreshPanel(); }
+export function cancelQueue(i) { const st = sideState[0], q = st.queue[i]; if (!q) return; st.gold += UNITS[q.type].cost; st.queue.splice(i, 1); sfx('cancel'); refreshPanel(); }
 export const heroesOf = side => units.filter(u => u.side === side && u.type === 'hero');
 export const heroCount = side => heroesOf(side).length + sideState[side].heroQ.length;   // vivos + en camino + esperando a volver tras caer
 // el héroe "activo": para ti, el seleccionado (o el primero); para la IA, el primero
@@ -47,7 +47,7 @@ export function summonHero(side, c) {
   const st = sideState[side];
   if (state !== 'play' || heroCount(side) >= GAME.maxHeroes || st.gold < UNITS.hero.cost) { if (side === 0) sfx('deny'); return false; }
   st.gold -= UNITS.hero.cost; st.heroQ.push({ state: 'training', t: UNITS.hero.time, c: cityOk(side, c) });
-  if (side === 0) { sfx('select'); track('hero_summon'); refreshPanel(); }
+  if (side === 0) { sfx('train'); track('hero_summon'); refreshPanel(); }
   return true;
 }
 // ---------- Templo: ritual y dios ----------
@@ -58,7 +58,7 @@ export function startRitual(side, c) {
   if (state !== 'play' || st.ritual.state !== 'none' || st.gold < GAME.ritualCost) { if (side === 0) sfx('deny'); return false; }
   st.gold -= GAME.ritualCost; c = cityOk(side, c); st.ritual = { state: 'ritual', t: GAME.ritualTime, c };
   burst(spotPos(spots[TEMP0 + c], 1), [0xffe9a0, 0xffffff], 20, 2.5, 6, 1, .24);
-  if (side === 0) { sfx('hero'); toast('EL RITUAL HA COMENZADO EN EL TEMPLO', 'good', spots[TEMP0]); track('ritual_start'); refreshPanel(); }
+  if (side === 0) { sfx('ritual'); toast('EL RITUAL HA COMENZADO EN EL TEMPLO', 'good', spots[TEMP0]); track('ritual_start'); refreshPanel(); }
   else toast('EL RIVAL HA COMENZADO UN RITUAL EN SU TEMPLO', 'bad');
   return true;
 }
@@ -66,20 +66,20 @@ export function summonGod(side) {
   const st = sideState[side];
   if (state !== 'play' || st.ritual.state !== 'done' || hasGod(side) || st.gold < UNITS.god.cost || popOf(side) >= capOf(side)) { if (side === 0) sfx('deny'); return false; }
   st.gold -= UNITS.god.cost; st.godQ = { t: UNITS.god.time, c: st.ritual.c };
-  if (side === 0) { sfx('select'); track('god_summon'); refreshPanel(); }
+  if (side === 0) { sfx('train'); track('god_summon'); refreshPanel(); }
   return true;
 }
 function updateTemple(side, dt) {
   const st = sideState[side], r = st.ritual, tp = spots[TEMP0 + cityOk(side, r.c)];
   if (r.state === 'ritual' && (r.t -= dt) <= 0) {
     r.state = 'done'; if (side === 0) addMoment('TEMPLO CONSAGRADO'); burst(spotPos(tp, 2), [0xffe9a0, 0xffffff, TEAM[side].c], 40, 4, 8, 1.6, .3); ping(spotPos(tp), '#e8c870');
-    toast(side === 0 ? `¡TEMPLO CONSAGRADO! YA PUEDES INVOCAR A ${uname(0, 'god')}` : 'EL TEMPLO RIVAL ESTÁ CONSAGRADO', side === 0 ? 'good' : 'bad', side === 0 ? tp : null); sfx('win', side);
+    toast(side === 0 ? `¡TEMPLO CONSAGRADO! YA PUEDES INVOCAR A ${uname(0, 'god')}` : 'EL TEMPLO RIVAL ESTÁ CONSAGRADO', side === 0 ? 'good' : 'bad', side === 0 ? tp : null); sfx('consecrate', side);
     if (side === 0) refreshPanel();
   }
   if (st.godQ && (st.godQ.t -= dt) <= 0) {
     const gc = cityOk(side, st.godQ.c); st.godQ = null; const u = spawnUnit(side, 'god', TEMP0, gc); u.bounty = GAME.godBounty;
     burst(u.pos, [0xffe9a0, 0xffffff, TEAM[side].c], 40, 4, 9, 1.4, .3); ping(u.pos, '#e8c870');
-    toast(side === 0 ? `¡${uname(0, 'god')} HA DESCENDIDO!` : `¡EL RIVAL HA INVOCADO A ${uname(1, 'god')}!`, side === 0 ? 'good' : 'bad', u.pos); sfx('hero', side);
+    toast(side === 0 ? `¡${uname(0, 'god')} HA DESCENDIDO!` : `¡EL RIVAL HA INVOCADO A ${uname(1, 'god')}!`, side === 0 ? 'good' : 'bad', u.pos); sfx('god', side);
     if (side === 0) refreshPanel();
   }
 }
@@ -177,7 +177,7 @@ export function endGame(win, surrender = false) {
   const m = Math.floor(elapsed / 60), sec = Math.floor(elapsed % 60);
   $('endP').textContent = (win ? 'La fortaleza roja ha caído' : surrender ? 'Te has rendido' : 'Tu fortaleza ha caído') + ` en ${m}:${String(sec).padStart(2, '0')} (${DIFF[S.diff].label}).`;
   renderEndStats(win); setTimeout(() => { $('end').hidden = false; }, 1400);
-  sfx(win ? 'win' : 'lost'); track('game_end', { win, surrender, seconds: Math.round(elapsed), diff: S.diff });
+  sfx(win ? 'win' : 'defeat'); track('game_end', { win, surrender, seconds: Math.round(elapsed), diff: S.diff });
 }
 export const miniPings = [], edgeMarks = [];   // edgeMarks queda vacío: sin avisos
 export function toast() {}   // sin avisos de texto en pantalla (la única excepción es el cartel de ciudad conquistada)
@@ -204,7 +204,7 @@ export function upgradeTown(side, s) {
   if (noGold(s) || s.owner !== side || s.lvl >= 3 || st.gold < TOWN_LV.cost[s.lvl]) { if (side === 0) sfx('deny'); return false; }
   st.gold -= TOWN_LV.cost[s.lvl]; s.lvl++; townLevelLook(s);
   burst(spotPos(s, 1), [0xffd23f, 0xffffff], 16, 2.5, 5, .9, .22);
-  if (side === 0) { sfx('capture'); floatText(spotPos(s, 5), 'NIVEL ' + s.lvl, '#e8c870', 10); refreshPanel(); }
+  if (side === 0) { sfx('upgrade'); floatText(spotPos(s, 5), 'NIVEL ' + s.lvl, '#e8c870', 10); refreshPanel(); }
   return true;
 }
 export function campSpawn(s) {   // el campamento da jinetes arqueros a su dueño, hasta 20 vivos por campamento
@@ -257,7 +257,7 @@ export function upgradeWall(side, c = homeOf(side)) {   // c: ciudad cuya murall
   if (state !== 'play' || b.side !== side || lv >= 3 || st.gold < WALL_LV.cost[lv + 1]) { if (side === 0) sfx('deny'); return false; }
   st.gold -= WALL_LV.cost[lv + 1]; b.wallLvl = lv + 1; const f = forts[c]; wallLevelLook(f, b.wallLvl);
   for (const sh of f.shooters || []) burst(new THREE.Vector3(sh.x, sh.arch.g.position.y + 1, sh.z), [RANKS[b.wallLvl].hex, 0xffffff], 5, 2, 3, .6, .18);
-  if (side === 0) { sfx('rank'); toast(`MURALLA DE ${RANKS[b.wallLvl].name}: SUS ARQUEROS DISPARAN MÁS FUERTE Y MÁS LEJOS`, 'good', b); addMoment('MURALLA DE ' + RANKS[b.wallLvl].name); refreshPanel(); }
+  if (side === 0) { sfx('upgrade'); toast(`MURALLA DE ${RANKS[b.wallLvl].name}: SUS ARQUEROS DISPARAN MÁS FUERTE Y MÁS LEJOS`, 'good', b); addMoment('MURALLA DE ' + RANKS[b.wallLvl].name); refreshPanel(); }
   return true;
 }
 function updateTowns(dt) {
@@ -323,7 +323,7 @@ function conquer(c) {
   for (const k of ['barracks', 'altar', 'temple']) { const f = S.rallyFlag[k + c]; if (f) { world.remove(f); delete S.rallyFlag[k + c]; delete S.rally[k + c]; } }
   if (S.city === c && by !== 0) { S.city = null; if (S.selBld) S.selBld = null; }
   if (NP > 2 && players().filter(sd => citiesOf(sd).length).length > 1) banner(`¡${civOf(c).name} HA SIDO CONQUISTADA!`, `AHORA ES DE ${by === 0 ? 'TU IMPERIO' : civOf(by).name}`, TEAM[by].css);
-  sfx(by === 0 ? 'win' : old === 0 ? 'lost' : 'capture'); updateCtx();
+  if (by === 0) sfx('conquer'); else if (old === 0) sfx('cityLost'); else sfx('capture', by); updateCtx();
 }
 // un rival que se queda sin ciudades queda fuera: sus tropas se rinden (desaparecen) y sus pueblos vuelven a ser neutrales
 let lastFallen = null;
@@ -333,5 +333,5 @@ function eliminate(sd) {
   for (let k = 0; k < 3; k++) burst(spotPos(spots[sd], 2 + k * 2), [0xd4cde2, TEAM[sd].c, 0xffa03a, 0x3a2a4a], 14, 6, 6, 1.4, .45);
   for (const u of [...units]) if (u.side === sd && !u.dead) { u.hp = 0; kill(u, { side: NEU, vis: false, def: {} }); }
   for (const s of spots) if (s.kind === 'town' && s.owner === sd) setOwner(s, -1);
-  if (NP > 2 && alivePlayers().length > 1) { toast(`¡HA CAÍDO LA FORTALEZA ${civOf(sd).name === civOf(0).name ? '' : 'DE ' + civOf(sd).name}! QUEDAN ${alivePlayers().length - 1} RIVALES`, 'good', spots[sd]); sfx('win'); }
+  if (NP > 2 && alivePlayers().length > 1) { toast(`¡HA CAÍDO LA FORTALEZA ${civOf(sd).name === civOf(0).name ? '' : 'DE ' + civOf(sd).name}! QUEDAN ${alivePlayers().length - 1} RIVALES`, 'good', spots[sd]); sfx('conquer'); }
 }
