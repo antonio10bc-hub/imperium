@@ -259,3 +259,4 @@ body.touch button{touch-action:manipulation}
   body.touch #feed{right:calc(max(10px,env(safe-area-inset-right,0px)) + 60px);max-width:40vw}
 }
 body.touch #tools #fullBtn{display:flex}
+#heroes .hc.grp{border-color:#3a4a6a} #heroes .hc.grp.on{border-color:var(--yellow)} #heroes .hc.grp .n{background:var(--cyan)}

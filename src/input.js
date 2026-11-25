@@ -8,7 +8,7 @@ import { GAME, MD, MW, SIEGE, TYPES } from './config.js';
 import { ping } from './effects.js';
 import { exploredAt, toggleFog } from './fog.js';
 import { enqueue, heroesOf, newGame, startGame, state, toast } from './game.js';
-import { closeMenu, curCity, cycleBuilding, openMenu, pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
+import { closeMenu, curCity, cycleBuilding, saveGroup, selectGroup, openMenu, pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
 import { GEOT, HM, cellOf, gateList, homeOf, spots, surfY } from './map.js';
 import { bfs, nearestNode } from './nav.js';
 import { seed } from './noise.js';
@@ -251,9 +251,12 @@ export function init() {
     if (state !== 'play') return;
     if (S.intro) { S.intro.t = S.intro.dur; keys.delete(k); return; }   // una tecla se salta la presentación
     if (S.menuOpen) { if (k === 'escape') closeMenu(); return; }   // con el menú abierto, el juego no recibe teclas
+    const dg = /^Digit[1-9]$/.test(e.code) ? +e.code[5] : 0;
     if (/^f[1-5]$/.test(k)) { e.preventDefault(); pickGroup(+k[1] - 1); }
-    else if (k === '1' || k === '2' || k === '3') enqueue(0, TYPES[+k - 1], curCity());
-    else if (k === '4' || k === '5') enqueue(0, SIEGE[+k - 4], curCity());
+    else if (dg && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveGroup(dg); }   // CTRL + número: guarda la selección como grupo
+    else if (dg && S.selBld !== 'barracks' && selectGroup(dg)) {}   // número: ese grupo (con el cuartel seleccionado, recluta)
+    else if (dg >= 1 && dg <= 3) enqueue(0, TYPES[dg - 1], curCity());
+    else if (dg === 4 || dg === 5) enqueue(0, SIEGE[dg - 4], curCity());
     else if (k === 'q') cycleBuilding('barracks');
     else if (k === 'w') cycleBuilding('altar');
     else if (k === 'e') cycleBuilding('temple');

@@ -526,29 +526,11 @@ function buildVoxels() {
       signs.push({ x: u + .5, y: h + 1.6, z: v + .5, name: s.name });
       if (dirs.length >= 3) break; }
   }
-  buildOutside();
   const lmat = terrainMat(false), wmat = terrainMat(true);
   chunkMesh = landC.map(L => { if (!L.nv) return null; const m = L.build(lmat); meshes.push(m); return m; });
   waterC.forEach(W => { if (W.nv) meshes.push(W.build(wmat)); });
 }
 
-// alrededores del mapa: lomas y montes (o islotes en el mar) que siguen el terreno del borde y se pierden en la bruma; no se juegan
-function buildOutside() {
-  const L = new Chunk(), M = 44, S2 = 2, sea = geoR?.sea;
-  for (let z = -M; z < MD + M; z += S2) for (let x = -M; x < MW + M; x += S2) {
-    if (x >= 0 && z >= 0 && x < MW && z < MD) continue;
-    const ex = THREE.MathUtils.clamp(x, 0, MW - 1), ez = THREE.MathUtils.clamp(z, 0, MD - 1), d = Math.max(Math.abs(x - ex), Math.abs(z - ez)), eh = Math.max(0, HM[idx(ex, ez)]);
-    const hill = 2 + n2(x, z, .03, 3, 73) * 10, k = smooth01(d / 14);
-    let h = sea ? (d < 8 ? eh * (1 - d / 8) : 0) + (n2(x, z, .035, 2, 77) > .7 ? 1 + (n2(x, z, .035, 2, 77) - .7) * 20 : 0) : eh * (1 - k) + hill * k;
-    h = Math.round(h); if (h <= 0) continue;
-    const B = bioOf(sideAt(ex + .5, ez + .5)), c0 = h >= 8 ? (geoR?.snow || h >= 10 ? 0xe4e2da : 0x9a9488) : B.ground[(hash(x, 5, z) * 4) | 0];
-    const col = mixHex(geoR?.snow ? mixHex(c0, 0xeef2f6, .6) : c0, 0x20304a, .12 + Math.min(.3, d / M * .3));
-    L.box(x + S2 / 2, (h - 6) / 2, z + S2 / 2, S2, h + 6, S2, col);
-  }
-  if (!L.nv) return;
-  meshes.push(L.build(terrainMat(false)));   // con la niebla de guerra de la orilla más cercana (la textura de la niebla se estira hasta el borde): fuera solo se ve lo que está junto a lo explorado
-  ocean.position.y = sea ? -.06 : -5;
-}
 
 // ---------- Vista de una geografía para el menú ----------
 // Terreno vóxel como el de la partida (alturas, laderas, agua, bosque y arboledas) de la geografía de ejemplo,

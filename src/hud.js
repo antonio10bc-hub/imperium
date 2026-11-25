@@ -15,7 +15,6 @@ import { THUMB, alive, sel, sideState, units } from './units.js';
 import { BRIDGE_COST, buildBridge } from './rules.js';
 import { ruleTimer } from './rules.js';
 import { GEO } from './geo.js';
-import { targetBase } from './ai.js';
 
 // ---------- HUD ----------
 // Grupos con F1–F5 (sin barra visible: la barra inferior queda libre para la selección)
@@ -61,7 +60,24 @@ function renderHeroes() {
   heroesOf(0).forEach((u, i) => { const on = sel.has(u);
     html += `<button type="button" class="hc${on ? ' on' : ''}" data-hero="${u.id}" title="Héroe ${i + 1} · clic: seleccionar con su escolta"><kbd>${i ? i + 1 : 'G'}</kbd><img alt="Héroe" src="${THUMB.hero || ''}"><span class="n">${u.escort.length}</span><i><b style="width:${pct(u.hp / u.maxHp)};background:${hpCol(u.hp / u.maxHp)}"></b></i></button>`; });
   for (const h of sideState[0].heroQ) html += `<button type="button" class="hc off" data-hero="0" title="${h.state === 'dead' ? 'Un héroe ha caído' : 'Un héroe está en camino'}"><img alt="Héroe" src="${THUMB.hero || ''}"><span class="st">${Math.ceil(h.t)} S</span><i><b style="width:${pct(h.state === 'training' ? 1 - h.t / UNITS.hero.time : 0)};background:var(--yellow)"></b></i></button>`;
+  for (let n = 1; n <= 9; n++) { const g = groupOf(n); if (!g.length) continue;   // grupos guardados (CTRL + número): debajo de los héroes
+    const cnt = {}; for (const u of g) cnt[u.type] = (cnt[u.type] || 0) + 1; const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0], on = g.every(u => sel.has(u));
+    html += `<button type="button" class="hc grp${on ? ' on' : ''}" data-grp="${n}" title="Grupo ${n} · clic o tecla ${n}: seleccionarlo · CTRL+${n}: guardar ahí la selección"><kbd>${n}</kbd><img alt="Grupo ${n}" src="${THUMB[top] || ''}"><span class="n">${g.length}</span></button>`; }
   if (html !== heroesHtml) { heroesHtml = html; $('heroes').innerHTML = html; }
+}
+// grupos de tropas guardados por el jugador (1–9)
+export const groupOf = n => { const g = S.groups[n]; if (!g) return []; const live = g.filter(u => !u.dead && u.side === 0); if (live.length !== g.length) S.groups[n] = live; return live; };
+export function saveGroup(n) {   // sin n: el primer hueco libre
+  const list = [...sel].filter(u => !u.dead && u.side === 0);
+  if (n == null) { if (!list.length) return; n = 1; while (n < 9 && groupOf(n).length) n++; }
+  for (const k in S.groups) S.groups[k] = groupOf(k).filter(u => !list.includes(u));   // una tropa está en un solo grupo
+  S.groups[n] = list; sfx(list.length ? 'cmd' : 'deny'); refreshPanel();
+}
+let lastGrp = { n: 0, t: 0 };
+export function selectGroup(n) {   // dos veces seguidas: la cámara va al grupo
+  const g = groupOf(n); if (!g.length) return false;
+  const now = performance.now(), twice = lastGrp.n === n && now - lastGrp.t < 400; lastGrp = { n, t: now };
+  setSelection(g, false); if (twice) { S.follow = g[0]; S.focusGoal = null; } return true;
 }
 // Panel de la barra inferior: vacío por defecto; muestra el edificio, el pueblo o las unidades seleccionadas
 let panelHtml = '';
@@ -140,7 +156,7 @@ function panelContent() {
   const cards = groupCards(list, 'type');
   const asg = h && free.length ? `<button type="button" class="y" data-act="assign">ASIGNAR (${h.escort.length}/${GAME.escortMax})</button>` : '';
   const shp = h && sel.has(h) ? shapeButtons(h) : '';
-  return `<div class="ph"><h3>${list.length} UNIDADES</h3><em>${cnt.slice(0, 2).join(' · ')}</em>${cnt[2] ? `<em>${cnt[2]}</em>` : ''}</div>${cards}<div class="act">${shp}${asg}<button type="button" data-act="amove" title="Avanzar atacando lo que encuentren">ATACAR <kbd>A</kbd></button></div>`;
+  return `<div class="ph"><h3>${list.length} UNIDADES</h3><em>${cnt.slice(0, 2).join(' · ')}</em>${cnt[2] ? `<em>${cnt[2]}</em>` : ''}</div>${cards}<div class="act">${shp}${asg}<button type="button" data-act="amove" title="Avanzar atacando lo que encuentren">ATACAR <kbd>A</kbd></button><button type="button" data-act="grp" title="Guarda estas tropas como grupo (también CTRL + número)">+ GRUPO</button></div>`;
 }
 // una tarjeta por tipo de tropa: retrato, cuántas hay y vida media
 function groupCards(list, act) {
@@ -230,7 +246,7 @@ function initTips() {
 // preparación de la página (listeners y elementos del DOM); la llama main.js al arrancar
 export function init() {
   initTips();
-  $('heroes').addEventListener('pointerdown', e => { const b = e.button === 0 && e.target.closest('[data-hero]'); if (!b) return; const u = units.find(o => o.id === +b.dataset.hero); if (u) { setSelection([u, ...u.escort], false); S.follow = u; S.focusGoal = null; } else heroButton(); });
+  $('heroes').addEventListener('pointerdown', e => { const gb = e.button === 0 && e.target.closest('[data-grp]'); if (gb) { selectGroup(+gb.dataset.grp); return; } const b = e.button === 0 && e.target.closest('[data-hero]'); if (!b) return; const u = units.find(o => o.id === +b.dataset.hero); if (u) { setSelection([u, ...u.escort], false); S.follow = u; S.focusGoal = null; } else heroButton(); });
   $('panel').addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
     const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
@@ -251,6 +267,7 @@ export function init() {
     else if (a === 'esc') { const h = heroOf(0); if (h) setSelection(h.escort.filter(u => u.type === b.dataset.t), false); }
     else if (a === 'shape') { const h = heroOf(0); if (h) { h.formShape = b.dataset.s; sfx('cmd'); } }
     else if (a === 'amove') { S.amode = true; sfx('select'); }
+    else if (a === 'grp') saveGroup();
     else if (a === 'one') { const u = units.find(o => o.id === +b.dataset.id); if (u) { if (e.shiftKey) { sel.delete(u); updateCtx(); } else { setSelection([u], false); S.follow = u; S.focusGoal = null; } } }
     refreshPanel();
   });
@@ -259,7 +276,6 @@ export function init() {
     UI_IC[el.dataset.ic].forEach((row, j) => [...row].forEach((v, i) => { if (v === '1') x.fillRect(i, j, 1, 1); })); el.src = c.toDataURL();
   });
   $('fBase').addEventListener('click', () => { const h = spots[homeOf(0)]; focusOn(h.x, h.z); selectSpot(h); });
-  $('fEnemy').addEventListener('click', () => { const t = spots[targetBase(0, spots[homeOf(0)])]; focusOn(t.x, t.z); });   // la fortaleza rival más cercana que siga en pie
   $('fBarr').addEventListener('click', () => cycleBuilding('barracks'));
   $('fHero').addEventListener('click', () => cycleBuilding('altar'));
   $('spd').addEventListener('click', () => { S.speed = S.speed === 1 ? 2 : 1; syncTools(); });

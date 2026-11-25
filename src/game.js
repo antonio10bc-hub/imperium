@@ -148,7 +148,7 @@ function buildGame(s, keepCivs) {
     fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 5.6 : sp.kind === 'town' ? 2.6 : 3.2));
     sideState.length = 0; for (const sd of players()) sideState.push({ gold: GAME.startGold, queue: [], heroQ: [], ritual: { state: 'none', t: 0 }, godQ: null, dead: false });
     sideState[0].ai = S.aiPlayer ? makeAI(0, S.aiPlayer.diff, S.aiPlayer.brain) : null; for (let sd = 1; sd < NP; sd++) sideState[sd].ai = makeAI(sd, S.diff, S.aiRival);   // el bando 0 lo juega la IA solo en pruebas
-    elapsed = 0; lastFallen = null; S.city = null; resetStats(); resetEvents(); S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
+    elapsed = 0; lastFallen = null; S.city = null; S.groups = {}; resetStats(); resetEvents(); S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
     focusOn(spots[BASE0].x, spots[BASE0].z, true);
     $('mt').textContent = GAME.towns; $('cap').textContent = capOf(0);
     updateCtx(); syncDiff();
