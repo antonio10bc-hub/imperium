@@ -235,6 +235,11 @@ export const GEO = (() => {
       for (let z = 22; z <= H - 22; z += 2) for (let x = k ? W - 46 : 16; x <= (k ? W - 16 : 46); x += 2) { const d = Math.hypot(x - f[0], z - f[1]); if (d < bd && clean(x, z)) { bd = d; best = [x, z]; } }
       if (best) { f[0] = best[0]; f[1] = best[1]; } });
     for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 13 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
+    if (globalThis.__FLIPMAP) {   // prueba: el mapa reflejado de oeste a este
+      for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW / 2; gx++) { const i = gz * MW + gx, j = gz * MW + MW - 1 - gx; [HMg[i], HMg[j]] = [HMg[j], HMg[i]]; [TTg[i], TTg[j]] = [TTg[j], TTg[i]]; }
+      const fl = q => { q[0] = W - q[0]; }; F.forEach(fl); F.reverse(); passes.forEach(fl); for (const k of ['special', 'treasures', 'lavaEnds', 'fumaroles', 'bridges']) (M[k] || []).forEach(fl); for (const k of ['confluence', 'volcano']) if (M[k]) fl(M[k]);
+      if (M.div) { const d0 = M.div; M.div = z => W - d0(z); }
+    }
     const up = p => [p[0] * MW / W, p[1] * MD / H];
     return { HM: HMg, TT: TTg, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z * H / MD) * MW / W : null,
       volcano: M.volcano ? up(M.volcano) : null, lavaEnds: (M.lavaEnds || []).map(up), fumaroles: (M.fumaroles || []).map(up), confluence: M.confluence ? up(M.confluence) : null, bridgeStyles: M.bridgeStyles || [], bridges: (M.bridges || []).map(b => [...up(b), (b[2] || 13) * MW / W]), treasures: (M.treasures || []).map(up), snow: !!M.snow,
