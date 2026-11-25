@@ -265,7 +265,7 @@ export function init() {
     else if (k === 'h') { const b = spots[homeOf(0)]; focusOn(b.x, b.z); selectSpot(b); }   // tu fortaleza: muralla y puertas
     else if (k === 'p') { S.paused = !S.paused; syncTools(); }
     else if (k === 'v') { S.speed = S.speed === 1 ? 2 : 1; syncTools(); }
-    else if (k === ' ') { e.preventDefault(); if (alarm.pos) focusOn(alarm.pos.x, alarm.pos.z); }
+    else if (k === ' ') { e.preventDefault(); const ev = alarm.ev && (!alarm.pos || alarm.ev.at > (alarm.at || 0)) ? alarm.ev : alarm.pos; if (ev) focusOn(ev.x, ev.z); }   // ESPACIO: el último ataque o el último cambio del escenario
     else if (k === 'n') toggleFog();
     else if (k === 'escape') {   // por orden: cancela ataque-mover, quita la selección y, si no hay nada, abre el menú
       if (S.amode) S.amode = false;

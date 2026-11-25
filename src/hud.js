@@ -30,7 +30,16 @@ export function pickGroup(i) {
   setSelection(list, false); S.follow = list[0]; S.focusGoal = null; track('group_select', { group: GROUPS[i][0] });
 }
 let terrKey = '';
+// fortalezas tuyas atacadas en los últimos 8 s: barra de vida arriba, aunque no las estés mirando
+let siegeKey = '';
+function renderSiege() {
+  const now = performance.now(), hit = citiesOf(0).map(c => spots[c]).filter(s => now - (s.hitAt || -1e9) < 8000);
+  const key = hit.map(s => spots.indexOf(s) + ':' + Math.ceil(s.hp / GAME.baseHp * 50)).join(',');
+  if (key === siegeKey) return; siegeKey = key; const el = $('siege'); el.hidden = !hit.length;
+  el.innerHTML = hit.map(s => { const k = Math.max(0, Math.round(s.hp / GAME.baseHp * 100)); return `<button type="button" data-sg="${spots.indexOf(s)}" title="Ir a tu fortaleza">¡ASEDIAN ${civOf(s.civ ?? s.side).name}! <i><b style="width:${k}%"></b></i>${k} %</button>`; }).join('');
+}
 export function updateHud() {
+  renderSiege();
   const st = sideState[0], owned = sd => spots.filter(s => s.owner === sd).length;
   $('gold').textContent = Math.floor(st.gold);
   $('rate').textContent = '+' + String(Math.round(incomeOf(0) * 10) / 10).replace('.', ',') + '/S';
@@ -283,6 +292,7 @@ export function init() {
   $('menuBtn').addEventListener('click', openMenu);
   $('mercBtn').addEventListener('click', () => { if (hireMercs(0)) { sfx('gold'); updateHud(); } else sfx('deny'); });
   $('mResume').addEventListener('click', closeMenu);
+  $('siege').addEventListener('pointerdown', e => { const b = e.target.closest('[data-sg]'); if (b) { const s = spots[+b.dataset.sg]; focusOn(s.x, s.z); } });
   for (const [b, t] of [['mCopy', 'mCode'], ['eCopy', 'eCode']]) $(b).addEventListener('click', () => {   // copia el código del mapa
     const c = $(t).textContent; navigator.clipboard?.writeText(c).then(() => { $(b).textContent = 'COPIADO'; setTimeout(() => { $(b).textContent = 'COPIAR'; }, 1500); }, () => {}); sfx('ui'); });
   $('mRestart').addEventListener('click', () => { track('menu_restart'); S.pendingStart = true; newGame(seed, true); });   // misma semilla y mismas civilizaciones

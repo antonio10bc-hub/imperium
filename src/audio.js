@@ -233,6 +233,8 @@ export function sfx(kind, side = 0) {
     case 'train': noise(t, .02, { f: 900, q: 5, gain: .06, a: .001, wet: 0 }); ui(t + .03, N2F(chordNote(P, 55)), .3, .45, sfxBus); break;   // encargo: un toque de madera y una nota
     case 'ready': horn(t, N2F(pick([th[0], th[2]]) - 12), .22, .022, sfxBus, H); break;
     case 'warn': metal(t, 990, .5, .012, sfxBus, .4); metal(t + .28, 830, .6, .012, sfxBus, .4); break;   // aviso: dos campanas
+    case 'danger': for (let k = 0; k < 2; k++) { tone(t + k * .42, 523, .18, { type: 'square', gain: .028, a: .004, lp: 1600, wet: .2 }); tone(t + k * .42 + .2, 392, .2, { type: 'square', gain: .028, a: .004, lp: 1600, wet: .2 }); } break;   // cambio del escenario peligroso (aviso rojo): sirena de dos tonos
+    case 'notice': metal(t, 1320, .45, .01, sfxBus, .45); tone(t + .12, 660, .35, { type: 'triangle', gain: .03, a: .01, wet: .35 }); break;   // cambio sin peligro (aviso amarillo): campanilla suave
     case 'alarm': { const a = th[0] - 12; horn(t, N2F(a), .6, .055, sfxBus, H); horn(t + .75, N2F(a), .6, .055, sfxBus, H); horn(t + .75, N2F(a + 7), .6, .035, sfxBus, H); break; }
     // economía y construcción
     case 'gold': for (let i = 0; i < 6; i++) metal(t + i * .045 + Math.random() * .02, rnd(2400, 3600), .18, .005, sfxBus, .2); break;   // monedas

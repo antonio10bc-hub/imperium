@@ -10,7 +10,7 @@
 // (Istmo y cordillera colocan además la ciudadela y las atalayas en sus pasos; la meseta tiene tres rampas estrechas.)
 import * as THREE from 'three';
 import { sfx } from './audio.js';
-import { damage, shoot } from './combat.js';
+import { alarm, damage, shoot } from './combat.js';
 import { MD, MW, N, NEU, NP, RANGED, TEAM, idx, players } from './config.js';
 import { orderMove } from './behavior.js';
 import { burst, dropBox, ping, plume, takeBox } from './effects.js';
@@ -122,7 +122,7 @@ function updateCycle(dt) {
   if (c.phase === 'warn') { g.layer.visible = true; g.layer.material.opacity = .25 + .25 * Math.sin(performance.now() / 160);   // el agua empieza a asomar
     if ((c.fx = (c.fx ?? 0) - dt) <= 0) { c.fx = .3; for (const m of g.marks || []) if (exploredAt(m.x, m.z)) burst(new THREE.Vector3(m.x + (Math.random() - .5) * 6, HM[idx(m.x | 0, m.z | 0)] + .4, m.z + (Math.random() - .5) * 6), [0xffffff, 0xbfe4f4, 0x5fb0d4], 3, 1.5, 2.5, .5, .18); } }   // espuma: el agua sube
   if (c.t > 0) return;
-  if (c.phase === 'open') { c.phase = 'warn'; c.t = 10; toast(tx.warn, 'bad'); sfx('warn'); }
+  if (c.phase === 'open') { c.phase = 'warn'; c.t = 10; toast(tx.warn, 'bad'); const m = g.marks?.find(q => exploredAt(q.x, q.z)) || g.marks?.[0]; if (m) scenEvent(m.x, m.z, false); }
   else if (c.phase === 'warn') { c.phase = 'closed'; c.t = R.on.tides ? 45 : 60; setGate(g, false); toast(tx.close, 'bad'); for (const m of g.marks || []) if (exploredAt(m.x, m.z)) { burst(new THREE.Vector3(m.x, HM[idx(m.x | 0, m.z | 0)] + .6, m.z), [0xffffff, 0xbfe4f4, 0x5fb0d4], 16, 3, 4, .8, .24); plume(new THREE.Vector3(m.x, 1, m.z), 0xe8f0f8, 1.2, 1.2, 1, -.3); } }
   else { c.phase = 'open'; c.t = (R.on.tides ? 100 : 130) + Math.random() * 40; setGate(g, true); toast(tx.open, 'good'); }
 }
@@ -190,7 +190,8 @@ export function hitBridge(u, b, dt) {
   if (u.cd > 0) return;
   u.cd = u.def.cd; u.lunge = 1;
   if (lastBridge(b)) { if (u.side === 0 && !b.toldLast) { b.toldLast = true; toast('ES EL ÚLTIMO PUENTE: NO SE PUEDE DERRIBAR', 'bad', b); } u.order = null; return; }
-  b.hitAt = performance.now(); b.hp -= u.def.dmg * (RANGED(u.type) ? .35 : 1) * (u.type === 'hero' || u.type === 'god' || u.type === 'titan' ? 1.5 : 1);
+  b.hitAt = performance.now(); if (b.hitAt - (b.warnAt || -1e9) > 10000 && exploredAt(b.x, b.z)) { b.warnAt = b.hitAt; scenEvent(b.x, b.z, true); }
+  b.hp -= u.def.dmg * (RANGED(u.type) ? .35 : 1) * (u.type === 'hero' || u.type === 'god' || u.type === 'titan' ? 1.5 : 1);
   burst(new THREE.Vector3(ex + (b.x - ex) * .1, b.hb + .6, b.z + (Math.random() - .5) * 2), b.style === 'rope' ? [0x8a5a34, 0xc8b080] : [0xb0aca0, 0x8e8a80, 0x8a5a34], 3, 2, 3, .5, .16);
   if (b.hp <= 0) breakBridge(u.side, b);
 }
@@ -241,11 +242,11 @@ function updateIce(dt) {
   for (const u of units) {
     if (u.dead || (GEOT[u.node] !== 6 && GEOT[u.node] !== 15) || R.breaks.some(b => Math.hypot(b.x - u.pos.x, b.z - u.pos.z) < 10)) continue;
     const on = UGRID.near(u.pos.x, u.pos.z, 5, _near).filter(o => (GEOT[o.node] === 6 || GEOT[o.node] === 15) && Math.hypot(o.pos.x - u.pos.x, o.pos.z - u.pos.z) < 5), thr = GEOT[u.node] === 15 ? 5 : 10;
-    if (on.length < thr) { if (on.length >= thr * .6 && !R.iceRisk.some(p => Math.hypot(p.x - u.pos.x, p.z - u.pos.z) < 6)) R.iceRisk.push({ x: u.pos.x, z: u.pos.z }); continue; }   // cerca del límite: aviso amarillo
+    if (on.length < thr) { if (on.length >= thr * .6 && !R.iceRisk.some(p => Math.hypot(p.x - u.pos.x, p.z - u.pos.z) < 6)) { R.iceRisk.push({ x: u.pos.x, z: u.pos.z }); if (performance.now() - (R.iceRiskAt || -1e9) > 10000 && exploredAt(u.pos.x, u.pos.z)) { R.iceRiskAt = performance.now(); scenEvent(u.pos.x, u.pos.z, false); } } continue; }   // cerca del límite: aviso amarillo
     // el hielo fino aguanta la mitad
     const cx = Math.floor(u.pos.x), cz = Math.floor(u.pos.z), cells = [];
     for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const x = cx + dx, z = cz + dz; if (x >= 0 && z >= 0 && x < MW && z < MD && dx * dx + dz * dz <= 36 && (GEOT[idx(x, z)] === 6 || GEOT[idx(x, z)] === 15)) cells.push(idx(x, z)); }
-    R.breaks.push({ x: u.pos.x, z: u.pos.z, cells, t: 3, phase: 'crack' }); if (exploredAt(u.pos.x, u.pos.z)) sfx('crack');
+    R.breaks.push({ x: u.pos.x, z: u.pos.z, cells, t: 3, phase: 'crack' }); if (exploredAt(u.pos.x, u.pos.z)) { sfx('crack'); scenEvent(u.pos.x, u.pos.z, true); }
     if (on.some(o => o.side === 0) || u.vis) toast('¡EL HIELO SE AGRIETA! SALID DE AHÍ', 'bad', u.pos);
   }
 }
@@ -350,7 +351,7 @@ function updateVolcano(dt) {
     for (const u of UGRID.near(b.to.x, b.to.z, 2.8, _near)) if (Math.hypot(u.pos.x - b.to.x, u.pos.z - b.to.z) < 2.8) damage({ side: NEU, vis: u.vis, def: {} }, u, 40);
   }
   if (v.t > 0) return;
-  if (v.phase === 'calm') { v.phase = 'warn'; v.t = 8; toast('¡EL VOLCÁN RUGE! VA A ENTRAR EN ERUPCIÓN', 'bad', v); sfx('rumble'); }
+  if (v.phase === 'calm') { v.phase = 'warn'; v.t = 8; toast('¡EL VOLCÁN RUGE! VA A ENTRAR EN ERUPCIÓN', 'bad', v); sfx('rumble'); scenEvent(v.x, v.z, true); }
   else if (v.phase === 'warn') { v.phase = 'erupt'; v.t = 7; toast('¡ERUPCIÓN! LEJOS DEL VOLCÁN', 'bad', v); sfx('rumble'); launchRock(top); }
   else { v.phase = 'calm'; v.t = 160 + Math.random() * 60; }
 }
@@ -369,6 +370,7 @@ function launchRock(top) {
   if (!to) return;
   const m = new THREE.Group(); part(m, 2.6, 2.2, 2.4, 0x3a3034, 0, 0, 0); part(m, 1.8, 1.6, 2.8, 0x4a4448, .4, .5, -.2); part(m, 2.2, 1.4, 1.6, 0x2e282c, -.5, -.4, .5);
   part(m, .5, .5, 2.9, 0xff7a1a, .9, .2, 0, false); part(m, 2.7, .4, .5, 0xffa03a, 0, -.3, 1.05, false); bake(m); m.position.copy(top); world.add(m); R.meshes.push(m);
+  scenEvent(to.x, to.z, true);
   R.rock = { m, to, t: ROCK_T, v: new THREE.Vector3((to.x - top.x) / ROCK_T, (to.y - top.y + 4.5 * ROCK_T * ROCK_T) / ROCK_T, (to.z - top.z) / ROCK_T) };
 }
 function updateRock(dt) {
@@ -409,11 +411,13 @@ function updateTsunami(dt) {
     if ((T.fx = (T.fx ?? 0) - dt) <= 0 && e < TSU.in + TSU.hold) { T.fx = .08; for (let k = 0; k < 3; k++) burst(new THREE.Vector3(Math.random() * MW, 4.5, front), [0xffffff, 0xbfe4f4], 3, 2, 3, .6, .25, true); }
   }
   if (T.t > 0) return;
-  if (T.phase === 'calm') { T.phase = 'warn'; T.t = TSU.warn; sfx('rumble'); }
+  if (T.phase === 'calm') { T.phase = 'warn'; T.t = TSU.warn; sfx('rumble'); scenEvent(MW / 2, MD * .7, true); }
   else if (T.phase === 'warn') { T.phase = 'wave'; T.t = TSU.in + TSU.hold + TSU.out; T.n++; sfx('rumble'); }
   else { T.phase = 'calm'; T.t = 220 + Math.random() * 100; if (R.tsuMesh) R.tsuMesh.g.visible = false; }
 }
 
+// un cambio del escenario empieza: sonido (sirena si es peligroso, campanilla si no) y ESPACIO lleva la cámara allí
+function scenEvent(x, z, danger) { alarm.ev = { x, z, at: performance.now() }; sfx(danger ? 'danger' : 'notice'); }
 // ---------- avisos en el terreno ----------
 // Cada cambio del escenario que va a pasar (o está pasando) se marca en el suelo con una zona que late y un aviso con texto:
 // rojo = peligro (hace daño o mata) · amarillo = cambia el terreno pero no hace daño. La capa 2D los dibuja (overlay.js)
@@ -446,15 +450,15 @@ export function ruleTimer() {
   const v = R.volcano; if (v) return v.phase === 'calm' ? `ERUPCIÓN EN ~${mmss(v.t + 8)}` : v.phase === 'warn' ? '¡EL VOLCÁN RUGE!' : '¡ERUPCIÓN!';
   return '';
 }
-// avisos en el minimapa: agua que va a cubrir pasos, zona del volcán en erupción y hielo agrietado (parpadean)
+// avisos en el minimapa: los mismos que en el terreno, con los mismos colores (rojo peligro, amarillo cambio); parpadean
 export function drawRulesMini(c) {
-  const blink = (performance.now() / 300 | 0) % 2;
-  const g = R.gates[0], ph = R.cycle?.phase;
-  if (g && (ph === 'warn' || ph === 'closed') && (ph === 'closed' || blink)) { c.fillStyle = ph === 'warn' ? '#ffe06a' : '#3a8ad8'; for (let k = 0; k < g.cells.length; k += 3) { const i = g.cells[k], x = i % MW, z = (i / MW) | 0; if (exploredAt(x, z)) c.fillRect(x - 1, z - 1, 3, 3); } }
-  const v = R.volcano; if (v && v.phase !== 'calm' && exploredAt(v.x, v.z)) { c.strokeStyle = blink ? '#ff7a1a' : '#d83a4a'; c.lineWidth = 3; c.beginPath(); c.arc(v.x, v.z, 34, 0, 7); c.stroke(); }
-  if (R.rock && blink) { c.strokeStyle = '#d83a4a'; c.lineWidth = 3; c.beginPath(); c.arc(R.rock.to.x, R.rock.to.z, ROCK_R + 2, 0, 7); c.stroke(); }
-  if (R.tsunami && R.tsunami.phase !== 'calm' && (R.tsunami.phase === 'wave' || blink)) { c.fillStyle = 'rgba(58,138,216,.35)'; c.fillRect(0, MD / 2, MW, MD / 2); }
-  for (const b of R.breaks || []) if (b.phase === 'crack' && blink && exploredAt(b.x, b.z)) { c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.arc(b.x, b.z, 8, 0, 7); c.stroke(); }
+  const on = (performance.now() / 300 | 0) % 2;
+  for (const w of warnZones()) {
+    if (w.type === 'edge') continue;
+    const col = w.danger ? '255,58,58' : '255,210,63', a = on ? .55 : .3;
+    if (w.type === 'disc') { if (!exploredAt(w.x, w.z)) continue; c.fillStyle = `rgba(${col},${a})`; c.beginPath(); c.arc(w.x, w.z, Math.max(w.r, 5), 0, 7); c.fill(); c.strokeStyle = `rgb(${col})`; c.lineWidth = 2; c.stroke(); }
+    else { if (!w.fixed && !exploredAt((w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2)) continue; c.fillStyle = `rgba(${col},${a * .7})`; c.fillRect(w.x0, w.z0, Math.max(3, w.x1 - w.x0), Math.max(3, w.z1 - w.z0)); }
+  }
 }
 export function updateRules(dt) {
   if (R.cycle) updateCycle(dt);

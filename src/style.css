@@ -280,3 +280,9 @@ body.touch #tools #fullBtn{display:flex}
   #res{font-size:12px;padding:4px 7px} #tug{padding:4px 7px}
   #banner{padding:10px 16px} #banner b{font-size:18px}
 }
+/* tu fortaleza bajo asedio: barra de vida siempre visible (clic: ir allí) */
+#siege{left:50%;top:84px;transform:translateX(-50%);display:flex;flex-direction:column;gap:4px;pointer-events:auto;z-index:4}
+#siege button{display:flex;align-items:center;gap:8px;background:var(--ink);color:#fff;border:2px solid var(--red);box-shadow:0 3px 0 var(--ink);padding:5px 8px;font-size:11px;animation:sgP 1s steps(2) infinite}
+#siege i{display:block;width:110px;height:8px;background:#3a2a2a;border:1px solid #000} #siege i b{display:block;height:100%;background:var(--red)}
+@keyframes sgP{50%{border-color:#ff9a6a}}
+@media (max-height:520px){#siege{top:62px} #siege button{font-size:9px;padding:3px 6px} #siege i{width:70px}}

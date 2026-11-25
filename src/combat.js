@@ -18,7 +18,7 @@ export const alarm = { t: 0, pos: null, cool: 0 }; export let lastCombat = -99;
 export const corpses = [];
 export function raiseAlarm(loc, msg) {
   if (alarm.cool > 0) return;
-  Object.assign(alarm, { t: 3, pos: loc.clone(), cool: 10 });
+  Object.assign(alarm, { t: 3, pos: loc.clone(), cool: 10, at: performance.now() });
   sfx('alarm');   // sin avisos en pantalla: ESPACIO lleva al último ataque
 }
 // tiñe la tropa del metal de su rango (variante de color de su plantilla) y le pone la cresta
@@ -94,7 +94,7 @@ export function kill(u, by) {
 }
 function hitBase(att, s) {
   const dmg = att.def.dmg * (att.def.bld || (RANGED(att.type) ? .6 : 1)) * (att.leader ? GAME.escortBonus : 1) * RANKS[att.rank].mul;
-  s.hp -= dmg; s.shake = .18; s.lastBy = att.side;
+  s.hp -= dmg; s.shake = .18; s.lastBy = att.side; s.hitAt = performance.now();
   if (s.vis) floatText(spotPos(s, 7), '-' + Math.round(dmg), s.side === 0 ? '#d83a4a' : '#ffffff', 9);
   if (s.side === 0) raiseAlarm(spotPos(s), '¡TU CASTILLO ESTÁ BAJO ATAQUE!');
 }

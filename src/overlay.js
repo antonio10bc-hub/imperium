@@ -1,10 +1,10 @@
 // Capa 2D sobre el 3D (barras, iconos, textos), cursores y tamaño de la ventana.
 import * as THREE from 'three';
 import { spotPos } from './buildings.js';
-import { ALT0, BARR0, BASE1, CFG, GAME, RANKS, TEAM, TEMP0, UNITS } from './config.js';
+import { ALT0, BARR0, BASE1, CFG, GAME, RANGED, RANKS, TEAM, TEMP0, UNITS } from './config.js';
 import { uname } from './civs.js';
 import { exploredAt, visibleAt } from './fog.js';
-import { edgeMarks, state } from './game.js';
+import { capR, edgeMarks, state } from './game.js';
 import { RALLY_BLD, drag, groundAt, mouse, pickEnemy, pickGate, pickSpot, pickTreasure, pickUnit, project } from './input.js';
 import { GEOT, cellOf, gateList, signs, spots, surfY } from './map.js';
 import { curCity } from './hud.js';
@@ -112,10 +112,39 @@ function warnSign(x, y, text, danger) {
   octx.fillStyle = '#0f0f1b'; octx.fillRect(x - 1.2, y - 13, 2.4, 6.5); octx.fillRect(x - 1.2, y - 5, 2.4, 2.2);
   if (text) label(x, y + 18, text, col, fg, 7);
 }
+let lastWarns = [];
+// ¿cae este punto del suelo en algún aviso? (para avisar junto al cursor antes de dar la orden)
+function warnAt(x, z) {
+  let best = null;
+  for (const w of lastWarns) {
+    const inside = w.type === 'disc' ? Math.hypot(x - w.x, z - w.z) < w.r : w.type === 'rect' && x >= w.x0 - 1 && x <= w.x1 + 1 && z >= w.z0 - 1 && z <= w.z1 + 1;
+    if (inside && (!best || (w.danger && !best.danger))) best = w;
+  }
+  return best;
+}
+// elipse en el suelo alrededor de (x, z) con radio r, proyectada a la pantalla
+function groundRing(x, z, r, stroke, fill, dash) {
+  const y = Math.max(0, surfY(x, z)) + .15, c = project(_g.set(x, y, z), _gp); if (!c.vis) return;
+  const e = project(_g.set(x + r, y, z), _ga), s2 = project(_g.set(x, y, z + r), _gb);
+  octx.beginPath(); octx.ellipse(c.x, c.y, Math.hypot(e.x - c.x, e.y - c.y), Math.hypot(s2.x - c.x, s2.y - c.y), 0, 0, 7);
+  if (fill) { octx.fillStyle = fill; octx.fill(); }
+  if (dash) octx.setLineDash(dash); octx.lineWidth = 1.5; octx.strokeStyle = stroke; octx.stroke(); octx.setLineDash([]);
+}
+// con tropas seleccionadas: alcance de los tiradores y, sobre un pueblo ajeno, su círculo de conquista; junto al cursor, el aviso de la zona a la que irían
+function drawOrderHints() {
+  if (state !== 'play' || !sel.size) return;
+  let n = 0; for (const u of sel) if (!u.dead && u.side === 0 && RANGED(u.type) && n++ < 24) groundRing(u.pos.x, u.pos.z, u.def.range, 'rgba(244,244,232,.45)', null, [4, 4]);
+  if (!mouse.in || drag) return;
+  const sp = pickSpot(mouse.x, mouse.y);
+  if (sp?.kind === 'town' && sp.owner !== 0) groundRing(sp.x, sp.z, capR(sp), 'rgba(232,200,112,.95)', 'rgba(232,200,112,.16)');
+  const g = groundAt(mouse.x, mouse.y), w = g && warnAt(g.x, g.z);
+  if (w) warnSign(mouse.x + 22, mouse.y + 30, w.label || (w.danger ? '¡PELIGRO!' : 'AQUÍ CAMBIA EL TERRENO'), w.danger);
+}
 function drawWarnings() {
   if (state !== 'play') return;
   const now = performance.now(), pulse = .5 + .5 * Math.sin(now / 170), signs = [];   // signs: carteles ya puestos (uno por grupo cercano)
-  for (const w of warnZones()) {
+  lastWarns = warnZones();
+  for (const w of lastWarns) {
     const [rgb, col] = WC[w.danger ? 'red' : 'yellow'], fa = (w.strong ? .24 : w.danger ? .18 : .14) + pulse * (w.strong ? .2 : .12), ea = .55 + pulse * .4;
     let lx, ly, show = false;
     if (w.type === 'disc') {
@@ -142,7 +171,7 @@ function drawWarnings() {
 export function drawOverlay(dt) {
   octx.clearRect(0, 0, S.VW, S.VH);
   drawWeather(octx, S.VW, S.VH, dt);
-  drawWarnings();
+  drawWarnings(); drawOrderHints();
   if (state === 'play') { const rt = ruleTimer(); if (rt) label(S.VW / 2, 62, rt, '#0f0f1b', rt.startsWith('¡') ? '#ff9a6a' : '#e8c870', 9); }   // contador de mareas, crecidas o volcán
   const showUI = state !== 'menu';
   for (const s of spots) {
