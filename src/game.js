@@ -300,7 +300,7 @@ export function updateGame(dt) {
     const a = arrows[i]; a.t += dt * (a.sp || 4); const k = Math.min(1, a.t);
     a.m.position.copy(a.a).lerp(a.b, k); a.m.position.y += Math.sin(k * Math.PI) * (a.arc || 1.2);
     if (a.stone) a.m.rotation.x += dt * 6; else a.m.lookAt(a.b);
-    if (a.t >= 1) { if (a.stone && a.m.visible) burst(a.b, [0x8a7a68, 0x6a6266], 6, 2.5, 3, .5, .2); dropBox(a.m); arrows.splice(i, 1); }
+    if (a.t >= 1) { a.onHit?.(); if (a.stone && a.m.visible) burst(a.b, [0x8a7a68, 0x6a6266], 6, 2.5, 3, .5, .2); dropBox(a.m); arrows.splice(i, 1); }
   }
   alarm.cool -= dt;
   for (let c = 0; c < NP; c++) if (spots[c].hp <= 0) conquer(c);

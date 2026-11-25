@@ -123,7 +123,10 @@ function playerUnit(u, dt) {
     if (o.noProg > (ph === 0 ? 25 : 6)) u.order = null;   // en el camino común hay más paciencia: en rampas y vados estrechos se forman colas
     return;
   }
-  if (o?.type === 'attack') { if (strike(u, o.target, dt)) return; u.order = null; }
+  if (o?.type === 'attack') {
+    if (o.ret && (Math.hypot(u.pos.x - o.ret.x, u.pos.z - o.ret.z) > 16 || !alive(o.target))) { const r = o.ret; u.order = null; if (Math.hypot(u.pos.x - r.x, u.pos.z - r.z) > 2) orderMove([u], r.x, r.z, false); return; }   // respuesta a un ataque: no persigue más allá y vuelve a su sitio
+    if (strike(u, o.target, dt)) return; u.order = null;
+  }
   if (o?.type === 'gate') {   // derribar una puerta marcada: solo la puerta (el asedio no se distrae; el resto se defiende si le atacan de cerca)
     const g = o.g; if (g.hp <= 0) { u.order = null; return; }
     if (!u.def.siege) { if ((u.think -= dt) <= 0) { u.think = .3; u.enemy = nearestEnemy(u, 2.5); } if (alive(u.enemy) && strike(u, u.enemy, dt)) return; }

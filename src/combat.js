@@ -2,7 +2,7 @@
 import { sfx } from './audio.js';
 import { spotPos } from './buildings.js';
 import { GAME, NEU, RANGED, RANKS, TEAM } from './config.js';
-import { burst, floatText, ping, seenAt, takeBox } from './effects.js';
+import { burst, floatText, ping, plume, seenAt, takeBox } from './effects.js';
 import { elapsed, fields, toast } from './game.js';
 import { updateCtx } from './hud.js';
 import * as THREE from 'three';
@@ -44,6 +44,18 @@ export function damage(att, tgt, dmg) {
   if (tgt.side === 0 && !tgt.vis) raiseAlarm(tgt.pos, tgt.type === 'hero' ? '¡ATACAN A TU HÉROE!' : '¡ATACAN A TUS TROPAS!');
   if (att.vis || tgt.vis) sfx('hit');
   if (tgt.hp <= 0 && !tgt.dead) kill(tgt, att);
+  else if (tgt.side === 0 && att.pos && !att.dead && att.side !== 0) provoke(tgt, att);
+}
+// respuesta a un ataque: la tropa quieta que recibe el golpe va a por el atacante y algunas compañeras quietas de cerca acuden a ayudar
+// (no interrumpe órdenes del jugador; si la persecución las aleja mucho de donde estaban, lo dejan)
+const _prov = [];
+function provoke(tgt, att) {
+  const free = u => !u.dead && !u.order && !u.leader && !u.def.siege && u.type !== 'cart';
+  let n = 0;
+  for (const u of [tgt, ...UGRID.near(tgt.pos.x, tgt.pos.z, 7, _prov).filter(o => o !== tgt && o.side === 0).sort((a, b) => a.pos.distanceTo(tgt.pos) - b.pos.distanceTo(tgt.pos))]) {
+    if (n >= 5) break; if (!free(u)) continue;
+    u.order = { type: 'attack', target: att, ret: { x: u.pos.x, z: u.pos.z } }; u.enemy = att; n++;
+  }
 }
 export function unassign(u) {
   const h = u.leader; if (!h) return;
@@ -94,21 +106,36 @@ export function shoot(from, toPos, lift = 1.1, stone = false) {   // stone: pied
 export function bashGate(u, g, dt) {
   u.fwd.set(g.x - u.pos.x, 0, g.z - u.pos.z).normalize(); u.combatT = 2;
   if (u.cd > 0) return; u.cd = u.def.cd;
-  if (RANGED(u.type)) shoot(u.pos, new THREE.Vector3(g.x, HM[u.node] + 1, g.z), 1.1, u.type === 'catapult'); else u.lunge = 1;
+  if (RANGED(u.type)) { shoot(u.pos, new THREE.Vector3(g.x, HM[u.node] + 1, g.z), 1.1, u.type === 'catapult'); const big = u.type === 'catapult'; arrows[arrows.length - 1].onHit = () => gateImpact(g, big); }
+  else { u.lunge = 1; gateImpact(g, u.type === 'ram'); }
   const dmg = u.def.dmg * (u.def.gate || (RANGED(u.type) ? .25 : .7)) * RANKS[u.rank].mul;
   g.hp -= dmg; g.shake = .2; if (spots[g.f.side].side === 0) raiseAlarm(new THREE.Vector3(g.x, 0, g.z), '¡ESTÁN DERRIBANDO UNA PUERTA!');
-  if (seenAt({ x: g.x, z: g.z })) { floatText(new THREE.Vector3(g.x, HM[u.node] + 3, g.z), '-' + Math.round(dmg), spots[g.f.side].side === 0 ? '#d83a4a' : '#ffffff', 8); sfx('hit'); }
+  if (seenAt({ x: g.x, z: g.z })) { if (!RANGED(u.type)) sfx('hit'); floatText(new THREE.Vector3(g.x, HM[u.node] + 3, g.z), '-' + Math.round(dmg), spots[g.f.side].side === 0 ? '#d83a4a' : '#ffffff', 8); }
   if (g.hp <= 0) breakGate(g);
+}
+// impacto en una puerta: astillas (y piedras y polvo si es una catapulta o un ariete), la puerta tiembla y se va quebrando según su vida
+function gateImpact(g, big) {
+  if (g.hp <= 0) return;
+  const p = new THREE.Vector3(g.x, HM[nearestNode(g.x, g.z)] + 1.2, g.z);
+  burst(p, [0x6a4224, 0x8a5a34, 0x3a2414], big ? 14 : 5, big ? 3.5 : 2, big ? 4 : 2.5, big ? .9 : .5, big ? .26 : .18);
+  if (big) { burst(p, [0x8a7a68, 0x6a6266, 0xb4ab98], 10, 3, 3.5, .8, .3); for (let k = 0; k < 3; k++) plume(p.clone().add(new THREE.Vector3((Math.random() - .5) * 2.5, 0, (Math.random() - .5) * 2.5)), 0xc8bca4, .9 + Math.random() * .5, 1.4, .9, -.1); sfx('hit'); }
+  g.shake = big ? .35 : .18; gateLook(g);
+}
+// la puerta se va rompiendo: se inclina hacia dentro, se hunde y se oscurece a medida que pierde vida
+export function gateLook(g) {
+  const k = Math.max(0, g.hp / g.max), b = 1 - k;
+  for (const d of g.doors) { d.userData.y0 ??= d.position.y; d.rotation.order = 'YXZ'; d.rotation.x = b * b * .45; d.rotation.z = (g.gi % 2 ? 1 : -1) * b * .12; d.position.y = d.userData.y0 - b * .5; d.scale.set(1, 1 - b * .25, 1); }
 }
 export function breakGate(g) {
   g.hp = 0; for (const d of g.doors) d.visible = false;
   const p = new THREE.Vector3(g.x, HM[nearestNode(g.x, g.z)] + 1, g.z); burst(p, [0x6a4224, 0x8a5a34, 0x3a2a1a], 22, 4, 5, 1.1, .3, true);
+  for (let k = 0; k < 5; k++) plume(p.clone().add(new THREE.Vector3((Math.random() - .5) * 4, 0, (Math.random() - .5) * 4)), 0xc8bca4, 1.3 + Math.random() * .6, 1.8, 1, -.1, true);
   toast(g.f.side === 0 ? '¡HAN DERRIBADO UNA PUERTA DE TU FORTALEZA!' : 'PUERTA ENEMIGA DERRIBADA', g.f.side === 0 ? 'bad' : 'good', p); addMoment(g.f.side === 0 ? 'DERRIBAN UNA PUERTA TUYA' : 'DERRIBAS UNA PUERTA');
 }
 export function repairGates(side) {
   const st = sideState[side], broken = gateList.filter(g => spots[g.f.side].side === side && g.hp < g.max);
   if (!broken.length || st.gold < GAME.gateRepair) { if (side === 0) sfx('deny'); return false; }
-  st.gold -= GAME.gateRepair; for (const g of broken) { g.hp = g.max; for (const d of g.doors) d.visible = true; }
+  st.gold -= GAME.gateRepair; for (const g of broken) { g.hp = g.max; for (const d of g.doors) d.visible = true; gateLook(g); }
   if (side === 0) { sfx('build'); toast('PUERTAS REPARADAS', 'good'); }
   return true;
 }

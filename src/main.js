@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { layout, orderMove } from './behavior.js';
 import { damageFx, setOwner, templeFx } from './buildings.js';
-import { alarm, assign, corpses, promote } from './combat.js';
+import { alarm, assign, corpses, gateLook, promote } from './combat.js';
 import { CFG, MD, MW } from './config.js';
 import { dropBox } from './effects.js';
 import { updateFog } from './fog.js';
@@ -81,6 +81,7 @@ function frameBody(now) {
   const live = state !== 'play' || !S.paused;
   if (live) {
     damageFx(dt); templeFx(dt, now); updateLife(dt); rulesFrame(dt);
+    for (const g of gateList) if (g.shake > 0) { g.shake -= dt; for (const d of g.doors) { d.userData.p0 ??= d.position.clone(); if (g.shake > 0) d.position.set(d.userData.p0.x + (Math.random() - .5) * g.shake * .8, d.position.y, d.userData.p0.z + (Math.random() - .5) * g.shake * .8); else d.position.x = d.userData.p0.x, d.position.z = d.userData.p0.z; } }   // la puerta tiembla con cada golpe
     for (const s of spots) if (s.shake > 0) { s.shake -= dt; s.group.position.copy(s.base).add(_h.set(Math.random() - .5, 0, Math.random() - .5).multiplyScalar(s.shake * 1.5)); if (s.shake <= 0) s.group.position.copy(s.base); }
     for (let i = corpses.length - 1; i >= 0; i--) {
       const c = corpses[i]; c.t += dt; const k = Math.min(1, c.t / .35);
@@ -116,7 +117,7 @@ function mapShot(w = 1536) {
 window.__game = { mapShot, WEATHER: WEA, ambientInfo, S, gl, units, triggerEvent, ev, R, buildBridge, breakBridge, startChop, get scen() { return scen; },
   // pruebas: pone un cerebro de IA en un bando (diff: dificultad base; over: ajustes que la sobrescriben) o se lo quita con diff = null
   setAI(sd, diff, brain, over) { sideState[sd].ai = diff ? makeAI(sd, diff, brain, over?.persona) : null; if (over && sideState[sd].ai) { const A = sideState[sd].ai; A.Df = { ...A.Df, ...over }; if (over.inc != null) A.inc = over.inc; } }, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
-  step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) S.camGoal = S.camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, get stats() { return STATS; }, civs: () => [0, 1].map(sd => civOf(sd).id), spawnAt, dbg: () => ({ world, roadCell, fields, walk, HM, GEOT, MW, wallHit, promote, gateList, pickGate }) };
+  step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) S.camGoal = S.camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, get stats() { return STATS; }, civs: () => [0, 1].map(sd => civOf(sd).id), spawnAt, dbg: () => ({ world, roadCell, fields, walk, HM, GEOT, MW, wallHit, promote, gateList, pickGate, gateLook }) };
 makeThumbs();
 // ?mapa=RIO-48213 en la dirección abre ese mapa
 { let c = null; try { c = parseCode(new URLSearchParams(location.search).get('mapa')); } catch (e) {}
