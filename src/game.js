@@ -264,7 +264,7 @@ function updateTowns(dt) {
   for (let k = TOWN0; k < spots.length; k++) {
     const s = spots[k], p = spotPos(s), here = Array(NEU + 1).fill(0);
     const inside = UGRID.near(p.x, p.z, capR(s), _nearTown).filter(u => u.pos.distanceTo(p) < capR(s)); for (const u of inside) here[u.side]++;
-    const cheer = sd => { for (const u of inside) if (u.side === sd && !u.enemy) u.capT = .25; };   // los que conquistan saltan en el sitio
+    const cheer = sd => { for (const u of inside) if (u.side === sd && !u.enemy) { u.capT = .25; u.capAt = p; if (u.type === 'hero') for (const e of u.escort) if (!e.enemy) { e.capT = .25; e.capAt = p; } } };   // los que conquistan saltan en el sitio (si es un héroe, también toda su escolta)
     if ((s.camp || s.fortified || s.keep) && s.owner === -1 && s.guards > 0) { s.prog.fill(0); continue; }   // hay que acabar antes con los defensores
     if (s.camp && s.owner >= 0 && (s.genT -= dt) <= 0) { s.genT = GAME.campGen; campSpawn(s); }
     if (s.keep && s.owner >= 0 && (s.genT -= dt) <= 0) { s.genT = GAME.keepGen; keepSpawn(s); }

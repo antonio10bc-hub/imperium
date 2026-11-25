@@ -202,7 +202,10 @@ export function place(u, dt = 0) {
   u.body.position.set(0, u.moving ? Math.abs(Math.sin(u.bob)) * .12 : 0, u.lunge * .35);
   if (u.type === 'god') u.body.position.y += .55 + Math.sin(performance.now() / 520 + u.id) * .12;   // flota sobre el suelo
   u.hitT = Math.max(0, (u.hitT || 0) - dt); u.body.rotation.x = u.lunge * .45 - u.hitT * 2.2;   // se inclina al golpear y retrocede al recibir
-  if (u.capT > 0) { u.capT -= dt; u.body.position.y += Math.abs(Math.sin(performance.now() / 120 + u.id * 1.7)) * .5; }   // salto de conquista
+  if (u.capT > 0) {   // salto de conquista, mirando al sitio que conquistan (si no van andando)
+    u.capT -= dt; u.body.position.y += Math.abs(Math.sin(performance.now() / 120 + u.id * 1.7)) * .5;
+    if (u.capAt && !u.moving) { const dx = u.capAt.x - u.pos.x, dz = u.capAt.z - u.pos.z; if (dx * dx + dz * dz > .25) { u.g.rotation.y = Math.atan2(dx, dz); u.fwd.set(dx, 0, dz).normalize(); } }
+  }
   const fl = u.flash > 0; if (fl !== u.flashOn) { u.flashOn = fl; u.mesh.material = fl ? FLASH : VCMAT; }   // destello blanco al recibir daño
   if (u.banner) { u.banner.visible = u.type === 'hero' || (!!u.leader && u.id % 4 === 0); if (u.banner.visible) u.banner.rotation.y = Math.sin(performance.now() / 400 + u.id) * .25; }   // estandartes de la escolta
   const s = sel.has(u); u.selR.visible = s; if (s) u.selR.scale.setScalar(1 + Math.sin(performance.now() / 120) * .06);
