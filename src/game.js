@@ -242,12 +242,13 @@ function castleDefense(dt) {
     const lv = spots[f.side].wallLvl || 0, R = GAME.wallRange + WALL_LV.range[lv];
     for (const sh of f.shooters || []) {
       if ((sh.cd -= dt) > 0) continue;
-      let best = null, bd = R;
-      for (const u of UGRID.near(sh.x, sh.z, bd, _nearWall)) if (u.side !== own) { const d = Math.hypot(u.pos.x - sh.x, u.pos.z - sh.z); if (d < bd) { bd = d; best = u; } }
-      if (!best) { sh.cd = .35; sh.arch.g.rotation.y += (Math.atan2(Math.cos(sh.th), Math.sin(sh.th)) - sh.arch.g.rotation.y) * .3; continue; }
-      sh.cd = GAME.wallCd * WALL_LV.cd[lv]; const from = new THREE.Vector3(sh.x, sh.arch.g.position.y + 1, sh.z);
-      sh.arch.g.rotation.y = Math.atan2(best.pos.x - sh.x, best.pos.z - sh.z);   // el arquero se gira hacia su blanco
-      shoot(from, best.pos, 0); damage({ side: own, vis: seenAt(from), def: {} }, best, GAME.wallDmg * WALL_LV.dmg[lv]);
+      const foes = [];   // los enemigos más cercanos al alcance: cada andanada reparte flechas entre varios
+      for (const u of UGRID.near(sh.x, sh.z, R, _nearWall)) if (u.side !== own) { const d = Math.hypot(u.pos.x - sh.x, u.pos.z - sh.z); if (d < R) foes.push([d, u]); }
+      if (!foes.length) { sh.cd = .35; sh.arch.g.rotation.y += (Math.atan2(Math.cos(sh.th), Math.sin(sh.th)) - sh.arch.g.rotation.y) * .3; continue; }
+      foes.sort((a, b) => a[0] - b[0]); const best = foes[0][1];
+      sh.cd = GAME.wallCd * WALL_LV.cd[lv]; const from = new THREE.Vector3(sh.x, sh.arch.g.position.y + 1, sh.z), src = { side: own, vis: seenAt(from), def: {} };
+      sh.arch.g.rotation.y = Math.atan2(best.pos.x - sh.x, best.pos.z - sh.z);   // el arquero se gira hacia el más cercano
+      for (const [, u] of foes.slice(0, WALL_LV.targets[lv])) { shoot(from, u.pos, 0); damage(src, u, GAME.wallDmg * WALL_LV.dmg[lv]); }
     }
   }
 }

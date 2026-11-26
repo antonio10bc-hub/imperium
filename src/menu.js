@@ -1,9 +1,9 @@
 // Menú principal en tres columnas iguales: civilizaciones (la tuya arriba, la del rival abajo), geografía y, a la derecha, título, dificultad y jugar.
 import * as THREE from 'three';
-import { sfx } from './audio.js';
+import { sfx, startMenuMusic } from './audio.js';
 import { BONUS, CIV, CIVS, civPick } from './civs.js';
 import { MAX_PLAYERS, MD, MW, TEAM, TP, idx, mixHex } from './config.js';
-import { newGame } from './game.js';
+import { newGame, state } from './game.js';
 import { GEO } from './geo.js';
 import { syncDiff } from './hud.js';
 import { geoTerrain, parseCode, previewMap } from './map.js';
@@ -165,6 +165,9 @@ export function setPlayersPick(n, quiet = false) {
   if (!quiet) { sfx('ui'); S.menuDirty = true; }
 }
 export function init() {
+  // música del menú: el navegador no deja sonar nada hasta el primer gesto, así que arranca con el primer clic o tecla
+  const kick = () => { if (state === 'menu') startMenuMusic(); };
+  addEventListener('pointerdown', kick); addEventListener('keydown', kick);
   document.querySelectorAll('#start [data-players]').forEach(b => b.addEventListener('click', () => setPlayersPick(+b.dataset.players)));
   document.querySelectorAll('#start [data-size]').forEach(b => b.addEventListener('click', () => setSize(b.dataset.size)));
   setSize(S.mapSize, true);

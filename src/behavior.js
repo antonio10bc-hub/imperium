@@ -51,10 +51,12 @@ export function layout(list, shape, z0) {
   return slots;
 }
 // Órdenes de movimiento en grupo: cada tropa recibe su puesto en un bloque orientado hacia el destino y el grupo avanza al paso del más lento
-export function orderMove(list, x, z, show = true, attack = false) {
+// face: dirección hacia la que mirarán al llegar (clic derecho arrastrado); sin ella, la del camino
+export function orderMove(list, x, z, show = true, attack = false, face = null) {
   const node = nearestNode(x, z), f = bfs([node]), tx = cellX(node), tz = cellZ(node);
   let cx = 0, cz = 0; for (const u of list) { cx += u.pos.x; cz += u.pos.z; } cx /= list.length; cz /= list.length;
   let fx = tx - cx, fz = tz - cz; const L = Math.hypot(fx, fz); if (L < .5) { fx = 0; fz = -1; } else { fx /= L; fz /= L; }
+  if (face) { fx = face.x; fz = face.z; }
   const pace = Math.min(...list.map(u => u.def.speed));
   const sl = list.length > 1 ? layout(list, 'block', 0) : new Map([[list[0], [0, 0]]]);
   let mz = 0; for (const [, p] of sl) mz += p[1]; mz /= Math.max(1, sl.size);
@@ -67,7 +69,7 @@ export function orderMove(list, x, z, show = true, attack = false) {
       for (let dz = -7; dz <= 7; dz++) for (let dx = -7; dx <= 7; dx++) { const xx = x0 + dx, zz = z0 + dz; if (xx < 0 || zz < 0 || xx >= MW || zz >= MD) continue; const j = idx(xx, zz), dd = dx * dx + dz * dz; if (dd < bd && slotOk(f, j, lim + Math.sqrt(dd))) { bd = dd; best = j; } }
       c = best >= 0 ? best : node; px = cellX(c); pz = cellZ(c);
     }
-    u.order = { type: 'move', f, tx: px, tz: pz, slot: c, slotF: f[c], fx, fz, pace: list.length > 1 ? pace : 99, attack, stuck: 0, bestD: 1e9, noProg: 0 };
+    u.order = { type: 'move', f, tx: px, tz: pz, slot: c, slotF: f[c], fx, fz, face: !!face, pace: list.length > 1 ? pace : 99, attack, stuck: 0, bestD: 1e9, noProg: 0 };
   }
   if (show) ping(new THREE.Vector3(tx, HM[node] + .1, tz), attack ? '#d83a4a' : '#9ad86a');
 }
@@ -121,6 +123,7 @@ function playerUnit(u, dt) {
     if (prog < o.bestD - .25) { o.bestD = prog; o.noProg = 0; } else o.noProg += dt;
     if (!ok) { o.stuck += dt; if (o.stuck > 1.5) u.order = null; } else o.stuck = 0;
     if (o.noProg > (ph === 0 ? 25 : 6)) u.order = null;   // en el camino común hay más paciencia: en rampas y vados estrechos se forman colas
+    if (!u.order && o.face) u.fwd.set(o.fx, 0, o.fz);   // con orientación pedida, mira hacia ella aunque se quede a un paso de su puesto
     return;
   }
   if (o?.type === 'attack') {

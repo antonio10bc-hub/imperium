@@ -8,7 +8,7 @@ import { S } from './state.js';
 // sfx → compresor; rival (farBus): más bajo, más apagado y con más sala, para que se distinga de lo tuyo sin estorbar;
 // música → filtro paso bajo (timbre opaco, deja el agudo libre para los efectos) → ducking (baja cuando hay mucho jaleo o un momento importante)
 export let ac = null, master = null, sfxBus = null, musBus = null, verb = null, noiseBuf = null;
-let farBus = null, duck = null; const lastSfx = {};
+let farBus = null, duck = null, menuBus = null; const lastSfx = {};
 export function audio() {
   if (ac) return ac;
   try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
@@ -18,6 +18,7 @@ export function audio() {
   farBus = ac.createGain(); farBus.gain.value = .5; const fl = ac.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 1800; farBus.connect(fl).connect(comp);
   duck = ac.createGain(); duck.connect(comp); const ml = ac.createBiquadFilter(); ml.type = 'lowpass'; ml.frequency.value = 2800; ml.Q.value = .5; ml.connect(duck);
   musBus = ac.createGain(); musBus.gain.value = 0; musBus.connect(ml);
+  menuBus = ac.createGain(); menuBus.gain.value = 0; menuBus.connect(ml);
   // sala cálida: ruido que se apaga y además se oscurece (filtro de un polo cada vez más cerrado), sin el siseo de antes
   verb = ac.createConvolver(); const L = ac.sampleRate * 1.9 | 0, ir = ac.createBuffer(2, L, ac.sampleRate);
   for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let y = 0; for (let i = 0; i < L; i++) { const k = i / L, a = .5 - .42 * k; y += a * ((Math.random() * 2 - 1) - y); d[i] = y * 1.8 * Math.pow(1 - k, 2.6); } }
@@ -91,13 +92,13 @@ const INSTR = {
   wood: (t, f, d, g = 1, bus) => { tone(t, f, .25, { type: 'triangle', gain: .05 * g, a: .001, bus, wet: .3 }); tone(t, f * 3.9, .05, { gain: .012 * g, a: .001, bus, wet: .2 }); },   // marimba de madera
 };
 // acorde sostenido: dos triángulos desafinados por nota y un poco de sierra muy apagada; entra y sale despacio
-function pad(t, notes, dur, gain = .016) {
+function pad(t, notes, dur, gain = .016, bus = musBus) {
   const g = ac.createGain(), fl = ac.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 850; fl.Q.value = .5;
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + 1.4); g.gain.setValueAtTime(gain, t + dur - .4); g.gain.linearRampToValueAtTime(0, t + dur + 1.2);
   for (const n of notes) for (const [type, det, k] of [['triangle', -6, 1], ['triangle', 6, 1], ['sawtooth', 0, .25]]) {
     const o = ac.createOscillator(), og = ac.createGain(); o.type = type; o.frequency.value = N2F(n); o.detune.value = det; og.gain.value = k; o.connect(og).connect(fl); o.start(t); o.stop(t + dur + 1.3);
   }
-  fl.connect(g); out(g, musBus, .55);
+  fl.connect(g); out(g, bus, .55);
 }
 function bass(t, f, dur, gain = .05) { tone(t, f, dur, { type: 'triangle', gain, a: .03, bus: musBus, wet: .2, lp: 400 }); tone(t, f * 2, dur * .5, { gain: gain * .2, a: .03, bus: musBus, wet: .2 }); }
 
@@ -292,7 +293,7 @@ function scheduleMusic() {
   const now = ac.currentTime, battle = state === 'play' && elapsed - lastCombat < 6;
   mus.inten += ((battle ? 1 : 0) - mus.inten) * .03;
   const spe = 30 / (P.bpm[0] + (P.bpm[1] - P.bpm[0]) * mus.inten);   // segundos por corchea
-  musBus.gain.setTargetAtTime(state !== 'play' ? .22 : S.paused ? .12 : .28 + mus.inten * .06, now, 1.5);
+  musBus.gain.setTargetAtTime(state === 'menu' ? 0 : state !== 'play' ? .22 : S.paused ? .12 : .28 + mus.inten * .06, now, 1.5);
   if (now > duckUntil) duck.gain.setTargetAtTime(busy > 10 ? .7 : 1, now, .6);
   while (mus.next < now + .3) {
     const t = mus.next, s = mus.step, bar = (s >> 3) % 16, pos = s & 7, M = mus.motif, I = mus.inten > .5;
@@ -315,5 +316,38 @@ function scheduleMusic() {
       if (k >= 0) { const n = deg(P, mus.d + line[k]); INSTR[P.leads[M.lead]](t, N2F(n), spe * r[k][1] * .95, .9); }
     } else if (bar === 12 && (pos === 0 || pos === 4)) INSTR[P.leads[M.lead ^ 1]](t, N2F(mus.chord[pos ? 1 : 2]), spe * 4, .55);
     mus.next += spe; mus.step++;
+  }
+}
+
+// ---------- Música del menú ----------
+// Neutral y sosegada, sin civilización: acordes largos que entran despacio, un bajo muy suave y alguna nota suelta de arpa
+// sobre la pentatónica de re. Sin percusión. Suena mientras se está en el menú y se apaga sola al empezar la partida.
+let menuMus = null;
+const MENU_PROG = [[50, 57, 62, 64, 66], [47, 54, 57, 62, 66], [43, 50, 55, 59, 62], [45, 52, 57, 62, 64]];   // re (add9), si menor 7, sol maj7, la sus4
+const MENU_PENTA = [62, 64, 66, 69, 71, 74, 76, 78];
+export function startMenuMusic() {
+  if (!S.soundOn || !audio()) return;
+  if (ac.state === 'suspended') ac.resume();
+  if (menuMus) return;
+  menuMus = { next: ac.currentTime + .4, i: 0, last: 69 };
+  setInterval(scheduleMenuMusic, 250);
+}
+function scheduleMenuMusic() {
+  const now = ac.currentTime, on = state === 'menu' && S.soundOn;
+  menuBus.gain.setTargetAtTime(on ? .32 : 0, now, on ? 2.5 : .8);
+  if (!on) { menuMus.next = Math.max(menuMus.next, now + .4); return; }
+  const CH = 9;   // segundos por acorde
+  while (menuMus.next < now + .6) {
+    const t = menuMus.next, ch = MENU_PROG[menuMus.i % MENU_PROG.length];
+    pad(t, ch.map(n => n - 12), CH, .012, menuBus);
+    tone(t, N2F(ch[0] - 24), CH * .9, { type: 'sine', gain: .03, a: 2, bus: menuBus, wet: .35 });
+    // de dos a cuatro notas sueltas por acorde, cerca de la anterior, como quien toca sin prisa
+    const n = 2 + (Math.random() * 3 | 0);
+    for (let k = 0; k < n; k++) {
+      const j = MENU_PENTA.indexOf(menuMus.last), nj = Math.max(0, Math.min(MENU_PENTA.length - 1, (j < 0 ? 3 : j) + pick([-2, -1, -1, 1, 1, 2])));
+      menuMus.last = MENU_PENTA[nj];
+      string(t + 1.2 + k * CH / n + Math.random() * .6, N2F(menuMus.last), { dur: 3, gain: .028, lp: 1800, bend: 1, h2: .12, bus: menuBus, wet: .75 });
+    }
+    menuMus.next += CH; menuMus.i++;
   }
 }

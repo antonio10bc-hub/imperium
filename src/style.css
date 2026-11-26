@@ -38,19 +38,20 @@ kbd{font:400 12px/1 var(--font);border:2px solid currentColor;padding:2px 3px;ma
 .mp{position:relative;min-width:0;overflow:hidden}
 .mp+.mp{border-left:4px solid var(--ink)}
 .mp.civs{display:grid;grid-template-rows:1fr 1fr}
-.half{position:relative;overflow:hidden;background:repeating-linear-gradient(45deg,rgba(255,255,255,.05) 0 10px,transparent 10px 20px),radial-gradient(ellipse at 50% 60%,#6a9ae8,#1e3a7a 75%)}
-.half.s1{border-top:4px solid var(--ink);background:repeating-linear-gradient(45deg,rgba(255,255,255,.05) 0 10px,transparent 10px 20px),radial-gradient(ellipse at 50% 60%,#e86a74,#6a1420 75%)}
+.half{position:relative;overflow:hidden;background:repeating-linear-gradient(45deg,rgba(255,255,255,.08) 0 10px,transparent 10px 20px),radial-gradient(ellipse at 50% 58%,#e2f2f2,#a6d0de 80%)}
+.half.s1{border-top:4px solid var(--ink);background:repeating-linear-gradient(45deg,rgba(255,255,255,.08) 0 10px,transparent 10px 20px),radial-gradient(ellipse at 50% 58%,#f2ead6,#cdbb9c 80%)}
 .mp.geo{background:#8ad8f0}
 .stage{position:absolute;inset:0}
 .half .stage{top:4px;bottom:44px;animation:float 3.2s ease-in-out infinite}
 .half.s1 .stage{animation-delay:-1.6s}
 .stage>*{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transition:transform .55s cubic-bezier(.2,.9,.25,1.2),opacity .45s ease}
-.half .stage>*{filter:drop-shadow(0 10px 0 rgba(15,15,27,.3))}
+.half .stage>*{filter:drop-shadow(0 8px 0 rgba(15,15,27,.18))}
 .mp.geo .stage>*{object-fit:cover}
 .stage>.enter{opacity:0;transform:translateX(calc(var(--dx) * 1px)) scale(.86)}
 .stage>.leave{opacity:0;transform:translateX(calc(var(--dx) * -1px)) scale(.9)}
 .stage .q{display:grid;place-items:center;font:400 clamp(90px,12vw,150px)/1 var(--font);color:#f4f4e8;text-shadow:0 6px 0 var(--ink),0 0 24px rgba(255,255,255,.25)}
 .mp.geo .stage .q{background:#262a3b;color:#e8c870}
+.half .stage .q{color:rgba(15,15,27,.5);text-shadow:0 5px 0 rgba(255,255,255,.45)}
 .tag{position:absolute;left:10px;top:10px;display:flex;font:400 13px/1 var(--font);letter-spacing:.06em;box-shadow:0 3px 0 var(--ink);z-index:1}
 .tag>*{padding:6px 8px 5px;border:2px solid var(--ink)}
 .tag .who{background:var(--ink);color:#fff}

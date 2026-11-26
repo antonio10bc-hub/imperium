@@ -93,7 +93,7 @@ function frameBody(now) {
   }
   for (const s of spots) if (s.anim > 0 && s.group) {   // conquista: el pueblo da un bote y la bandera sube por el mástil
     s.anim = Math.max(0, s.anim - dt); const k = s.anim / 1.4, t = 1.4 - s.anim;
-    s.group.scale.set(1 + Math.sin(t * 12) * .06 * k, 1 + Math.sin(t * 12) * .16 * k, 1 + Math.sin(t * 12) * .06 * k);
+    const b = s.gsc || 1; s.group.scale.set(b * (1 + Math.sin(t * 12) * .06 * k), b * (1 + Math.sin(t * 12) * .16 * k), b * (1 + Math.sin(t * 12) * .06 * k));   // relativo a su escala: la ciudadela no encoge
   }
   for (const s of spots) for (const f of s.flags || []) { f.y0 ??= f.m.position.y; f.m.position.y = f.y0 - (s.anim > 0 ? (s.anim / 1.4) * 1.6 : 0); const k = .8 + .2 * (.5 + .5 * Math.sin(now / 160 + f.ph)); f.m.scale.x = f.w * k; f.m.position.x = f.px + f.dir * f.w * k / 2; f.m.rotation.y = Math.sin(now / 230 + f.ph) * .18; }
   if (alarm.t > 0) alarm.t -= dt;

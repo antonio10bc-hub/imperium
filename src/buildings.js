@@ -15,10 +15,15 @@ import { addMoment, statCapture } from './stats.js';
 
 // ---------- Edificios ----------
 export const spotPos = (s, lift = 0) => new THREE.Vector3(s.x, s.y + lift, s.z);
+// los sitios neutrales que se conquistan (pueblos, campamentos, atalayas y ciudadela) se ven algo más grandes; solo es aspecto:
+// el círculo de conquista se compensa para que siga marcando el radio real
+const SITE_VIS = 1.2;
 function placeSpot(s, g, face) {
   let m = 1; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) m = Math.max(m, surfY(s.x + dx, s.z + dz));
+  const vis = s.kind === 'town' ? SITE_VIS : 1;
+  s.gsc = g.scale.x * vis; g.scale.setScalar(s.gsc); if (vis !== 1 && s.zone) s.zone.scale.multiplyScalar(1 / vis);   // gsc: escala de reposo (el bote de la conquista vuelve a ella)
   s.y = m; g.position.set(s.x, s.y, s.z); g.rotation.y = face; world.add(g); s.group = g; s.base = g.position.clone(); g.updateMatrixWorld();
-  const r = ({ base: 4.4, barracks: 2.9, altar: 2.9, temple: 3, town: 3.3 }[s.kind] || 3) * (s.kind !== 'town' ? s.sc || 1 : 1) * (s.keep ? (s.narrow ? 1.8 : 2.3) : s.fortified ? 1.5 : 1);   // sombra suave desplazada hacia donde cae la luz
+  const r = ({ base: 4.4, barracks: 2.9, altar: 2.9, temple: 3, town: 3.3 }[s.kind] || 3) * (s.kind !== 'town' ? s.sc || 1 : 1) * (s.keep ? (s.narrow ? 1.8 : 2.3) : s.fortified ? 1.5 : 1) * vis;   // sombra suave desplazada hacia donde cae la luz
   const sh = new THREE.Mesh(discGeo(r), basic(0x0f1a2a, .22)); sh.rotation.x = -Math.PI / 2; sh.position.set(s.x + r * .18, s.y + .04, s.z - r * .22); world.add(sh); decos.push(sh); s.shadow = sh;
   s.flags = [];
 }

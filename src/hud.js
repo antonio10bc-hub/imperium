@@ -1,5 +1,5 @@
 // Interfaz: barra superior, héroes, panel de selección y herramientas.
-import { ac, audio, master, sfx, startMusic } from './audio.js';
+import { ac, audio, master, sfx, startMenuMusic, startMusic } from './audio.js';
 import { SHAPES } from './behavior.js';
 import { civOf, uname } from './civs.js';
 import { assign, repairGates } from './combat.js';
@@ -82,11 +82,9 @@ export function saveGroup(n) {   // sin n: el primer hueco libre
   for (const k in S.groups) S.groups[k] = groupOf(k).filter(u => !list.includes(u));   // una tropa está en un solo grupo
   S.groups[n] = list; sfx(list.length ? 'cmd' : 'deny'); refreshPanel();
 }
-let lastGrp = { n: 0, t: 0 };
-export function selectGroup(n) {   // dos veces seguidas: la cámara va al grupo
+export function selectGroup(n) {   // selecciona el grupo y la cámara va a él (a su héroe, si lleva uno), como con G
   const g = groupOf(n); if (!g.length) return false;
-  const now = performance.now(), twice = lastGrp.n === n && now - lastGrp.t < 400; lastGrp = { n, t: now };
-  setSelection(g, false); if (twice) { S.follow = g[0]; S.focusGoal = null; } return true;
+  setSelection(g, false); S.follow = g.find(u => u.type === 'hero') || g[0]; S.focusGoal = null; return true;
 }
 // Panel de la barra inferior: vacío por defecto; muestra el edificio, el pueblo o las unidades seleccionadas
 let panelHtml = '';
@@ -299,5 +297,5 @@ export function init() {
   $('mSurrender').addEventListener('click', () => { track('menu_surrender'); endGame(false, true); });
   $('mQuit').addEventListener('click', () => { track('menu_quit'); newGame(1 + Math.floor(Math.random() * 99999)); });
   $('snd').textContent = '♪ ' + (S.soundOn ? 'SÍ' : 'NO');
-  $('snd').addEventListener('click', () => { S.soundOn = !S.soundOn; $('snd').textContent = '♪ ' + (S.soundOn ? 'SÍ' : 'NO'); try { localStorage.setItem('imperium-sound', S.soundOn ? '1' : '0'); } catch (e) {} if (S.soundOn && state === 'play') startMusic(); if (audio()) master.gain.setTargetAtTime(S.soundOn ? .9 : 0, ac.currentTime, .05); });
+  $('snd').addEventListener('click', () => { S.soundOn = !S.soundOn; $('snd').textContent = '♪ ' + (S.soundOn ? 'SÍ' : 'NO'); try { localStorage.setItem('imperium-sound', S.soundOn ? '1' : '0'); } catch (e) {} if (S.soundOn && state === 'play') startMusic(); else if (S.soundOn && state === 'menu') startMenuMusic(); if (audio()) master.gain.setTargetAtTime(S.soundOn ? .9 : 0, ac.currentTime, .05); });
 }

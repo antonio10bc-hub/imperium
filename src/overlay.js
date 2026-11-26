@@ -1,7 +1,7 @@
 // Capa 2D sobre el 3D (barras, iconos, textos), cursores y tamaño de la ventana.
 import * as THREE from 'three';
 import { spotPos } from './buildings.js';
-import { ALT0, BARR0, BASE1, CFG, GAME, RANGED, RANKS, TEAM, TEMP0, UNITS } from './config.js';
+import { ALT0, BARR0, BASE1, CFG, GAME, RANKS, TEAM, TEMP0, UNITS } from './config.js';
 import { uname } from './civs.js';
 import { exploredAt, visibleAt } from './fog.js';
 import { capR, edgeMarks, state } from './game.js';
@@ -130,10 +130,21 @@ function groundRing(x, z, r, stroke, fill, dash) {
   if (fill) { octx.fillStyle = fill; octx.fill(); }
   if (dash) octx.setLineDash(dash); octx.lineWidth = 1.5; octx.strokeStyle = stroke; octx.stroke(); octx.setLineDash([]);
 }
-// con tropas seleccionadas: alcance de los tiradores y, sobre un pueblo ajeno, su círculo de conquista; junto al cursor, el aviso de la zona a la que irían
+// flecha del clic derecho arrastrado: de dónde se colocan las tropas hacia dónde mirarán
+function faceArrow(x0, y0, x1, y1, attack) {
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy); if (L < 14) return;
+  const ux = dx / L, uy = dy / L, nx = -uy, ny = ux, hl = Math.min(18, L * .45), hw = hl * .62, bx = x1 - ux * hl, by = y1 - uy * hl, w = 3.2;
+  octx.beginPath();
+  octx.moveTo(x0 + nx * w, y0 + ny * w); octx.lineTo(bx + nx * w, by + ny * w); octx.lineTo(bx + nx * hw, by + ny * hw); octx.lineTo(x1, y1);
+  octx.lineTo(bx - nx * hw, by - ny * hw); octx.lineTo(bx - nx * w, by - ny * w); octx.lineTo(x0 - nx * w, y0 - ny * w); octx.closePath();
+  octx.lineJoin = 'round'; octx.lineWidth = 4; octx.strokeStyle = 'rgba(15,15,27,.85)'; octx.stroke();
+  octx.fillStyle = attack ? '#d83a4a' : '#9ad86a'; octx.fill(); octx.lineJoin = 'miter';
+  octx.beginPath(); octx.arc(x0, y0, 4.5, 0, 7); octx.fill(); octx.lineWidth = 2; octx.stroke();
+}
+// con tropas seleccionadas: sobre un pueblo ajeno, su círculo de conquista; junto al cursor, el aviso de la zona a la que irían
 function drawOrderHints() {
   if (state !== 'play' || !sel.size) return;
-  let n = 0; for (const u of sel) if (!u.dead && u.side === 0 && RANGED(u.type) && n++ < 24) groundRing(u.pos.x, u.pos.z, u.def.range, 'rgba(244,244,232,.45)', null, [4, 4]);
+  if (drag?.face && drag.moved) { faceArrow(drag.x0, drag.y0, drag.lx, drag.ly, S.amode); return; }
   if (!mouse.in || drag) return;
   const sp = pickSpot(mouse.x, mouse.y);
   if (sp?.kind === 'town' && sp.owner !== 0) groundRing(sp.x, sp.z, capR(sp), 'rgba(232,200,112,.95)', 'rgba(232,200,112,.16)');

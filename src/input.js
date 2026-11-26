@@ -71,14 +71,20 @@ function setRally(g) {
   ping(f.position, '#3a6ad8'); sfx('cmd'); toast(`PUNTO DE REUNIÓN ${{ barracks: 'DEL CUARTEL', altar: 'DE LOS HÉROES', temple: 'DEL DIOS' }[k]} FIJADO`);
 }
 // orden sobre la fortaleza rival (asalto), un pueblo ajeno (conquista) o un punto del suelo (mover); la usan el mapa y el minimapa
-function orderTo(list, sp, g, attack) {
+function orderTo(list, sp, g, attack, face = null) {
   if (sp && sp.kind === 'base' && sp.side !== 0) { const tgt = sp; for (const u of list) u.order = { type: 'siege', s: tgt }; ping(spotPos(tgt), '#d83a4a'); sfx('cmd'); toast('¡AL ASALTO DE LA FORTALEZA!'); track('order', { type: 'siege' }); return; }
   if (sp && sp.kind === 'bridge' && sp.built) { for (const u of list) u.order = { type: 'demolish', b: sp }; ping(new THREE.Vector3(sp.x, sp.hb, sp.z), '#d83a4a'); sfx('cmd'); toast('¡A DERRIBAR EL PUENTE!'); return; }   // derribar un puente
   if (sp && sp.kind === 'town' && sp.owner !== 0) { const k = spots.indexOf(sp); for (const u of list) u.order = { type: 'capture', k }; ping(spotPos(sp), '#e8c870'); sfx('cmd'); track('order', { type: 'capture' }); return; }
-  orderMove(list, g.x, g.z, true, attack); sfx('cmd'); track('order', { type: attack ? 'amove' : 'move' });
+  orderMove(list, g.x, g.z, true, attack, face); sfx('cmd'); track('order', { type: attack ? 'amove' : 'move', face: !!face });
+}
+// orden con orientación: van al punto donde empezó el arrastre y miran hacia donde terminó
+function faceCommand(d, x, y) {
+  const a = groundAt(d.x0, d.y0), b = groundAt(x, y), atk = !!S.amode; S.amode = false;
+  const fx = a && b ? b.x - a.x : 0, fz = a && b ? b.z - a.z : 0, L = Math.hypot(fx, fz);
+  command(d.x0, d.y0, atk, L > 1.2 ? { x: fx / L, z: fz / L } : null);
 }
 const commandList = () => [...sel].filter(u => !(u.leader && sel.has(u.leader)));   // la escolta de un héroe seleccionado sigue en formación
-export function command(x, y, attack = false) {
+export function command(x, y, attack = false, face = null) {
   if (state !== 'play') return;
   if (S.selBld in RALLY_BLD) { const g = groundAt(x, y); if (g) setRally(g); return; }
   if (!sel.size) return;
@@ -100,7 +106,7 @@ export function command(x, y, attack = false) {
   if (eu) { for (const u of list) u.order = { type: 'attack', target: eu }; ping(eu.pos, '#d83a4a'); sfx('cmd'); track('order', { type: 'attack' }); return; }
   const sp = pickSpot(x, y), g = sp ? { x: sp.x, z: sp.z } : groundAt(x, y); if (!g) return;
   if (!sp && !attack && GEOT[cellOf(g.x, g.z)] === 1 && startChop(g.x, g.z, list)) { sfx('cmd'); return; }   // bosque denso: talarlo
-  orderTo(list, sp, g, attack);
+  orderTo(list, sp, g, attack, face);
 }
 // ---------- Táctil ----------
 // Con tropas o un edificio seleccionados, tocar el mapa da la orden (mover, atacar, conquistar, asaltar, talar o fijar el punto de reunión);
@@ -192,7 +198,9 @@ export function init() {
       const d0 = drag; d0.lp = setTimeout(() => { if (drag === d0 && !d0.moved && !pinch) { d0.done = true; longPress(d0.x0, d0.y0); } }, 480);   // pulsación larga
       return;
     }
-    drag = { btn: e.button, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, shift: e.shiftKey };
+    // clic derecho con tropas seleccionadas: arrastrar dibuja una flecha (adónde van y hacia dónde mirarán) en vez de mover la cámara
+    const face = e.button === 2 && state === 'play' && sel.size > 0 && !(S.selBld in RALLY_BLD);
+    drag = { btn: e.button, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, shift: e.shiftKey, face };
   });
   addEventListener('pointermove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = e.pointerType === 'mouse'; });
   document.addEventListener('pointerleave', () => { mouse.in = false; });
@@ -207,7 +215,7 @@ export function init() {
     }
     if (!drag || drag.pinch) return;
     if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > (drag.touch ? 12 : 5)) { drag.moved = true; clearTimeout(drag.lp); }
-    if (drag.btn !== 0 && drag.moved) { const k = S.camDist * .0019; pan(-(e.clientX - drag.lx) * k, -(e.clientY - drag.ly) * k * 1.5); }
+    if (drag.btn !== 0 && drag.moved && !drag.face) { const k = S.camDist * .0019; pan(-(e.clientX - drag.lx) * k, -(e.clientY - drag.ly) * k * 1.5); }
     drag.lx = e.clientX; drag.ly = e.clientY;
   });
   canvas.addEventListener('pointercancel', e => { if (drag) clearTimeout(drag.lp); touchEnd(e); if (!touches.size) drag = null; });
@@ -237,6 +245,7 @@ export function init() {
         lastClick = now;
       }
     } else if (d.btn === 2 && !d.moved) command(e.clientX, e.clientY);
+    else if (d.btn === 2 && d.face) faceCommand(d, e.clientX, e.clientY);
   });
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
