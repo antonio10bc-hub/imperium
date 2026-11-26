@@ -213,11 +213,11 @@ const UI_IC = {
 // ciudad elegida para producir (con varias ciudades, Q/W/E pasan de una a otra)
 export const curCity = () => S.city != null && spots[S.city]?.side === 0 ? S.city : homeOf(0);
 export function selectBuilding(kind, city) { sel.clear(); S.follow = null; S.selBld = kind; S.selSpot = null; if (city != null) S.city = city; S.city = curCity(); updateCtx(); syncTouch(); }
-const BLD0 = { barracks: BARR0, altar: ALT0, temple: TEMP0 };
+const BLD0 = () => ({ barracks: BARR0, altar: ALT0, temple: TEMP0 });   // se calcula al usarlo: con 3 a 5 jugadores los índices cambian (antes se quedaban los de 2 y Q/W/E llevaban a edificios de otro)
 export function cycleBuilding(kind) {   // Q cuartel · W salón de héroes · E templo; pulsar otra vez pasa a la siguiente ciudad
   const cs = citiesOf(0); if (!cs.length) return;
   let c = curCity(); if (S.selBld === kind && cs.length > 1) c = cs[(cs.indexOf(c) + 1) % cs.length];
-  selectBuilding(kind, c); sfx('select'); const s = spots[BLD0[kind] + c]; focusOn(s.x, s.z);
+  selectBuilding(kind, c); sfx('select'); const s = spots[BLD0()[kind] + c]; focusOn(s.x, s.z);
 }
 export function selectSpot(s) { sel.clear(); S.follow = null; S.selBld = null; S.selSpot = s; updateCtx(); syncTouch(); }
 export function setSelection(list, add) { S.amode = false; if (!add) sel.clear(); for (const u of list) sel.add(u); S.selBld = null; S.selSpot = null; if (list.length) sfx('select'); updateCtx(); syncTouch(); }

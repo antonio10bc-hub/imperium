@@ -56,6 +56,7 @@ const ICONS = {
   god:   ['2002002', '0222220', '0200020', '2202022', '0200020', '0222220', '2002002'],
   ram:   ['0000000', '0222220', '2222222', '0002222', '0222220', '2020202', '0000000'],
   catapult: ['0000022', '0000220', '0002200', '0222000', '2222222', '2020202', '0000000'],
+  wall:  ['2020202', '2222222', '2222222', '2220222', '2200022', '2200022', '2200022'],   // muralla con almenas y puerta
   shield: ['2222222', '2000002', '2022202', '2022202', '0200020', '0020200', '0002000'],
 };
 // icono grande de acción sobre un edificio (con un pequeño bote)
@@ -204,7 +205,12 @@ export function drawOverlay(dt) {
     const ed = project(_h.set(s.x + 3, s.y, s.z), tmpQ); s.pr = Math.max(18, Math.hypot(ed.x - s.sx, ed.y - s.sy) * (s.kind === 'base' ? 1.3 : 1));
     if (!s.vis || !showUI) continue;
     const top = project(spotPos(s, s.kind === 'base' ? 11.5 : s.watch ? 11 : s.keep ? (s.narrow ? 9.5 : 12) : s.kind === 'town' ? 6 : 5), tmpP);
+    s.ix = null;   // posición en pantalla de su icono de acción (también se puede pulsar)
     if (s.kind === 'base') {
+      if (s.side === 0 && state === 'play') {   // tu fortaleza: icono de la muralla (mejorarla y reparar las puertas)
+        const ic = project(spotPos(s, 9), tmpQ); s.ix = ic.x; s.iy = ic.y - 6 - 18;
+        actionIcon(ic.x, ic.y - 6, 'wall', S.selSpot === s ? '#f4f4e8' : '#e8c870');
+      }
       if (s.hp < GAME.baseHp) bar(top.x, top.y - 4, 70, 6, s.hp / GAME.baseHp, TEAM[s.side].css);
     } else if (s.kind === 'town') {
       const own = s.owner;
@@ -216,7 +222,7 @@ export function drawOverlay(dt) {
     } else {
       const st = sideState[s.side], mine = e => e && (e.c ?? s.side) === s.civ, q = s.kind === 'barracks' && mine(st.queue[0]) ? st.queue[0] : null, h = s.kind === 'altar' ? st.heroQ.find(e => e.state === 'training' && mine(e)) : null;
       if (s.side === 0 && state === 'play') {   // tus edificios con acciones: reclutar tropas y el héroe
-        const ic = project(spotPos(s, s.kind === 'barracks' ? 4.6 : 5.2), tmpQ);
+        const ic = project(spotPos(s, s.kind === 'barracks' ? 4.6 : 5.2), tmpQ); s.ix = ic.x; s.iy = ic.y - 6 - 18;
         actionIcon(ic.x, ic.y - 6, s.kind === 'barracks' ? 'sword' : s.kind === 'temple' ? 'god' : 'hero', S.selBld === s.kind && s.civ === curCity() ? '#f4f4e8' : '#e8c870');
       }
       if (s.side === 0 && S.selBld === s.kind && s.civ === curCity()) continue;

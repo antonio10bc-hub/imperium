@@ -179,11 +179,11 @@ let uid = 0;
 const maxHpOf = u => Math.round(u.def.hp * (u.leader ? GAME.escortBonus : 1) * RANKS[u.rank].mul);
 export function setMax(u) { const old = u.maxHp; u.maxHp = maxHpOf(u); if (u.maxHp > old) u.hp += u.maxHp - old; else u.hp = Math.min(u.hp, u.maxHp); }
 // edificio que produce cada tipo de sitio: su punto de reunión está en S.rally[edificio]
-export const RALLY_OF = { [BARR0]: 'barracks', [ALT0]: 'altar', [TEMP0]: 'temple' };
+const RALLY_OF = at => at === BARR0 ? 'barracks' : at === ALT0 ? 'altar' : at === TEMP0 ? 'temple' : null;   // al usarlo: los índices dependen del número de jugadores
 export function spawnUnit(side, type, at = BARR0, city = side) {
   const b = spots[at + city], k = spots[city], ang = Math.atan2(k.z - b.z, k.x - b.x) + (Math.random() - .5) * 1.6;
   const u = spawnAt(side, type, b.x + Math.cos(ang) * 2.8, b.z + Math.sin(ang) * 2.8, ang, city);
-  const r = S.rally[RALLY_OF[at] + city];
+  const r = S.rally[RALLY_OF(at) + city];
   if (side === 0 && r) orderMove([u], r.x, r.z, false);   // punto de reunión del edificio (si tu bando lo lleva la IA, ella decide luego)
   return u;
 }

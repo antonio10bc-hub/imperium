@@ -49,6 +49,7 @@ export function pickTreasure(x, y) {
 }
 export function pickSpot(x, y) {
   let best = null, bd = 1e9;
+  for (const s of spots) if (s.vis && s.ix != null && Math.abs(s.ix - x) < 19 && Math.abs(s.iy - y) < 19) return s;   // el icono de acción de un edificio tuyo
   for (const s of [...spots, ...R.bridges]) if (s.vis) { const d = Math.hypot(s.sx - x, s.sy - y); if (d < s.pr && d < bd) { bd = d; best = s; } }
   return best;
 }
@@ -238,7 +239,6 @@ export function init() {
         else {
           S.follow = null; const sp = pickSpot(e.clientX, e.clientY);
           if (sp && sp.side === 0 && (sp.kind === 'barracks' || sp.kind === 'altar' || sp.kind === 'temple')) { selectBuilding(sp.kind, sp.civ); sfx('select'); }
-          else if (sp && sp.side === 0 && sp.kind === 'base') { selectBuilding('barracks', sp.civ); sfx('select'); }
           else if (sp && (sp.kind === 'town' || sp.kind === 'base' || sp.kind === 'bridge')) { selectSpot(sp); sfx('select'); }
           else { S.selBld = null; setSelection([], d.shift); }
         }
