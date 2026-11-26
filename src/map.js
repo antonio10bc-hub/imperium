@@ -291,12 +291,13 @@ export function generate(newSeed, tries = 0) {
   const nearSite = (x, z, r, maxD) => { const n = findSite(x, z, r, maxD); return n >= 0 ? n : nearestNode(x, z); };
   for (const [x, z] of geoR?.special || []) { const n = nearSite(x, z, geoR.oasis ? 4 : 6, 13); if (Math.hypot(cellX(n) - x, cellZ(n) - z) < 14) addTown(cellX(n), cellZ(n), geoR.goldTop || scen === 'lago' ? { special: true } : geoR.oasis ? { oasis: true } : {}); }
   // sitios propios de la geografía: una atalaya en cada puerto de la cordillera y la ciudadela en el paso del istmo
-  const onLand = ([x, z], max = 8, r = 3.5) => { const n = nearSite(x, z, r, max); return Math.hypot(cellX(n) - x, cellZ(n) - z) < max && spots.every(o => Math.hypot(o.x - cellX(n), o.z - cellZ(n)) > 18) ? n : -1; };
+  // strict: solo un sitio donde el edificio quepa entero en tierra firme (sin caer a la casilla andable más cercana, que podía ser la orilla de un río)
+  const onLand = ([x, z], max = 8, r = 3.5, strict = false) => { const n = strict ? findSite(x, z, r, max) : nearSite(x, z, r, max); if (n < 0) return -1; return Math.hypot(cellX(n) - x, cellZ(n) - z) < max && spots.every(o => Math.hypot(o.x - cellX(n), o.z - cellZ(n)) > 18) ? n : -1; };
   if (scen === 'cordillera') for (const p of geoR.passes) { const n = onLand(p); if (n >= 0) addTown(cellX(n), cellZ(n), { watch: true }); }
   if (geoR?.confluence) {   // la ciudadela en la confluencia (afluentes) o en el centro de la isla (cañón: siempre dentro de la isla)
-    const n = scen === 'canon' ? nearestNode(geoR.confluence[0], geoR.confluence[1]) : onLand(geoR.confluence, 18, 6.5);
+    const n = scen === 'canon' ? nearestNode(geoR.confluence[0], geoR.confluence[1]) : onLand(geoR.confluence, 26, 6.5, true);   // si no cabe en seco junto a la confluencia, la ciudadela va al pueblo más céntrico
     if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }
-  if (scen === 'istmo' && geoR.passes[0]) { const n = onLand(geoR.passes[0], 14, 5); if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }
+  if (scen === 'istmo' && geoR.passes[0]) { let n = onLand(geoR.passes[0], 14, 5.5, true); if (n < 0) n = onLand(geoR.passes[0], 14, 5); if (n >= 0) addTown(cellX(n), cellZ(n), { keep: true }); }
   // el mismo número de pueblos en cada mitad (con más de dos jugadores, en la zona de cada fortaleza)
   const zoneOf = (x, z) => { if (NP === 2) return x >= MW / 2 ? 1 : 0; let b = 0, bd = 1e9; for (const f of forts) { const d = Math.hypot(f.x - x, f.z - z); if (d < bd) { bd = d; b = f.side; } } return b; };
   const halves = players().map(h => pool.filter(i => zoneOf(cellX(i), cellZ(i)) === h));

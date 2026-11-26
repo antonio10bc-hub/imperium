@@ -34,7 +34,9 @@ const FOCUS = `(key) => { const g = __game, d = g.dbg(), R = d.geoR, sp = g.spot
     case 'lago': return [...R.volcano, 140];
     case 'helado': return [...centroid(15), 125];
     case 'canon': return [...R.confluence, 125];
-    case 'costa': { const p = near(C, R.passes); return [p[0], p[1] + 34, 150]; }
+    case 'costa': {   // la orilla del mar (junto al galeón varado, si lo hay): abajo el mar, arriba la playa y un poco del llano
+      const gal = g.ambientInfo().landmarks.find(l => l[2] === 'galleon'), x = Math.round(gal ? gal[0] : MW / 2); let z = MD - 1; while (z > 0 && d.HM[z * MW + x] <= 0) z--;
+      return [x, z - 9, 100]; }
     case 'ruinas': return [...near(C, R.treasures), 100];
   } return [...C, 130]; }`;
 
