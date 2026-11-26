@@ -7,7 +7,7 @@ import { alarm, assign, unassign } from './combat.js';
 import { GAME, MD, MW, SIEGE, TYPES } from './config.js';
 import { ping } from './effects.js';
 import { exploredAt, toggleFog } from './fog.js';
-import { enqueue, heroesOf, newGame, startGame, startRitual, state, summonGod, summonHero, toast } from './game.js';
+import { enqueue, heroesOf, newGame, startGame, startRitual, state, summonGod, summonHero, toast, upgradeWall } from './game.js';
 import { closeMenu, curCity, cycleBuilding, saveGroup, selectGroup, openMenu, pickGroup, selectBuilding, selectSpot, setSelection, syncTools, updateCtx } from './hud.js';
 import { GEOT, HM, cellOf, gateList, homeOf, spots, surfY } from './map.js';
 import { bfs, nearestNode } from './nav.js';
@@ -266,12 +266,13 @@ export function init() {
     else if (dg && S.selBld === 'barracks') { if (dg <= 3) enqueue(0, TYPES[dg - 1], curCity()); else if (dg <= 5) enqueue(0, SIEGE[dg - 4], curCity()); }   // números: lo que produce el edificio seleccionado
     else if (dg === 1 && S.selBld === 'altar') summonHero(0, curCity());
     else if (dg === 1 && S.selBld === 'temple') { if (sideState[0].ritual.state === 'none') startRitual(0, curCity()); else summonGod(0); }
+    else if (dg === 1 && S.selSpot?.kind === 'base' && S.selSpot.side === 0) upgradeWall(0, spots.indexOf(S.selSpot));   // fortaleza seleccionada: 1 mejora la muralla (si hay oro)
     else if (dg && !S.selBld) selectGroup(dg);   // sin edificio seleccionado: los grupos guardados
     else if (k === 'q') cycleBuilding('barracks');
     else if (k === 'w') cycleBuilding('altar');
     else if (k === 'e') cycleBuilding('temple');
     else if (k === 'g') heroButton();
-    else if (k === 'h') { const b = spots[homeOf(0)]; focusOn(b.x, b.z); selectSpot(b); }   // tu fortaleza: muralla y puertas
+    else if (k === 'r') { const b = spots[homeOf(0)]; focusOn(b.x, b.z); selectSpot(b); }   // tu fortaleza: muralla y puertas
     else if (k === 'p') { S.paused = !S.paused; syncTools(); }
     else if (k === 'v') { S.speed = S.speed === 1 ? 2 : 1; syncTools(); }
     else if (k === ' ') { e.preventDefault(); const ev = alarm.ev && (!alarm.pos || alarm.ev.at > (alarm.at || 0)) ? alarm.ev : alarm.pos; if (ev) focusOn(ev.x, ev.z); }   // ESPACIO: el último ataque o el último cambio del escenario
