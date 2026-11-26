@@ -49,7 +49,7 @@ export let EL = null, G = null, HM = null, flats = [], forts = [];
 export const FORT_K = 1.25;   // tamaño de las fortalezas de los jugadores (recinto y murallas) respecto al original
 function groundXZ(x, z) {
   let g = EL[idx(x, z)]; const cx = x + .5, cz = z + .5;
-  for (const f of flats) { const r = Math.hypot(cx - f.x, cz - f.z); if (r < f.r1 && (f.kind !== 'town' || EL[idx(x, z)] > .5)) g += (f.h - g) * (1 - smooth01((r - f.r0) / (f.r1 - f.r0))); }   // la explanada de un pueblo no rellena el agua (dejaba círculos en la costa)
+  for (const f of flats) { const r = Math.hypot(cx - f.x, cz - f.z); if (r < f.r1 && (f.kind !== 'town' || (EL[idx(x, z)] > .5 && !(GEOT && (GEOT[idx(x, z)] === 17 || GEOT[idx(x, z)] === 9))))) g += (f.h - g) * (1 - smooth01((r - f.r0) / (f.r1 - f.r0))); }   // la explanada de un pueblo no rellena el agua (dejaba círculos en la costa) ni el fondo del cañón (abría pasos sin puente)
   for (const f of forts) if (f.moat) { const p = polar(f, cx, cz); if (p) { const rw = wallR(f, p[1]); if (p[0] > rw + 2.2 && p[0] < rw + 4.6 && !f.gates.some(ga => angDiff(p[1], ga) * p[0] < 2.4)) g = -1.6; } }
   return g;
 }
@@ -193,9 +193,10 @@ export function terrainColor(x, z) {
   if (h <= 1) return B.sand;
   if (treeCell && treeCell[i]) return B.lush;
   const fc = geoR?.snow ? -1 : featureAt(x, z, side, B); if (fc >= 0) return fc;   // en la nieve no hay cultivos ni jardines
-  const m = n2(cx, cz, .045, 3, 21 + side * 7) + (h - 2) * .05, tone = THREE.MathUtils.clamp(Math.floor((m - .34) / .09), 0, 3);
-  let col = h >= 6 ? (h >= 9 ? 0xe4e2da : mixHex(B.ground[tone], 0x9a9488, Math.min(1, (h - 5) / 3))) : B.ground[tone];   // alturas: la hierba pasa a roca y, en las cumbres, a nieve
-  if (h < 6) { const mx = mixAt(cx, cz, side); if (mx) col = mixHex(col, bioOf(mx.o).ground[tone], mx.w); }   // transición entre biomas
+  const hc = scen === 'meseta' ? Math.min(h, 7) : h;   // la meseta es alta, pero arriba sigue siendo hierba y roca (no nieve)
+  const m = n2(cx, cz, .045, 3, 21 + side * 7) + (hc - 2) * .05, tone = THREE.MathUtils.clamp(Math.floor((m - .34) / .09), 0, 3);
+  let col = hc >= 6 ? (hc >= 9 ? 0xe4e2da : mixHex(B.ground[tone], 0x9a9488, Math.min(1, (hc - 5) / 3))) : B.ground[tone];   // alturas: la hierba pasa a roca y, en las cumbres, a nieve
+  if (hc < 6) { const mx = mixAt(cx, cz, side); if (mx) col = mixHex(col, bioOf(mx.o).ground[tone], mx.w); }   // transición entre biomas
   if (roadCell && (roadCell[i + 1] === 1 || roadCell[i - 1] === 1 || roadCell[i + MW] === 1 || roadCell[i - MW] === 1)) col = mixHex(col, 0x3a4a2a, .05);   // cuneta junto al camino
   return geoR?.snow && (geoR.snowSide == null || (cx < geoR.seam(cz)) === (geoR.snowSide === 0)) ? mixHex(col, 0xeef2f6, .62) : col;   // valle helado: todo nevado
 }
@@ -279,11 +280,11 @@ export function generate(newSeed, tries = 0) {
       if (xx < 0 || zz < 0 || xx >= MW || zz >= MD) return false; const j = idx(xx, zz); if (HM[j] < 1 || Math.abs(HM[j] - h0) > 1 || BAD[GEOT[j]]) return false; }
     return true;
   };
-  const inside = i => HM[i] <= 7 && ![6, 7, 9, 10, 11, 13, 15].includes(GEOT[i]) && dry(i) && cellX(i) > 26 && cellX(i) < MW - 26 && cellZ(i) > 22 && cellZ(i) < MD - 22;
+  const inside = i => HM[i] <= (scen === 'meseta' ? 12 : 7) && ![6, 7, 9, 10, 11, 13, 15].includes(GEOT[i]) && dry(i) && cellX(i) > 26 && cellX(i) < MW - 26 && cellZ(i) > 22 && cellZ(i) < MD - 22;
   let pool = mainList.filter(i => inside(i) && siteOK(cellX(i), cellZ(i), 8.5));
   if (pool.length < GAME.towns * 40) pool = mainList.filter(i => inside(i) && siteOK(cellX(i), cellZ(i), 5));   // geografía muy accidentada: basta con que la plaza quede limpia
   const addTown = (x, z, extra = {}) => { const small = extra.watch || extra.keep && scen !== 'canon'; spots.push({ kind: 'town', x, z, name: names[spots.length % names.length], owner: -1, ...extra, ...(extra.keep && small ? { narrow: true } : {}) });
-    flats.push({ kind: 'town', x, z, r0: small ? 3.5 : 4.8, r1: small ? 6 : 8.5, h: plateau(x, z, 4, small ? 4 : 8) }); };   // atalayas de los puertos y ciudadelas de los pasos: explanada pequeña para no ensanchar el paso
+    flats.push({ kind: 'town', x, z, r0: small ? 3.5 : 4.8, r1: small ? 6 : 8.5, h: plateau(x, z, 4, small ? 4 : scen === 'meseta' ? 12 : 8) }); };   // atalayas de los puertos y ciudadelas de los pasos: explanada pequeña para no ensanchar el paso
   // sitio propio de la geografía (ciudadela de la confluencia, atalaya de un puerto…): el punto más cercano donde el edificio cabe entero en tierra firme
   const findSite = (x, z, r, maxD) => { let best = -1, bd = 1e9; for (let dz = -maxD; dz <= maxD; dz++) for (let dx = -maxD; dx <= maxD; dx++) { const d = dx * dx + dz * dz, xx = Math.floor(x) + dx, zz = Math.floor(z) + dz; if (d >= bd || d > maxD * maxD || xx < 0 || zz < 0 || xx >= MW || zz >= MD) continue; const i = idx(xx, zz); if (inMain[i] && siteOK(xx, zz, r, false)) { bd = d; best = i; } } return best; };
   const nearSite = (x, z, r, maxD) => { const n = findSite(x, z, r, maxD); return n >= 0 ? n : nearestNode(x, z); };
@@ -300,13 +301,15 @@ export function generate(newSeed, tries = 0) {
   const halves = players().map(h => pool.filter(i => zoneOf(cellX(i), cellZ(i)) === h));
   // por rondas: todas las zonas eligen a la vez (frente a los pueblos ya puestos), para que ninguna se quede siempre con los mejores huecos
   for (let guard = 0; spots.filter(s => s.kind === 'town').length < GAME.towns && guard < 99; guard++) {
-    const cnt = players().map(h => spots.filter(s => s.kind === 'town' && zoneOf(s.x, s.z) === h).length), lo = Math.min(...cnt), picks = [];
-    for (const half of players()) { if (cnt[half] !== lo) continue;
+    const cnt = players().map(h => spots.filter(s => s.kind === 'town' && zoneOf(s.x, s.z) === h).length), lo = Math.min(...cnt), P = players();
+    let added = 0;
+    // cada zona elige viendo lo que ya eligieron las demás en esta ronda (antes elegían a la vez y, junto a la raya entre zonas, salían dos pueblos pegados);
+    // el orden rota cada ronda para que ninguna elija siempre primero
+    for (let o = 0; o < P.length; o++) { const half = P[(o + guard) % P.length]; if (cnt[half] !== lo || spots.filter(s => s.kind === 'town').length >= GAME.towns) continue;
       let bi = -1, bs = -1;
       for (const i of halves[half]) { const x = cellX(i), z = cellZ(i); let m = 1e9; for (const s of spots) m = Math.min(m, (s.x - x) ** 2 + (s.z - z) ** 2); if (m > bs) { bs = m; bi = i; } }
-      if (bi >= 0) picks.push(bi); }
-    if (!picks.length) break;
-    for (const bi of picks) if (spots.filter(s => s.kind === 'town').length < GAME.towns) addTown(cellX(bi), cellZ(bi));
+      if (bi >= 0 && bs > 14 * 14) { addTown(cellX(bi), cellZ(bi)); added++; } }
+    if (!added) break;
   }
   const plain = s => s.kind === 'town' && !s.camp && !s.keep && !s.watch && !s.fortified && !s.special;
   // el pueblo más céntrico del mapa es la ciudadela: guardada por colosos neutrales, da colosos a quien la conquiste
@@ -388,8 +391,8 @@ export function generate(newSeed, tries = 0) {
 const sandHides = j => scen === 'oasis' && n2(j % MW, (j / MW) | 0, .03, 2, 93) < .66;
 function buildRoads() {
   roadCell = new Uint8Array(N);
-  // los caminos van por terreno bajo: nunca cruzan montañas (altura 8 o más; la cima de la meseta llega a 7)
-  const low = i => HM[i] <= 7, q = new Int32Array(N);
+  // los caminos van por terreno bajo: nunca cruzan montañas (altura 8 o más); en la meseta sí suben a lo alto (por sus rampas)
+  const low = i => HM[i] <= (scen === 'meseta' ? 12 : 7), q = new Int32Array(N);
   const lowBfs = src => { const f = new Int32Array(N).fill(1e9); let h = 0, t = 0; f[src] = 0; q[t++] = src;
     while (h < t) { const v = q[h++], dv = f[v] + 1, m = stepMask[v]; for (let k = 0; k < 8; k++) if (m >> k & 1) { const j = v + NBO[k]; if (f[j] > dv && low(j)) { f[j] = dv; q[t++] = j; } } } return f; };
   const Rg = regions, n = Rg.length, F = Rg.map(r => lowBfs(r.node)), D = (a, b) => F[a][Rg[b].node];

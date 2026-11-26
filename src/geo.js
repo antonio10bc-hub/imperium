@@ -67,7 +67,7 @@ export const GEO = (() => {
     barrancos(M, r, s, F) {
       const ramps = [];
       M.each((x, z) => { const c1 = Math.abs(fbm(x * .02, z * .02, s + 9, 3) - .5), c2 = Math.abs(fbm(x * .016, z * .026, s + 10, 3) - .5); const cut = Math.min(c1, c2 * 1.3);
-        return [cut < .03 && F.every(f => Math.hypot(x - f[0], z - f[1]) > 16) ? 1 : 4 + fbm(x * .05, z * .05, s + 11) * 1.6, cut < .012 ? 2 : 0]; });
+        return [cut < .03 && F.every(f => Math.hypot(x - f[0], z - f[1]) > 16) ? 1 : 4, cut < .012 ? 2 : 0]; });   // arriba, llano: con desniveles sueltos, las explanadas de fortalezas y pueblos dejaban escalones en círculo
       const cand = []; M.each((x, z, h) => { if (h === 1 && hsh(x, z, s) < .02) cand.push([x, z]); return null; });
       for (const p of cand) if (ramps.every(q => Math.hypot(q[0] - p[0], q[1] - p[1]) > 28) && ramps.length < 7) ramps.push(p);
       M.each((x, z, h, t) => { for (const [px, pz] of ramps) { const d = Math.hypot(x - px, z - pz); if (d < 5) return [Math.min(Math.max(h, 2 + Math.floor(d / 1.6)), 4), 0]; } return null; });
@@ -76,10 +76,13 @@ export const GEO = (() => {
     meseta(M, r, s, F) {
       const cx = 96 + (r() - .5) * 36, cz = 64 + (r() - .5) * 34, f = blobR(cx, cz, 30 + r() * 10, 22 + r() * 8, .7, s + 12);
       const angs = [0, 1, 2].map(i => i * Math.PI * 2 / 3 + (r() - .5) * .9), ramps = angs.map(a => { let k = .5; while (k < 3 && f(cx + Math.cos(a) * k * 10, cz + Math.sin(a) * k * 10) < 1) k += .05; return [cx + Math.cos(a) * k * 10, cz + Math.sin(a) * k * 10]; });
-      M.each((x, z) => { const v = f(x, z); let h = v < 1 ? 6 + fbm(x * .1, z * .1, s + 13) : v < 1.12 ? 3 : 2 + Math.max(0, fbm(x * .05, z * .05, s + 14) - .45) * 6;
-        for (const [px, pz] of ramps) { const d = Math.hypot(x - px, z - pz); if (d < 3.2 && v < 1.3) h = Math.min(6, 3 + Math.max(0, (v < 1 ? 3 : 2) - d * .4)); }   // tres rampas estrechas: fáciles de defender
+      // la meseta es alta (10-11) y solo se sube por tres rampas largas y estrechas: un pasillo que baja hacia fuera desde el borde, con paredes a los lados
+      const TOP = 10, LO = 3, RL = 10, RW = 1.7;
+      M.each((x, z) => { const v = f(x, z); let h = v < 1 ? TOP + fbm(x * .1, z * .1, s + 13) : v < 1.12 ? 3 : 2 + Math.max(0, fbm(x * .05, z * .05, s + 14) - .45) * 6;
+        angs.forEach((a, k) => { const [px, pz] = ramps[k], ux = Math.cos(a), uz = Math.sin(a), t = (x - px) * ux + (z - pz) * uz, lat = Math.abs(-(x - px) * uz + (z - pz) * ux);
+          if (lat < RW && t > -2 && t < RL) h = TOP - (TOP - LO) * Math.max(0, t) / RL; });
         return [h, 0]; });
-      M.special = [[cx, cz]]; return ramps;
+      M.special = [[cx, cz]]; return ramps.map(([px, pz], k) => [px + Math.cos(angs[k]) * RL / 2, pz + Math.sin(angs[k]) * RL / 2]);
     },
     afluentes(M, r, s, F) {   // dos ríos que bajan del norte y se juntan en el centro (confluencia), con dos o tres arroyos; vados estrechos de arena
       const C = [96 + (r() - .5) * 20, 60 + (r() - .5) * 14];
@@ -144,6 +147,7 @@ export const GEO = (() => {
         const a = Math.atan2(z - cz, x - cx), gap = gaps.some(g => Math.abs(((a - g + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < .22);
         if (v < 1.45 && !gap) return [4 + fbm(x * .1, z * .1, s + 27) * 3, 0];
         return [2 + Math.max(0, fbm(x * .05, z * .05, s + 28) - .5) * 5, 0]; });
+      M.reveal = (x, z) => f(x, z) < .8 || Math.hypot(x - cx, z - cz) < Ra(Math.atan2(z - cz, x - cx)) + 2;   // el volcán y el agua de alrededor (una forma como la orilla, pero más metida): siempre a la vista
       M.volcano = [crx, crz]; M.lavaEnds = flows.map(f => f.P[f.P.length - 1]); M.fumaroles = fum; M.special = [];
       return gaps.map(g => { let k = 1; while (k < 1.6 && f(cx + Math.cos(g) * 50 * k, cz + Math.sin(g) * 33 * k) < 1.25) k += .02; return [cx + Math.cos(g) * 50 * k, cz + Math.sin(g) * 33 * k]; });
     },
@@ -165,7 +169,11 @@ export const GEO = (() => {
     canon(M, r, s, F) {   // una garganta seca (17 = fondo de roca) parte el mapa; en el centro se abre en una cuenca redonda con una isla (la ciudadela) unida a cada orilla por un puente; otro puente al norte y otro al sur
       const P = wander(r, 96 + (r() - .5) * 20, -4, 96 + (r() - .5) * 20, H + 4, 22, 16), atZ = z => { for (let i = 0; i + 1 < P.length; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1]; if ((az - z) * (bz - z) <= 0) return ax + (bx - ax) * ((z - az) / ((bz - az) || 1)); } return 96; };
       M.div = atZ;
-      const zc = H * .5 + (r() - .5) * 6, ic = [atZ(zc), zc], isl = blobR(ic[0], ic[1], 10, 11, .8, s + 63), basin = blobR(ic[0], ic[1], 13.5, 14.5, .4, s + 64);   // cuenca e isla irregulares
+      const zc = H * .5 + (r() - .5) * 6, ic = [atZ(zc), zc];
+      // cuenca e isla irregulares, pero la cuenca siempre rodea a la isla con un foso de al menos GAP: un anillo cerrado que solo se cruza por los puentes
+      const GAP = 3.6, polarC = (x, z) => { const dx = x - ic[0], dz = (z - ic[1]) / 1.08; return [Math.hypot(dx, dz), Math.atan2(dz, dx)]; };
+      const isR = a => 10 * (1 + (fbm(Math.cos(a) * 1.3 + 7, Math.sin(a) * 1.3 + 3, s + 63, 3) - .5) * .45), baR = a => Math.max(isR(a) + GAP, 13.5 * (1 + (fbm(Math.cos(a) * 1.3 + 7, Math.sin(a) * 1.3 + 3, s + 64, 3) - .5) * .3));
+      const isl = (x, z) => { const [d, a] = polarC(x, z); return d / isR(a); }, basin = (x, z) => { const [d, a] = polarC(x, z); return d / baR(a); };
       // en la fila de los puentes centrales, los bordes de la isla y de la cuenca (para que los tableros encajen entre paredes rectas)
       const edge = (f, dir) => { let x = ic[0]; while (f(x, zc) < 1 && Math.abs(x - ic[0]) < 60) x += dir * .25; return x; };
       const iW = edge(isl, -1), iE = edge(isl, 1), bW = edge(basin, -1), bE = edge(basin, 1);
@@ -238,13 +246,14 @@ export const GEO = (() => {
       for (let z = 22; z <= H - 22; z += 2) for (let x = k ? W - 46 : 16; x <= (k ? W - 16 : 46); x += 2) { const d = Math.hypot(x - f[0], z - f[1]); if (d < bd && clean(x, z)) { bd = d; best = [x, z]; } }
       if (best) { f[0] = best[0]; f[1] = best[1]; } });
     for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 13 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
+    let RV = null; if (M.reveal) { RV = new Uint8Array(MW * MD); for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) if (M.reveal((gx + .5) * W / MW, (gz + .5) * H / MD)) RV[gz * MW + gx] = 1; }
     if (globalThis.__FLIPMAP) {   // prueba: el mapa reflejado de oeste a este
-      for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW / 2; gx++) { const i = gz * MW + gx, j = gz * MW + MW - 1 - gx; [HMg[i], HMg[j]] = [HMg[j], HMg[i]]; [TTg[i], TTg[j]] = [TTg[j], TTg[i]]; }
+      for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW / 2; gx++) { const i = gz * MW + gx, j = gz * MW + MW - 1 - gx; [HMg[i], HMg[j]] = [HMg[j], HMg[i]]; [TTg[i], TTg[j]] = [TTg[j], TTg[i]]; if (RV) [RV[i], RV[j]] = [RV[j], RV[i]]; }
       const fl = q => { q[0] = W - q[0]; }; F.forEach(fl); F.reverse(); passes.forEach(fl); for (const k of ['special', 'treasures', 'lavaEnds', 'fumaroles', 'bridges']) (M[k] || []).forEach(fl); for (const k of ['confluence', 'volcano']) if (M[k]) fl(M[k]);
       if (M.div) { const d0 = M.div; M.div = z => W - d0(z); }
     }
     const up = p => [p[0] * MW / W, p[1] * MD / H];
-    return { HM: HMg, TT: TTg, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z * H / MD) * MW / W : null,
+    return { HM: HMg, TT: TTg, reveal: RV, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z * H / MD) * MW / W : null,
       volcano: M.volcano ? up(M.volcano) : null, lavaEnds: (M.lavaEnds || []).map(up), fumaroles: (M.fumaroles || []).map(up), confluence: M.confluence ? up(M.confluence) : null, bridgeStyles: M.bridgeStyles || [], bridges: (M.bridges || []).map(b => [...up(b), (b[2] || 13) * MW / W]), treasures: (M.treasures || []).map(up), snow: !!M.snow,
       sea: id === 'istmo' || id === 'archipielago' || id === 'costa', river: id === 'afluentes', goldTop: id === 'meseta', oasis: id === 'oasis' };
   }

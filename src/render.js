@@ -64,7 +64,7 @@ export const ringGeo = (r1, r2) => sharedGeo('r' + r1 + ',' + r2, () => new THRE
 export const discGeo = (r, n = 28) => sharedGeo('c' + r + ',' + n, () => new THREE.CircleGeometry(r, n));
 export function part(g, w, h, d, color, x, y, z, hull = true) {
   const m = new THREE.Mesh(BOX, mat(color)); m.scale.set(w, h, d); m.position.set(x, y, z); g.add(m);
-  if (hull) { const o = new THREE.Mesh(BOX, HULLMAT); o.scale.set(w + .09, h + .09, d + .09); o.position.copy(m.position); g.add(o); }
+  if (hull) { const o = new THREE.Mesh(BOX, HULLMAT); o.scale.set(w + .09, h + .09, d + .09); o.position.copy(m.position); g.add(o); m.userData.hull = o; }
   return m;
 }
 export function ring(g, r1, r2, color, y = .06, o = 1) {
@@ -79,6 +79,8 @@ const _m4 = new THREE.Matrix4(), _inv = new THREE.Matrix4(), _n3 = new THREE.Mat
 export function collectParts(root, skip) {
   const fill = [], hull = [];
   const visit = o => { if (skip?.has(o)) return; if (o.isMesh && o.geometry === BOX && (o.material === HULLMAT || o.material.userData.part)) (o.material === HULLMAT ? hull : fill).push(o); for (const c of o.children) visit(c); };
+  // el contorno se creó junto a la pieza: si luego se giró, movió o escaló la pieza, el contorno la sigue (si no, quedaba una caja negra recta)
+  root.traverse(o => { const h = o.userData.hull; if (!h || h.parent !== o.parent) return; h.position.copy(o.position); h.quaternion.copy(o.quaternion); h.scale.set(o.scale.x + .09, o.scale.y + .09, o.scale.z + .09); });
   root.updateMatrixWorld(true); for (const c of root.children) visit(c);
   return { fill, hull };
 }

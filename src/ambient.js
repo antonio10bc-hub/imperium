@@ -134,6 +134,11 @@ const PLACES = {
   ruinas: [['statue', 'land', 2], ['columns', 'land', 3]],
 };
 const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+// medio ancho de cada elemento (casillas): todo el suelo que pisa tiene que estar a su altura, para que nada quede flotando sobre un desnivel
+const LM_FOOT = { lighthouse: 1.5, mill: 2, windmill: 1.3, menhirs: 3, shrine: 1.3, pyramid: 3.4, columns: 3.2, statue: 1.2, hut: 1.3, totem: 1.2, wreck: 2.2, haystack: .8, fishhut: 1.8,
+  cascade: 2.6, colossus: 2.4, rockarch: 4, henge: 4.6, aqueduct: 5.6, ziggurat: 3.9, greattree: 4.6, bones: 6.6, obelisk: 1.6, icespire: 2.2, face: 2.8, galleon: 4.6, head: 3.6 };
+const footOK = (x, z, model, tol = 0) => { const r = LM_FOOT[model] || 1.5, R = Math.ceil(r), h0 = hAt(x, z);
+  for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) { if (dx * dx + dz * dz > (r + .5) ** 2) continue; const h = hAt(x + dx, z + dz); if (h < h0 - tol || h > h0 + 1) return false; } return true; };
 const hAt = (x, z) => x < 0 || z < 0 || x >= MW || z >= MD ? 0 : HM[idx(x, z)];
 const nearWater = (x, z, r) => { for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) if (hAt(x + dx, z + dz) <= 0) return true; return false; };
 const flat = (x, z) => N4.every(([a, b]) => hAt(x + a, z + b) === hAt(x, z));
@@ -167,7 +172,7 @@ export function setupAmbient() {
     for (let k = 0, tries = 0; k < n && tries < 2500; tries++) {
       const x = 2 + (r() * (MW - 4) | 0), z = 2 + (r() * (MD - 4) | 0), i = idx(x, z);
       if (geoR?.mix && (x < geoR.seam(z)) !== (key === geoR.mix[0])) continue;
-      if (!WHERE[where](x, z, i) || (roadCell && roadCell[i])) continue;
+      if (!WHERE[where](x, z, i) || (roadCell && roadCell[i]) || (where !== 'water' && !footOK(x, z, model))) continue;
       if (forts.some(f => Math.hypot(f.x - x, f.z - z) < 34) || spots.some(s => Math.hypot(s.x - x, s.z - z) < 13) || placed.some(p => Math.hypot(p[0] - x, p[1] - z) < 18)) continue;
       const g = new THREE.Group(); LM[model](g); bake(g);
       g.position.set(x + .5, where === 'water' ? -.15 : HM[i], z + .5); g.rotation.y = r() * 6.28; if (model === 'pyramid') g.rotation.y = 0;
@@ -178,7 +183,7 @@ export function setupAmbient() {
   { const [model, where] = GRAND[keys[0]] || GRAND.rio, wide = (x, z) => [[-3, -3], [3, -3], [-3, 3], [3, 3], [0, 0]].filter(([a, b]) => { const j = idx(Math.min(MW - 1, Math.max(0, x + a)), Math.min(MD - 1, Math.max(0, z + b))); return where === 'water' ? HM[j] <= 0 : Math.abs(HM[j] - HM[idx(x, z)]) <= 1 && HM[j] > 0; }).length >= (['coast', 'beach', 'bank', 'edge', 'gorge'].includes(where) ? 3 : 5);   // en la orilla basta con que casi todo sea tierra
     for (let tries = 0; tries < 6000; tries++) {   // el gran hito: en el centro del mapa si puede ser, para que se vea en la partida
       const x = 6 + (r() * (MW - 12) | 0), z = 6 + (r() * (MD - 12) | 0), i = idx(x, z);
-      if (Math.abs(x - MW / 2) > MW * (.2 + tries / 12000) || !WHERE[where](x, z, i) || !wide(x, z)) continue;
+      if (Math.abs(x - MW / 2) > MW * (.2 + tries / 12000) || !WHERE[where](x, z, i) || !wide(x, z) || (where !== 'water' && !footOK(x, z, model, ['coast', 'beach', 'bank', 'edge', 'gorge'].includes(where) ? 9 : 0))) continue;
       let road = false; for (let dz = -4; dz <= 4 && !road; dz++) for (let dx = -4; dx <= 4; dx++) if (roadCell?.[idx(x + dx, z + dz)]) { road = true; break; } if (road) continue;
       if (forts.some(f => Math.hypot(f.x - x, f.z - z) < 36) || spots.some(s => Math.hypot(s.x - x, s.z - z) < 15) || placed.some(p => Math.hypot(p[0] - x, p[1] - z) < 12)) continue;
       const g = new THREE.Group(); GRAND_LM[model](g); bake(g); g.position.set(x + .5, where === 'water' ? -.6 : HM[i], z + .5); g.rotation.y = (r() * 4 | 0) * Math.PI / 2; world.add(g); decos.push(g); placed.push([x, z, model]);

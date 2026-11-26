@@ -136,29 +136,44 @@ export function buildTown(s) {
   if (s.camp) return buildCamp(s);
   if (s.watch) return buildWatch(s);
   if (s.keep) return buildKeep(s);
-  const big = s.fortified ? 1.5 : 1, g0 = new THREE.Group(), g = CIV.grp(g0, 0, 0, 0, big), roofs = [], cv = civOf(sideAt(s.x, s.z)), [wc, wc2] = cv.wall;
+  // pueblo normal: de 3 a 5 casas repartidas alrededor de la plaza, con la torre en un lado de atrás; con más casas, el pueblo es algo mayor.
+  // Cada pueblo sale distinto (según su posición), pero ocupa casi lo mismo y la lógica no cambia
+  const rnd = k => hash(s.x | 0, 61 + k, s.z | 0), nH = s.fortified ? 3 : 3 + (rnd(0) * 3 | 0);
+  const big = s.fortified ? 1.5 : [1, 1.06, 1.12][nH - 3], g0 = new THREE.Group(), g = CIV.grp(g0, 0, 0, 0, big), roofs = [], cv = civOf(sideAt(s.x, s.z)), [wc, wc2] = cv.wall;
+  let tx = -1.5, tz = -1.5;
   if (s.fortified) {   // dos casas más, muralla baja con puerta al frente y dos torres
     cv.house(CIV.grp(g, -2.5, 0, 1.3, .5, .35)); cv.house(CIV.grp(g, 2.4, 0, 1.4, .5, -.35));
     for (let k = 0; k < 22; k++) { const a = k / 22 * Math.PI * 2; if (Math.abs(a - Math.PI / 2) < .3) continue; part(g, 1, .75, .38, cv.id === 'galos' ? 0x7a5a34 : wc, Math.cos(a) * 3.45, .28, Math.sin(a) * 3.45, false).rotation.y = -a + Math.PI / 2; }
     for (const sx of [-1, 1]) { part(g, .8, 1.8, .8, wc, sx * 1.3, .8, 3.35); part(g, 1, .25, 1, wc2, sx * 1.3, 1.8, 3.35); }
+    cv.house(CIV.grp(g, -1.25, 0, -.6, .68, .12)); cv.house(CIV.grp(g, 1.35, 0, -.8, .64, -.14)); cv.house(CIV.grp(g, .1, 0, 1.45, .62, .06));
+    s.lots = [[1.7, -2.2, .5, -.2], [-.2, -2.5, .5, .15]];
+  } else {
+    const ta = Math.PI * (1.12 + rnd(1) * .76), m = nH + 3, step = Math.PI * 2 / m;   // la torre, siempre detrás (no tapa las casas)
+    tx = Math.cos(ta) * 2.05; tz = Math.sin(ta) * 2.05;
+    const R = [1.6, 1.82, 2.02][nH - 3], hs = [.66, .6, .55][nH - 3], slots = [];
+    for (let k = 1; k < m; k++) { const a = ta + k * step + (rnd(10 + k) - .5) * .35, r = R + (rnd(20 + k) - .5) * .3; slots.push([Math.cos(a) * r, Math.sin(a) * r]); }
+    for (let k = slots.length - 1; k > 0; k--) { const j = rnd(30 + k) * (k + 1) | 0; [slots[k], slots[j]] = [slots[j], slots[k]]; }   // qué huecos llevan casa y cuáles quedan para las mejoras
+    slots.slice(0, nH).forEach(([x, z], k) => cv.house(CIV.grp(g, x, 0, z, hs * (.92 + rnd(40 + k) * .14), (rnd(50 + k) - .5) * .7)));
+    s.lots = slots.slice(nH, nH + 2).map(([x, z], k) => [x, z, hs * .85, (rnd(60 + k) - .5) * .6]);
   }
-  cv.house(CIV.grp(g, -1.25, 0, -.6, .68, .12)); cv.house(CIV.grp(g, 1.35, 0, -.8, .64, -.14)); cv.house(CIV.grp(g, .1, 0, 1.45, .62, .06));
-  part(g, .9, 4, .9, wc, -1.5, 1.2, -1.5); roofs.push(part(g, 1.2, .45, 1.2, wc2, -1.5, 3.4, -1.5));
-  part(g, .1, 1.4, .1, 0x8a5a34, -1.5, 4.3, -1.5); s.flag = part(g, .8, .5, .08, 0xffffff, -1.1, 4.7, -1.5, false);
+  s.towerAt = [tx, tz];
+  part(g, .9, 4, .9, wc, tx, 1.2, tz); roofs.push(part(g, 1.2, .45, 1.2, wc2, tx, 3.4, tz));
+  part(g, .1, 1.4, .1, 0x8a5a34, tx, 4.3, tz); s.flag = part(g, .8, .5, .08, 0xffffff, tx + .4, 4.7, tz, false);
   for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; if (Math.abs(Math.sin(a)) < .25 && Math.cos(a) > 0) continue; part(g, .12, .9, .12, cv.id === 'galos' ? 0x7a5a34 : wc2, Math.cos(a) * 2.9, .05, Math.sin(a) * 2.9, false); }
-  s.zone = ring(g, 3.5, 3.8, 0xfff4d6, .12, .85);
+  const zk = s.fortified ? 1 : big;   // el círculo de conquista no crece con el pueblo
+  s.zone = ring(g, 3.5 / zk, 3.8 / zk, 0xfff4d6, .12, .85);
   s.beacon = new THREE.Mesh(BOX, basic(0xffffff, .28)); s.beacon.scale.set(.5, 14, .5); s.beacon.position.y = 9; s.beacon.visible = false; g.add(s.beacon);
   s.roofs = roofs; s.townG = g; s.townCiv = cv; s.lvlG = null; bake(g0, new Set([...roofs, s.flag])); placeSpot(s, g0, camFace(s, .5)); s.owner = -1; s.known = -1; s.prog = [0, 0, 0, 0, 0]; s.lose = 0; s.towerCd = 0; s.lvl = 1; addFlag(s, s.flag);
-  s.tower = local(s, -1.5 * big, 3.6 * big, -1.5 * big);
+  s.tower = local(s, tx * big, 3.6 * big, tz * big);
 }
 // cada nivel de mejora se ve en el pueblo: nivel 2, una casa más; nivel 3, otra casa y remates dorados en la torre
 export function townLevelLook(s) {
   if (s.camp || s.watch || s.keep || !s.townG) return;
   if (s.lvlG) { s.townG.remove(s.lvlG); for (const c of s.lvlG.children) c.geometry?.dispose(); s.lvlG = null; }
   if (s.lvl < 2) return;
-  const g = new THREE.Group(), lots = s.fortified ? [[1.7, -2.2, .5, -.2], [-.2, -2.5, .5, .15]] : [[1.75, .95, .55, -.3], [-1.85, .85, .55, .3]];   // x, z, escala, giro
+  const g = new THREE.Group(), lots = s.lots || [[1.75, .95, .55, -.3], [-1.85, .85, .55, .3]], [tx, tz] = s.towerAt || [-1.5, -1.5];   // lots: x, z, escala, giro
   for (let k = 0; k < s.lvl - 1; k++) { const [x, z, sc, ry] = lots[k]; s.townCiv.house(CIV.grp(g, x, 0, z, sc, ry)); }
-  if (s.lvl >= 3) for (const [dx, dz] of [[-.5, -.5], [.5, -.5], [-.5, .5], [.5, .5]]) part(g, .22, .3, .22, 0xe8c050, -1.5 + dx, 3.8, -1.5 + dz);
+  if (s.lvl >= 3) for (const [dx, dz] of [[-.5, -.5], [.5, -.5], [-.5, .5], [.5, .5]]) part(g, .22, .3, .22, 0xe8c050, tx + dx, 3.8, tz + dz);
   s.townG.add(g); bake(g); s.lvlG = g;
 }
 // fortaleza dañada: humo por debajo del 75 % de vida; por debajo del 50 %, también fuego, y más cuanto menos vida le queda

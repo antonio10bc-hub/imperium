@@ -4,7 +4,7 @@ import { sfx } from './audio.js';
 import { decos, refreshKnownTowns } from './buildings.js';
 import { GAME, MD, MW } from './config.js';
 import { toast } from './game.js';
-import { spots } from './map.js';
+import { geoR, spots } from './map.js';
 import { markMiniDirty } from './minimap.js';
 import { fogU } from './render.js';
 import { units } from './units.js';
@@ -44,6 +44,7 @@ function blurFog(src, dst, tmp) {   // desenfoque de caja separable, radio 2, do
 export function updateFog(snapTo) {
   if (!fogOn) return;
   visF.fill(0);
+  const rv = geoR?.reveal; if (rv && rv.length === visF.length) for (let k = 0; k < rv.length; k++) if (rv[k]) visF[k] = 1;   // caldera: el volcán y su lago se ven siempre
   for (const u of units) if (u.side === 0) revealAt(u.pos.x, u.pos.z, ((VISION[u.type] || 10) + visionBonus(u)) * weatherVis());
   for (const s of spots) if (s.kind === 'base' && s.side === 0) revealAt(s.x, s.z, 28); else if (s.kind === 'town' && s.owner === 0) revealAt(s.x, s.z, s.watch ? GAME.watchVision : 14);
   for (let k = 0; k < visF.length; k++) { const v = visF[k]; if (v > expF[k]) expF[k] = v; seen[k] = v > .5 ? 1 : 0; if (expF[k] > .5) explored[k] = 1; fogTgt[k] = Math.max(v * 255, expF[k] * 120); }
