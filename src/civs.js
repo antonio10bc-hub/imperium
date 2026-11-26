@@ -20,6 +20,12 @@ function eaveRoof(g, w, d, y, c, gold) { P(g, w, .22, d, c, 0, y, 0); P(g, w - .
 function palm(g, x, z, h = 2.4) { for (let i = 0; i < 5; i++) P(g, .22, h / 5, .22, 0x8a6a3a, x + i * .05, h / 10 + i * h / 5, z, false); for (let a = 0; a < 6; a++) { const r = a / 6 * Math.PI * 2; P(g, .9, .1, .28, 0x4f8a3a, x + .25 + Math.cos(r) * .5, h + .05 - (a % 2) * .1, z + Math.sin(r) * .5, false, -r); } }
 function cypress(g, x, z) { P(g, .16, .4, .16, 0x5a3a24, x, .2, z, false); P(g, .5, 1.3, .5, 0x2f5a35, x, 1.05, z); P(g, .32, .6, .32, 0x2f5a35, x, 1.95, z); }
 function bush(g, x, z, c = 0x3f7a45) { P(g, .7, .5, .7, c, x, .25, z); }
+// rascacielos: bloque de cristal con franjas de forjado, azotea y remate del color del bando
+function tower(g, w, h, d, c, band, x, z, T, y0 = 0) { P(g, w, h, d, c, x, y0 + h / 2, z); for (let y = .55; y < h - .2; y += .55) P(g, w + .04, .07, d + .04, band, x, y0 + y, z, false); P(g, w + .1, .16, d + .1, band, x, y0 + h + .08, z); if (T) P(g, w * .6, .12, d * .6, T, x, y0 + h + .22, z, false); return y0 + h + .16; }
+// símbolo del dólar con cajas (s: alto)
+function dollar(g, x, y, z, s, c, o = false) { const w = s * .5, t = s * .14; for (const k of [-.4, 0, .4]) P(g, w, t, t, c, x, y + k * s, z, o); P(g, t, s * .4, t, c, x - w / 2 + t / 2, y + s * .2, z, o); P(g, t, s * .4, t, c, x + w / 2 - t / 2, y - s * .2, z, o); P(g, t * .6, s * 1.15, t * .6, c, x, y, z + t * .3, o); }
+// coche pequeño
+function car(g, x, z, c, ry = 0) { const k = grp(g, x, 0, z, 1, ry); P(k, .6, .26, 1.1, c, 0, .24, 0); P(k, .5, .22, .55, 0x2a3a4a, 0, .48, -.05); for (const a of [-.3, .3]) for (const b of [-.36, .36]) P(k, .08, .2, .2, 0x1a1a1a, a, .1, b, false); }
 
 // ---- piezas de tropa ----
 function legs(g, c, c2) { P(g, .16, .34, .16, c, -.11, .17, 0); P(g, .16, .34, .16, c2 ?? c, .11, .17, 0); }
@@ -298,6 +304,36 @@ const CIVS = [
     P(g, .62, .6, .4, T, 0, 1.42, -.42); P(g, .04, .5, .04, STEEL, .27, 1.3, .25); },
   god(g, T) { godBody(g, 0xc8302a, WHITE, SK.light, T); P(g, .38, .5, .12, 0x1a1a1a, 0, 1.2, -.14); P(g, .38, .12, .38, 0x1a1a1a, 0, 1.52, 0); P(g, .3, .06, .06, GOLD, 0, 1.55, .12);
     P(g, .24, .24, .04, 0xe8e8f0, .42, .9, .16); P(g, .3, .3, .04, GOLD, .42, .9, .14); } },
+{ id: 'desubicados', name: 'DESUBICADOS', era: 'Siglo XXI · la gran ciudad', own: 0x3a8ad8,
+  tag: 'Una ciudad de rascacielos de cristal, oficinas y garajes, perdida entre imperios antiguos. Bates de béisbol, ametralladoras, motos, un mecha y el Dinero como dios.',
+  biome: 0x7a9a6a, plaza: 0x8a8c94, sw: [0x6a9ac8, 0x3a3e48, 0x9a9ca4, 0xe8c050],
+  names: ['MATÓN', 'AMETRALLADOR', 'MOTORISTA', 'MECHA', 'EL DINERO'],
+  notes: ['<b>Cuerpo a cuerpo:</b> gorra del color del bando y bate de béisbol', '<b>A distancia:</b> ametralladora: ráfagas de balas trazadoras', '<b>Héroe:</b> un mecha de acero que va a pie; <b>dios:</b> el Dinero, con chistera y el símbolo del dólar'],
+  castle(g, T) { const GL = 0x5a8ab8, GL2 = 0x7aa8d0, GL3 = 0x3a5a80, CO = 0x9a9ca4, CO2 = 0x6a6c74; P(g, 6.6, .2, 4.8, 0x7a7c84, 0, .1, 0);
+    const top = tower(g, 1.7, 6.2, 1.7, GL, CO2, 0, -.6, T, .2); P(g, .08, 1.2, .08, STEEL, 0, top + .6, -.6); P(g, .14, .14, .14, 0xff3a2a, 0, top + 1.25, -.6, false);
+    tower(g, 1.3, 4.4, 1.3, GL2, CO, -2.1, -1, T, .2); tower(g, 1.3, 3.6, 1.5, GL3, CO, 2.2, -.9, T, .2); tower(g, 1, 2.6, 1, GL2, CO2, -1.1, .9, null, .2);
+    for (const s of [-1, 1]) { P(g, 1.6, 1.2, 1.1, CO, s * 2.3, .8, 1.5); for (let i = 0; i < 3; i++) P(g, .3, .3, .04, GL2, s * 2.3 - .5 + i * .5, .95, 2.06, false); }
+    P(g, 1, .8, .1, 0x2a2e38, 0, .6, .32); P(g, 1.2, .16, .3, T, 0, 1.1, .4); dollar(g, 0, 4.3, .26, .8, GOLD); car(g, 1.1, 2, 0xc83a2a, Math.PI / 2); car(g, -.9, 2.1, 0xe8e8e8, Math.PI / 2); },
+  barracks(g, T) { const top = tower(g, 2, 2.4, 1.8, 0x6a9ac8, 0x6a6c74, -.7, -.3, T, 0); P(g, .06, .6, .06, STEEL, -.3, top + .3, -.3);
+    P(g, 1.7, 1, 1.8, 0x9a9ca4, 1.3, .5, .1); P(g, 1.2, .7, .06, 0x4a4e58, 1.3, .38, 1.01); for (let i = 0; i < 4; i++) P(g, 1.2, .03, .07, 0x6a6e78, 1.3, .1 + i * .17, 1.03, false); P(g, 1, .22, .06, T, 1.3, .86, 1.02, false);
+    P(g, .8, .8, .06, 0x2a2e38, -.7, .4, .62); car(g, 2.4, 1.6, 0x2a2a2a); },
+  house(g) { tower(g, 1.4, 1.5, 1.2, 0xc8b8a0, 0x8a8c94, 0, 0, null, 0); for (const s of [-1, 1]) for (const y of [.45, 1.05]) P(g, .3, .3, .04, 0x5a8ab8, s * .35, y, .62, false);
+    P(g, .4, .24, .3, 0x9a9ca4, .3, 1.8, -.2); car(g, 1.2, .5, 0x3a6ab0); },
+  sword(g, T) { legs(g, 0x3a4a6a); torso(g, 0x2a2a30); P(g, .48, .14, .34, T, 0, .66, 0); head(g, SK.light); P(g, .34, .12, .34, T, 0, 1.15, 0); P(g, .3, .05, .2, T, 0, 1.1, .22);
+    P(g, .07, .3, .07, 0x3a2418, .31, .62, .16); P(g, .11, .5, .11, 0xd8b07a, .31, 1, .16); },
+  bow(g, T) { legs(g, 0x4a5a3a); torso(g, 0x3a4a2e); P(g, .5, .2, .34, T, 0, .7, 0); head(g, SK.tan); P(g, .36, .18, .36, 0x4a5a3a, 0, 1.15, 0); P(g, .3, .06, .06, 0x1a1a1a, 0, 1.02, .16);
+    P(g, .1, .14, .6, 0x2a2a2e, .14, .66, .24); P(g, .05, .05, .34, 0x1a1a1a, .14, .68, .68); P(g, .12, .14, .14, 0x5a6a3a, .14, .52, .2); P(g, .04, .24, .04, 0x1a1a1a, .14, .82, .36); },
+  horse(g, T) { for (const z of [.5, -.45]) P(g, .12, .44, .44, 0x1a1a1a, 0, .22, z); P(g, .24, .2, 1, T, 0, .48, .03); P(g, .3, .22, .38, 0x2a2a2e, 0, .64, .2); P(g, .26, .12, .4, 0x1a1a1a, 0, .62, -.22);
+    P(g, .7, .05, .05, STEEL, 0, .9, .44); P(g, .14, .12, .06, 0xfff0a0, 0, .66, .62, false); P(g, .08, .08, .5, STEEL, .18, .32, -.3);
+    for (const s of [-1, 1]) { P(g, .14, .34, .36, 0x3a4a6a, s * .17, .56, -.02); P(g, .1, .1, .42, 0x2a2a2a, s * .2, 1.02, .2); }
+    P(g, .4, .44, .3, 0x2a2a2a, 0, .96, -.12); P(g, .34, .34, .34, T, 0, 1.38, -.08); P(g, .28, .12, .04, 0x1a1a1a, 0, 1.4, .1); },
+  hero(g, T) { const M = 0x9aa0ac, M2 = 0x5a5e68;
+    for (const s of [-1, 1]) { P(g, .28, .82, .32, M, s * .25, .48, 0); P(g, .36, .14, .5, M2, s * .25, .07, .06); P(g, .32, .3, .4, M2, s * .64, 1.62, 0); P(g, .22, .62, .24, M, s * .64, 1.18, 0); }
+    P(g, .74, .26, .42, M2, 0, .98, 0); P(g, .92, .72, .62, M, 0, 1.44, 0); P(g, .6, .4, .06, T, 0, 1.46, .32); P(g, .34, .18, .06, 0x6ac8f0, 0, 1.66, .33, false);
+    P(g, .38, .28, .38, M, 0, 1.94, 0); P(g, .3, .08, .04, 0xff4a3a, 0, 1.96, .2, false); P(g, .04, .34, .04, STEEL, .14, 2.24, 0);
+    P(g, .16, .16, .66, 0x2a2a2e, .64, .9, .3); P(g, .1, .1, .2, 0x1a1a1a, .64, .9, .72); P(g, .3, .4, .2, M2, 0, 1.5, -.4); },
+  god(g, T) { godBody(g, 0x2f8a4a, 0x3fa05a, 0xf0d070, T); P(g, .52, .06, .52, 0x1a1a1a, 0, 1.52, 0); P(g, .34, .4, .34, 0x1a1a1a, 0, 1.76, 0); P(g, .36, .08, .36, GOLD, 0, 1.6, 0);
+    dollar(g, 0, .95, .22, .42, GOLD); for (const [x, y] of [[.5, 1.3], [-.55, 1.1], [.46, .62], [-.42, .5]]) P(g, .2, .2, .05, GOLD, x, y, .12); } },
 ];
 // carro egipcio: dos caballos, caja del color del bando y conductor-arquero; el del faraón es dorado con corona azul
 function chariot(g, T, hc, king) {
@@ -312,7 +348,7 @@ function chariot(g, T, hc, king) {
 
 
   const WALLS = { roma: [0xe2dccc, 0xc8c0ae], cartago: [0xd9b27a, 0xc49a62], china: [0x8a8a92, 0x6a6a74], mexica: [0xd8d0b8, 0xbab29a], egipto: [0xe0c48a, 0xc8aa70], galos: [0x8a6a3e, 0x6a4e2a],
-    grecia: [0xd8ceb0, 0xbab092], vikingos: [0x7a5a34, 0x6a5a3a], persia: [0xd8c8a8, 0x2a8a8a], mongoles: [0x8a6a44, 0x5a3a24], japon: [0xf2eee2, 0x8a8a8a] };
+    grecia: [0xd8ceb0, 0xbab092], vikingos: [0x7a5a34, 0x6a5a3a], persia: [0xd8c8a8, 0x2a8a8a], mongoles: [0x8a6a44, 0x5a3a24], japon: [0xf2eee2, 0x8a8a8a], desubicados: [0x9a9ca4, 0x6a6c74] };
   for (const c of CIVS) c.wall = WALLS[c.id];
   // ---- mapa de cada civilización: bioma, paisaje, muralla, distribución del recinto, altar ----
   const hsh = (x, z, k = 0) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263) ^ Math.imul(k, 2246822519); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };
@@ -389,6 +425,16 @@ function chariot(g, T, hc, king) {
       altar(g, T) { P(g, 1.6, .3, 1.4, 0x8a8a8a, 0, .15, -.3); P(g, 1, .8, .8, 0x8a5a34, 0, .7, -.3); for (let i = 0; i < 2; i++) P(g, 1.4 - i * .4, .2, 1.2, 0x3a3a2a, 0, 1.2 + i * .2, -.3);
         for (const s of [-1, 1]) { P(g, .18, 1.8, .18, 0xc8302a, s * .8, .9, .8); P(g, .06, .4, .06, 0x8a5a34, s * .25, 1.7, -.3); }
         P(g, 2.1, .16, .24, 0x1a1a1a, 0, 1.88, .8); P(g, 1.8, .12, .14, 0xc8302a, 0, 1.55, .8); P(g, .06, 1.6, .06, WOOD, -1.1, .8, -.2); P(g, .3, .8, .04, T, -.95, 1.1, -.2); } },
+    desubicados: { ground: [0x7a9a6a, 0x86a474, 0x6e8e60, 0x8e9a84], lush: 0x5e8a50, sand: 0xc8c4b0, road: 0x5a5a62, trees: ['plane', 'shrub'], treeCol: 0x4a7a3a, dens: .5, feature: 'city',
+      plaza: 0x8a8c94, wallbase: 0x7a7c84, path: 0x5a5a62, inside: (x, z) => Math.abs(x) < 1.3 || Math.abs(z) < 1.3 ? 0x4a4a52 : -1,
+      shape: () => rrect(13, 10, 1), wall: { h: 2.6, t: .8, tower: true, every: 8,
+        gate(g, T) { for (const s of [-1, 1]) { part(g, 1.3, 3.6, 1.3, 0x9a9ca4, s * 2.5, .75, 0); part(g, 1.5, .3, 1.5, 0x6a6c74, s * 2.5, 2.7, 0); part(g, 1.32, .3, 1.32, T, s * 2.5, 2.1, 0, false);
+          part(g, .08, 3, .08, 0x3a3a3a, s * 1.7, .45, .7); part(g, .5, .08, .14, 0x3a3a3a, s * 1.5, 1.95, .7); part(g, .2, .08, .14, 0xfff0a0, s * 1.3, 1.9, .7, false); } } },
+      layout: { castle: [0, 0, 0, 1.05], barracks: [-6.2, -4, 0, 1], altar: [5.4, 4, 0, 1.4], temple: [5.6, -4.4, 0, 1.5] },
+      altar(g, T) { P(g, 2.2, .3, 2, 0xd8d8dc, 0, .15, 0); steps(g, 2, 2, .15, 1.8, .2, 0xe8e8ec, 0, .3, 0); P(g, 1.7, 1.3, 1.1, 0xe8e8ec, 0, 1.25, -.3);
+        for (let i = 0; i < 4; i++) P(g, .16, 1.3, .16, WHITE, -.66 + i * .44, 1.25, .38); P(g, 1.9, .2, 1.4, 0xd8d8dc, 0, 2, -.15); steps(g, 2, 1.8, .16, 1.2, .5, 0xd8d8dc, 0, 2.1, -.15);
+        P(g, .6, .14, .06, T, 0, 1.75, .42); dollar(g, 0, 3.1, -.15, .9, GOLD, true); for (const [x, z, n] of [[.85, .7, 3], [-.85, .7, 2], [.95, -.8, 4]]) for (let k = 0; k < n; k++) P(g, .3, .1, .3, GOLD, x, .36 + k * .1, z); } },
+
   };
   for (const c of CIVS) c.map = MAPS[c.id];
   return { list: CIVS, grp };
@@ -408,6 +454,7 @@ export const BONUS = {
   persia: { name: 'INMORTALES', text: 'espadas y arqueros con +15 % de vida', unit: { sword: { mul: { hp: 1.15 } }, bow: { mul: { hp: 1.15 } } } },
   mongoles: { name: 'ESTEPA', text: 'jinetes un 25 % más rápidos y con +8 % de vida', unit: { horse: { mul: { speed: 1.25, hp: 1.08 } } } },
   japon: { name: 'BUSHIDO', text: 'jinetes con +25 % de vida y +5 % de daño', unit: { horse: { mul: { hp: 1.25, dmg: 1.05 } } } },
+  desubicados: { name: 'CAPITAL', text: 'sus pueblos dan +15 % de oro y las motos van un 10 % más rápido', income: 1.15, unit: { horse: { mul: { speed: 1.1 } } } },
 };
 export const bonusOf = side => (side === 0 || side === 1) ? BONUS[civOf(side).id] || {} : {};
 // estadísticas de una tropa con la ventaja de su civilización (los neutrales usan las comunes)

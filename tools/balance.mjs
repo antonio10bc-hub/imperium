@@ -13,7 +13,7 @@ const ROUNDS = +arg('rounds', 2), WORKERS = +arg('workers', 3), MIN = +arg('min'
 const CHROME = process.env.CHROME || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'google-chrome');
 const THREE = process.env.THREE ? fs.readFileSync(process.env.THREE) : null;
 const url = 'file://' + path.resolve(process.env.GAME || 'dist/imperium.html');   // GAME: otra copia del juego (para seguir compilando mientras corre)
-const CIVS = ['roma', 'cartago', 'china', 'mexica', 'egipto', 'galos', 'grecia', 'vikingos', 'persia', 'mongoles', 'japon'];
+const CIVS = ['roma', 'cartago', 'china', 'mexica', 'egipto', 'galos', 'grecia', 'vikingos', 'persia', 'mongoles', 'japon', 'desubicados'];
 const GEOS = ['cordillera', 'istmo', 'archipielago', 'barrancos', 'meseta', 'afluentes', 'delta', 'bosque', 'oasis', 'lago', 'helado', 'canon', 'costa', 'ruinas'];
 const PERS = ['agresivo', 'mercader', 'defensivo', 'relampago'];
 let rs = 12345; const rnd = () => (rs = (rs * 16807) % 2147483647) / 2147483647;
@@ -70,7 +70,7 @@ fs.mkdirSync('dist', { recursive: true }); fs.writeFileSync('dist/balance.json',
 
 // ---------- informe ----------
 const ok = results.filter(r => !r.fail), pct = (a, b) => b ? Math.round(a / b * 100) + ' %' : '—', avg = l => l.length ? (l.reduce((a, b) => a + b, 0) / l.length) : 0;
-const NAME = { roma: 'Roma', cartago: 'Cartago', china: 'Han', mexica: 'Mexicas', egipto: 'Egipto', galos: 'Galos', grecia: 'Grecia', vikingos: 'Vikingos', persia: 'Persia', mongoles: 'Mongoles', japon: 'Japón' };
+const NAME = { roma: 'Roma', cartago: 'Cartago', china: 'Han', mexica: 'Mexicas', egipto: 'Egipto', galos: 'Galos', grecia: 'Grecia', vikingos: 'Vikingos', persia: 'Persia', mongoles: 'Mongoles', japon: 'Japón', desubicados: 'Desubicados' };
 let md = `# Equilibrio: simulación IA contra IA\n\n${ok.length} partidas (${results.length - ok.length} fallidas) · límite ${MIN} min de partida · mapa normal, 2 jugadores. `
   + `Sin fortaleza caída al límite, gana quien tenga más puntos (vida del castillo + 120 por pueblo + 10 por tropa).\n`;
 const civG = ok.filter(r => r.set === 'civs');

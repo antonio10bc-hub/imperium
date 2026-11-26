@@ -159,6 +159,7 @@ const SOUND = {
   galos: { mode: [62, 64, 65, 67, 69, 71, 72], prog: [0, 6, 3, 0], leads: ['whistle', 'harp'], ui: 'harp', perc: 'bodhran', horn: 'carnyx', theme: [50, 57, 62, 69], bpm: [88, 108] },
   vikingos: { mode: [57, 59, 60, 62, 64, 66, 67], prog: [0, 6, 3, 0], leads: ['harp', 'fiddle'], ui: 'harp', perc: 'war', horn: 'lur', theme: [45, 52, 57, 64], bpm: [74, 92] },
   mongoles: { mode: [55, 57, 59, 62, 64], prog: [0, 3, 4, 0], leads: ['fiddle', 'flute'], ui: 'koto', perc: 'hoof', horn: 'bure', theme: [55, 62, 64, 67], bpm: [92, 112] },
+  desubicados: { mode: [57, 59, 60, 62, 64, 65, 67], prog: [0, 5, 2, 6], leads: ['pluck', 'reed'], ui: 'pluck', perc: 'war', horn: 'cornu', theme: [57, 60, 64, 69], bpm: [96, 120] },
 };
 const soundOf = side => SOUND[civOf(side >= 0 ? side : 0)?.id] || SOUND.roma;
 // nota de la escala por índice (sube de octava al pasar del final)

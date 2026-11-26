@@ -165,6 +165,7 @@ function featureAt(x, z, side, B) {
     case 'garden': return x % 8 === 0 || z % 8 === 0 ? 0x5a9ab8 : x % 8 === 4 || z % 8 === 4 ? 0xd8c8a0 : 0x5a9a44;   // Persia: jardines cuadrados con canales, paseos de grava y parterres (flores y cipreses en buildVoxels)
     case 'steppe': return f < .14 ? 0xc8c08a : 0xa8b070;   // mongoles: hierba seca
     case 'tea': return z % 3 === 0 ? 0x8a7a5a : 0x4a8040;   // Japón: hileras de té
+    case 'city': return x % 6 === 0 || z % 6 === 0 ? 0x5a5a62 : 0x8a8c90;   // desubicados: manzanas de hormigón entre calles de asfalto
     case 'rocks': return f < .15 ? 0x8a8e88 : 0x6a9a48;
   }
   return -1;

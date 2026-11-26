@@ -329,7 +329,7 @@ export function updateGame(dt) {
   { const L = [...units]; if (globalThis.__REV) L.reverse(); for (const u of L) if (!u.dead) updateUnit(u, dt); }
   updateTowns(dt); castleDefense(dt);
   for (let i = arrows.length - 1; i >= 0; i--) {
-    const a = arrows[i]; a.t += dt * (a.sp || 4); const k = Math.min(1, a.t);
+    const a = arrows[i]; a.t += dt * (a.sp || 4); const k = Math.max(0, Math.min(1, a.t));   // t < 0: bala de una ráfaga que aún no ha salido
     a.m.position.copy(a.a).lerp(a.b, k); a.m.position.y += Math.sin(k * Math.PI) * (a.arc || 1.2);
     if (a.stone) a.m.rotation.x += dt * 6; else a.m.lookAt(a.b);
     if (a.t >= 1) { a.onHit?.(); if (a.stone && a.m.visible) burst(a.b, [0x8a7a68, 0x6a6266], 6, 2.5, 3, .5, .2); dropBox(a.m); arrows.splice(i, 1); }

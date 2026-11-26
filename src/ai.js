@@ -38,7 +38,7 @@ export const PERSONAS = {
   defensivo: { name: 'DEFENSIVO', attack: 2, up: 1, siegeAt: 560, garrison: .35, horse: 0, wall: 100 },
   relampago: { name: 'RELÁMPAGO', attack: -2, up: 1.7, siegeAt: 360, garrison: 0, horse: .45, wall: 720 },
 };
-const LEADERS = { roma: 'ESCIPIÓN', cartago: 'ANÍBAL', china: 'LIU BANG', mexica: 'MOCTEZUMA', egipto: 'RAMSÉS', galos: 'VERCINGETÓRIX', grecia: 'LEÓNIDAS', vikingos: 'RAGNAR', persia: 'CIRO', mongoles: 'GENGIS', japon: 'NOBUNAGA' };
+const LEADERS = { roma: 'ESCIPIÓN', cartago: 'ANÍBAL', china: 'LIU BANG', mexica: 'MOCTEZUMA', egipto: 'RAMSÉS', galos: 'VERCINGETÓRIX', grecia: 'LEÓNIDAS', vikingos: 'RAGNAR', persia: 'CIRO', mongoles: 'GENGIS', japon: 'NOBUNAGA', desubicados: 'EL CEO' };
 export const leaderOf = sd => LEADERS[civOf(sd).id] || 'EL CAUDILLO';
 // estado de la IA de un bando según la dificultad (o el cerebro pedido para pruebas)
 export function makeAI(side, diff, brain, persona) {

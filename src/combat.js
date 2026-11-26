@@ -11,6 +11,7 @@ import { bfs, nearestNode } from './nav.js';
 import { VCMAT, mat } from './render.js';
 import { UGRID, _nearEn, alive, arrows, charging, followField, sel, setMax, sideState, spd, stepToward, unitGeo, units } from './units.js';
 import { geoDmg } from './rules.js';
+import { civOf } from './civs.js';
 import { addMoment, statKill } from './stats.js';
 
 // ---------- Combate ----------
@@ -98,16 +99,21 @@ function hitBase(att, s) {
   if (s.vis) floatText(spotPos(s, 7), '-' + Math.round(dmg), s.side === 0 ? '#d83a4a' : '#ffffff', 9);
   if (s.side === 0) raiseAlarm(spotPos(s), '¡TU CASTILLO ESTÁ BAJO ATAQUE!');
 }
-export function shoot(from, toPos, lift = 1.1, stone = false) {   // stone: piedra de catapulta (más grande, más alta y más lenta)
-  const m = takeBox(stone ? 0x6a6266 : 0xfff1c4); if (stone) m.scale.setScalar(.42); else m.scale.set(.07, .07, .6); m.visible = seenAt(from) || seenAt(toPos);
-  arrows.push({ m, a: from.clone().setY(from.y + lift), b: toPos.clone().setY(toPos.y + .7), t: 0, arc: stone ? 5 : 1.2, sp: stone ? 1.6 : 4, stone });
+export function shoot(from, toPos, lift = 1.1, stone = false, gun = false) {   // stone: piedra de catapulta (más grande, más alta y más lenta); gun: bala trazadora (casi recta y muy rápida)
+  const m = takeBox(stone ? 0x6a6266 : gun ? 0xffd040 : 0xfff1c4); if (stone) m.scale.setScalar(.42); else if (gun) m.scale.set(.05, .05, .4); else m.scale.set(.07, .07, .6); m.visible = seenAt(from) || seenAt(toPos);
+  arrows.push({ m, a: from.clone().setY(from.y + (gun ? .7 : lift)), b: toPos.clone().setY(toPos.y + .7), t: 0, arc: stone ? 5 : gun ? .1 : 1.2, sp: stone ? 1.6 : gun ? 10 : 4, stone });
+}
+const GUN = u => u.type === 'bow' && u.side < NEU && civOf(u.civ ?? u.side).id === 'desubicados';   // los ametralladores de los desubicados disparan balas
+export function fire(u, toPos) {
+  if (GUN(u)) for (let i = 0; i < 3; i++) { const p = toPos.clone(); p.x += (Math.random() - .5) * .5; p.z += (Math.random() - .5) * .5; shoot(u.pos, p, 1.1, false, true); arrows[arrows.length - 1].t = -i * .25; }
+  else shoot(u.pos, toPos, 1.1, u.type === 'catapult');
 }
 // puertas: los enemigos que llegan a una puerta cerrada la golpean hasta derribarla (el ariete, mucho más fuerte)
 export function bashGate(u, g, dt) {
   if (!CAN_GATE(u.type)) return;   // la infantería y la caballería no pueden con las puertas
   u.fwd.set(g.x - u.pos.x, 0, g.z - u.pos.z).normalize(); u.combatT = 2;
   if (u.cd > 0) return; u.cd = u.def.cd;
-  if (RANGED(u.type)) { shoot(u.pos, new THREE.Vector3(g.x, HM[u.node] + 1, g.z), 1.1, u.type === 'catapult'); const big = u.type === 'catapult'; arrows[arrows.length - 1].onHit = () => gateImpact(g, big); }
+  if (RANGED(u.type)) { fire(u, new THREE.Vector3(g.x, HM[u.node] + 1, g.z)); const big = u.type === 'catapult'; arrows[arrows.length - 1].onHit = () => gateImpact(g, big); }
   else { u.lunge = 1; gateImpact(g, u.type === 'ram'); }
   const dmg = u.def.dmg * (u.def.gate || (RANGED(u.type) ? .25 : .7)) * RANKS[u.rank].mul;
   g.hp -= dmg; g.shake = .2; if (spots[g.f.side].side === 0) raiseAlarm(new THREE.Vector3(g.x, 0, g.z), '¡ESTÁN DERRIBANDO UNA PUERTA!');
@@ -157,7 +163,7 @@ export function strike(u, tgt, dt) {
   } else {
     u.fwd.set(tgt.pos.x - u.pos.x, 0, tgt.pos.z - u.pos.z).normalize(); u.combatT = 2;
     if (u.cd <= 0) {
-      u.cd = u.def.cd; if (RANGED(u.type)) { shoot(u.pos, tgt.pos, 1.1, u.type === 'catapult'); if (u.vis) sfx('arrow'); } else u.lunge = 1;
+      u.cd = u.def.cd; if (RANGED(u.type)) { fire(u, tgt.pos); if (u.vis) sfx('arrow'); } else u.lunge = 1;
       const k = (u.def.vs[tgt.type] || 1) * (u.leader ? GAME.escortBonus : 1) * (charging(u) ? 1.5 : 1) * RANKS[u.rank].mul * (high ? 1.25 : 1) * geoDmg(u, tgt) * (tgt.def.siege && !u.def.siege ? 1.3 : 1);   // el asedio es frágil de cerca
       const dmg = u.def.dmg * k * (.85 + Math.random() * .3);
       if (u.def.splash) splashHit(u, tgt, dmg);
