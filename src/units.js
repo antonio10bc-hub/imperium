@@ -216,11 +216,13 @@ const FOOT_HERO = new Set(['mexica', 'vikingos', 'desubicados']);   // civilizac
 const MOUNTED = u => u.type === 'horse' || u.type === 'harcher' || (u.type === 'hero' && u.side < NEU && !FOOT_HERO.has(civOf(u.civ ?? u.side).id));
 export const slowK = u => (GEOT && GEOT[u.node] === 2 ? (MOUNTED(u) ? swampMounted() : .6) : GEOT && GEOT[u.node] === 11 ? .8 : 1) * geoSlow(u);   // las dunas también frenan   // pantano y bajío: más lentos, sobre todo a caballo
 export const spd = u => (u.leader ? Math.max(u.def.speed, u.leader.def.speed) : u.def.speed) * (charging(u) ? 1.6 : 1) * roadK(u) * slowK(u);
+// casilla de una puerta cerrada de una fortaleza ajena: hay que derribarla antes de pasar
+export const shutFor = (u, b) => gateCell[b] >= 0 && gateList[gateCell[b]].hp > 0 && spots[gateList[gateCell[b]].f.side].side !== u.side;
 export function stepToward(u, tx, tz, s, dt) {
   const dx = tx - u.pos.x, dz = tz - u.pos.z, L = Math.hypot(dx, dz); if (L < 1e-4) return false;
   const st = Math.min(s * dt, L), nx = u.pos.x + dx / L * st, nz = u.pos.z + dz / L * st, b = cellOf(nx, nz), a = u.node;
   if (b !== a && !(walk[b] && inMain[b] && Math.abs(HM[a] - HM[b]) <= 1)) { u.block = 1; return false; }
-  if (b !== a && gateCell[b] >= 0) { const g = gateList[gateCell[b]]; if (g.hp > 0 && spots[g.f.side].side !== u.side) { u.block = 1; if (CAN_GATE(u.type)) { u.gateHit = g; u.gateHitT = .5; } return false; } }   // puerta cerrada de una fortaleza ajena: hay que derribarla
+  if (b !== a && shutFor(u, b)) { const g = gateList[gateCell[b]]; u.block = 1; if (CAN_GATE(u.type)) { u.gateHit = g; u.gateHitT = .5; } return false; }   // puerta cerrada de una fortaleza ajena: hay que derribarla
   u.pos.x = nx; u.pos.z = nz; u.node = b;
   u.fwd.x += (dx / L - u.fwd.x) * .35; u.fwd.z += (dz / L - u.fwd.z) * .35; u.fwd.normalize(); u.moving = true; return true;
 }

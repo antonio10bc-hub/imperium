@@ -12,7 +12,7 @@ import { HM, cellOf, regionCell, regionOwner, spots } from './map.js';
 import { bfs, cellX, cellZ, inMain, nearestNode, walk } from './nav.js';
 import { _h } from './overlay.js';
 import { S } from './state.js';
-import { UGRID, _nearSep, alive, sideState, followField, place, roadK, slotOk, slowK, spd, stepToward } from './units.js';
+import { UGRID, _nearSep, alive, sideState, followField, place, roadK, shutFor, slotOk, slowK, spd, stepToward } from './units.js';
 import { hitBridge } from './rules.js';
 
 // ---------- Órdenes ----------
@@ -219,7 +219,7 @@ export function updateUnit(u, dt) {
   else if (u.raid != null) raiderUnit(u, dt); else if (u.caravan) { caravanUnit(u, dt); if (u.dead) return; } else guardUnit(u, dt);
   for (const o of UGRID.near(u.pos.x, u.pos.z, 1.7, _nearSep)) if (o !== u) {   // separación: solo vecinos cercanos
     const dx = u.pos.x - o.pos.x, dz = u.pos.z - o.pos.z, d = Math.hypot(dx, dz), min = (u.type === 'hero' || o.type === 'hero') ? 1.7 : 1.05;
-    if (d < min && d > 1e-4) { const k = (u.moving ? .8 : 1.4) * dt / d, nx = u.pos.x + dx * k, nz = u.pos.z + dz * k, b = cellOf(nx, nz); if (b === u.node || (walk[b] && inMain[b] && Math.abs(HM[b] - HM[u.node]) <= 1)) { u.pos.x = nx; u.pos.z = nz; u.node = b; } }
+    if (d < min && d > 1e-4) { const k = (u.moving ? .8 : 1.4) * dt / d, nx = u.pos.x + dx * k, nz = u.pos.z + dz * k, b = cellOf(nx, nz); if (b === u.node || (walk[b] && inMain[b] && Math.abs(HM[b] - HM[u.node]) <= 1 && !shutFor(u, b))) { u.pos.x = nx; u.pos.z = nz; u.node = b; } }
   }
   if (u.hp < u.maxHp && elapsed - u.lastHit > 3 && (regionOwner(regionCell[u.node]) === u.side || (u.side === NEU && elapsed - u.lastHit > 6))) {
     u.hp = Math.min(u.maxHp, u.hp + GAME.regen * (u.type === 'hero' ? 3 : 1) * dt);
