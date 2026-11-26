@@ -18,6 +18,6 @@ try { S.wantScen = localStorage.getItem('imperium-geo') || 'random'; } catch (e)
 S.mapSize = 'n'; try { S.mapSize = localStorage.getItem('imperium-size') || 'n'; } catch (e) {}
 S.players = 2; try { S.players = +localStorage.getItem('imperium-players') || 2; } catch (e) {}
 try { S.diff = localStorage.getItem('imperium-diff') || 'easy'; } catch (e) {}
-try { S.soundOn = localStorage.getItem('imperium-sound') === '1'; } catch (e) {}   // por defecto, sin sonido
+S.soundOn = true; try { S.soundOn = localStorage.getItem('imperium-sound') !== '0'; } catch (e) {}   // por defecto, con sonido (la música del menú suena desde el principio); se apaga con ♪
 export const $ = id => document.getElementById(id);
 export function track(ev, props) { try { window.posthog?.capture?.(ev, props); } catch (e) {} }

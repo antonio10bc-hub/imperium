@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { leaderOf, makeAI, updateAIs } from './ai.js';
 import { raidersAt, resetEvents, updateEvents } from './events.js';
-import { sfx, startMusic } from './audio.js';
+import { sfx, startMenuMusic, startMusic } from './audio.js';
 import { updateUnit } from './behavior.js';
 import { buildAltar, buildBarracks, buildCastle, buildFortDeco, buildWallArchers, keepR, wallLevelLook, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
 import { BONUS, bonusOf, civOf, resolveCivs, uname } from './civs.js';
@@ -153,7 +153,7 @@ function buildGame(s, keepCivs) {
     $('mt').textContent = GAME.towns; $('cap').textContent = capOf(0);
     updateCtx(); syncDiff();
     $('loading').hidden = true; state = 'menu'; S.menuDirty = false;
-    if (S.pendingStart) { S.pendingStart = false; startGame(); } else { $('start').hidden = false; showPortraits(); }
+    if (S.pendingStart) { S.pendingStart = false; startGame(); } else { $('start').hidden = false; showPortraits(); startMenuMusic(); }   // cada vez que se abre el menú (al arrancar o al volver de una partida), su música
     S.genFails = 0;
   }
 }

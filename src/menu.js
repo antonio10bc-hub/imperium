@@ -139,7 +139,8 @@ export function showPortraits(onlySide = -1, dir = 0) {
 }
 
 function showGeo(dir = 0) {
-  const key = S.wantScen, node = GEO.LIST[key] ? Object.assign(new Image(), { alt: '', src: geoRender(key) }) : Object.assign(document.createElement('div'), { className: 'q', textContent: '?' });
+  // imagen de cada geografía: captura de una partida real encuadrando su parte clave (npm run shots); si falta, se dibuja el terreno al vuelo
+  const key = S.wantScen, node = GEO.LIST[key] ? Object.assign(new Image(), { alt: '', src: `img/geo/${key}.jpg`, onerror() { this.onerror = null; this.src = geoRender(key); } }) : Object.assign(document.createElement('div'), { className: 'q', textContent: '?' });
   $('geoName').textContent = GEO.LIST[key] || 'ALEATORIA'; $('geoDesc').textContent = GEO.DESC[key] || 'UNA GEOGRAFÍA AL AZAR.';
   swapStage($('geoStage'), node, dir);
 }

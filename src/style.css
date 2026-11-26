@@ -67,7 +67,8 @@ kbd{font:400 12px/1 var(--font);border:2px solid currentColor;padding:2px 3px;ma
 .mcard{display:flex;flex-direction:column;gap:10px;padding:12px;background:var(--paper2);border:3px solid var(--ink);box-shadow:0 4px 0 var(--ink)}
 .mcard h3{margin:0;font:400 12px/1 var(--font);color:var(--mute);letter-spacing:.08em;text-align:center}
 .mp.mid #go{font-size:26px;padding:20px 0;letter-spacing:.08em}
-.mp.mid #howBtn{align-self:center;font-size:11px;padding:9px 16px}
+.mp.mid .mrow{display:flex;justify-content:center;gap:10px}
+.mp.mid #howBtn,.mp.mid #sndMenu{font-size:11px;padding:9px 16px}
 @media (max-width:860px){.menu3{grid-template-columns:1fr;height:auto;max-height:94vh;overflow:auto} .mp+.mp{border-left:0;border-top:4px solid var(--ink)} .mp.mid{order:-1;gap:14px} .mp.civs{height:560px} .mp.geo{height:340px}}
 @media (prefers-reduced-motion:reduce){.half .stage{animation:none}.stage>*{transition:none}}
 #geoPrev{display:block;width:100%;height:100%;image-rendering:pixelated}
@@ -248,7 +249,7 @@ body.touch button{touch-action:manipulation}
   .mp+.mp{border-left:3px solid var(--ink);border-top:0}
   .mp.mid{order:0;gap:8px;padding:10px 14px} .mp.mid h2{font-size:28px;margin:0} .mp.mid .sub{margin:-4px 0 0;font-size:8px}
   .mcard{gap:5px;padding:7px} .mcard h3{font-size:9px} .diff button{padding:6px 7px 5px;font-size:10px}
-  .mp.mid #go{padding:10px 0;font-size:16px} .mp.mid #howBtn{padding:6px 10px;font-size:10px} .codein{font-size:9px} .codein input{padding:4px;font-size:11px}
+  .mp.mid #go{padding:10px 0;font-size:16px} .mp.mid #howBtn,.mp.mid #sndMenu{padding:6px 10px;font-size:10px} .codein{font-size:9px} .codein input{padding:4px;font-size:11px}
   .mp.civs,.mp.geo{height:auto} .civinfo{font-size:9px;min-height:28px;padding:4px 8px} .tag{font-size:10px;left:6px;top:6px} .arr{width:34px;height:34px;margin-top:-17px}
 }
 /* móvil en vertical (menú): en una columna, con el botón de jugar arriba */

@@ -296,6 +296,7 @@ export function init() {
   $('mRestart').addEventListener('click', () => { track('menu_restart'); S.pendingStart = true; newGame(seed, true); });   // misma semilla y mismas civilizaciones
   $('mSurrender').addEventListener('click', () => { track('menu_surrender'); endGame(false, true); });
   $('mQuit').addEventListener('click', () => { track('menu_quit'); newGame(1 + Math.floor(Math.random() * 99999)); });
-  $('snd').textContent = '♪ ' + (S.soundOn ? 'SÍ' : 'NO');
-  $('snd').addEventListener('click', () => { S.soundOn = !S.soundOn; $('snd').textContent = '♪ ' + (S.soundOn ? 'SÍ' : 'NO'); try { localStorage.setItem('imperium-sound', S.soundOn ? '1' : '0'); } catch (e) {} if (S.soundOn && state === 'play') startMusic(); else if (S.soundOn && state === 'menu') startMenuMusic(); if (audio()) master.gain.setTargetAtTime(S.soundOn ? .9 : 0, ac.currentTime, .05); });
+  const sndLabel = () => { $('snd').textContent = '♪ ' + (S.soundOn ? 'SÍ' : 'NO'); const m = $('sndMenu'); if (m) m.textContent = '♪ SONIDO: ' + (S.soundOn ? 'SÍ' : 'NO'); };
+  sndLabel(); $('sndMenu')?.addEventListener('click', () => $('snd').click());   // el mismo interruptor en el menú principal
+  $('snd').addEventListener('click', () => { S.soundOn = !S.soundOn; sndLabel(); try { localStorage.setItem('imperium-sound', S.soundOn ? '1' : '0'); } catch (e) {} if (S.soundOn && state === 'play') startMusic(); else if (S.soundOn && state === 'menu') startMenuMusic(); if (audio()) master.gain.setTargetAtTime(S.soundOn ? .9 : 0, ac.currentTime, .05); });
 }

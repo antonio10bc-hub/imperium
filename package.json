@@ -9,7 +9,8 @@
     "check": "node tools/check-modules.mjs src",
     "smoke": "node tools/smoke.mjs",
     "bench": "node tools/bench.mjs",
-    "balance": "node tools/balance.mjs"
+    "balance": "node tools/balance.mjs",
+    "shots": "node tools/shots.mjs"
   },
   "devDependencies": {
     "acorn": "^8.14.0",
