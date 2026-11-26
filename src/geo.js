@@ -82,6 +82,9 @@ export const GEO = (() => {
         angs.forEach((a, k) => { const [px, pz] = ramps[k], ux = Math.cos(a), uz = Math.sin(a), t = (x - px) * ux + (z - pz) * uz, lat = Math.abs(-(x - px) * uz + (z - pz) * ux);
           if (lat < RW && t > -2 && t < RL) h = TOP - (TOP - LO) * Math.max(0, t) / RL; });
         return [h, 0]; });
+      // las rampas no se tocan: ni explanadas de pueblos o fortalezas ni elementos del paisaje encima (podían cortarlas y dejar un escalón)
+      M.lock = (x, z) => angs.some((a, k) => { const [px, pz] = ramps[k], ux = Math.cos(a), uz = Math.sin(a), t = (x - px) * ux + (z - pz) * uz; return Math.abs(-(x - px) * uz + (z - pz) * ux) < RW + 2.5 && t > -6 && t < RL + 4; });
+      M.keyExtra = angs.flatMap((a, k) => [[ramps[k][0] - Math.cos(a) * 3, ramps[k][1] - Math.sin(a) * 3], [ramps[k][0] + Math.cos(a) * RL, ramps[k][1] + Math.sin(a) * RL]]);   // arriba y abajo de cada rampa: los pueblos, lejos
       M.special = [[cx, cz]]; return ramps.map(([px, pz], k) => [px + Math.cos(angs[k]) * RL / 2, pz + Math.sin(angs[k]) * RL / 2]);
     },
     afluentes(M, r, s, F) {   // dos ríos que bajan del norte y se juntan en el centro (confluencia), con dos o tres arroyos; vados estrechos de arena
@@ -245,15 +248,16 @@ export const GEO = (() => {
     if (id !== 'archipielago' && id !== 'costa') F.forEach((f, k) => { if (clean(f[0], f[1])) return; let best = null, bd = 1e9;
       for (let z = 22; z <= H - 22; z += 2) for (let x = k ? W - 46 : 16; x <= (k ? W - 16 : 46); x += 2) { const d = Math.hypot(x - f[0], z - f[1]); if (d < bd && clean(x, z)) { bd = d; best = [x, z]; } }
       if (best) { f[0] = best[0]; f[1] = best[1]; } });
-    for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 13 ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza
+    for (const [fx, fz] of F) M.each((x, z, h) => Math.hypot(x - fx, z - fz) < 13 && !M.lock?.(x, z) ? [Math.max(2, Math.min(h, 4)), 0] : null);   // explanada de cada fortaleza (sin tocar las rampas de la meseta)
+    let LK = null; if (M.lock) { LK = new Uint8Array(MW * MD); for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) if (M.lock((gx + .5) * W / MW, (gz + .5) * H / MD)) LK[gz * MW + gx] = 1; }
     let RV = null; if (M.reveal) { RV = new Uint8Array(MW * MD); for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW; gx++) if (M.reveal((gx + .5) * W / MW, (gz + .5) * H / MD)) RV[gz * MW + gx] = 1; }
     if (globalThis.__FLIPMAP) {   // prueba: el mapa reflejado de oeste a este
-      for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW / 2; gx++) { const i = gz * MW + gx, j = gz * MW + MW - 1 - gx; [HMg[i], HMg[j]] = [HMg[j], HMg[i]]; [TTg[i], TTg[j]] = [TTg[j], TTg[i]]; if (RV) [RV[i], RV[j]] = [RV[j], RV[i]]; }
-      const fl = q => { q[0] = W - q[0]; }; F.forEach(fl); F.reverse(); passes.forEach(fl); for (const k of ['special', 'treasures', 'lavaEnds', 'fumaroles', 'bridges']) (M[k] || []).forEach(fl); for (const k of ['confluence', 'volcano']) if (M[k]) fl(M[k]);
+      for (let gz = 0; gz < MD; gz++) for (let gx = 0; gx < MW / 2; gx++) { const i = gz * MW + gx, j = gz * MW + MW - 1 - gx; [HMg[i], HMg[j]] = [HMg[j], HMg[i]]; [TTg[i], TTg[j]] = [TTg[j], TTg[i]]; if (RV) [RV[i], RV[j]] = [RV[j], RV[i]]; if (LK) [LK[i], LK[j]] = [LK[j], LK[i]]; }
+      const fl = q => { q[0] = W - q[0]; }; F.forEach(fl); F.reverse(); passes.forEach(fl); for (const k of ['special', 'keyExtra', 'treasures', 'lavaEnds', 'fumaroles', 'bridges']) (M[k] || []).forEach(fl); for (const k of ['confluence', 'volcano']) if (M[k]) fl(M[k]);
       if (M.div) { const d0 = M.div; M.div = z => W - d0(z); }
     }
     const up = p => [p[0] * MW / W, p[1] * MD / H];
-    return { HM: HMg, TT: TTg, reveal: RV, F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z * H / MD) * MW / W : null,
+    return { HM: HMg, TT: TTg, reveal: RV, lock: LK, keyPts: (M.keyExtra || []).map(up), F: F.map(up), passes: passes.map(up), special: (M.special || []).map(up), div: M.div ? z => M.div(z * H / MD) * MW / W : null,
       volcano: M.volcano ? up(M.volcano) : null, lavaEnds: (M.lavaEnds || []).map(up), fumaroles: (M.fumaroles || []).map(up), confluence: M.confluence ? up(M.confluence) : null, bridgeStyles: M.bridgeStyles || [], bridges: (M.bridges || []).map(b => [...up(b), (b[2] || 13) * MW / W]), treasures: (M.treasures || []).map(up), snow: !!M.snow,
       sea: id === 'istmo' || id === 'archipielago' || id === 'costa', river: id === 'afluentes', goldTop: id === 'meseta', oasis: id === 'oasis' };
   }

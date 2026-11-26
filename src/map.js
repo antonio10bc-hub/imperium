@@ -49,6 +49,7 @@ export let EL = null, G = null, HM = null, flats = [], forts = [];
 export const FORT_K = 1.25;   // tamaño de las fortalezas de los jugadores (recinto y murallas) respecto al original
 function groundXZ(x, z) {
   let g = EL[idx(x, z)]; const cx = x + .5, cz = z + .5;
+  if (geoR?.lock?.[idx(x, z)]) return g;   // rampas de la meseta: ninguna explanada las toca
   for (const f of flats) { const r = Math.hypot(cx - f.x, cz - f.z); if (r < f.r1 && (f.kind !== 'town' || (EL[idx(x, z)] > .5 && !(GEOT && (GEOT[idx(x, z)] === 17 || GEOT[idx(x, z)] === 9))))) g += (f.h - g) * (1 - smooth01((r - f.r0) / (f.r1 - f.r0))); }   // la explanada de un pueblo no rellena el agua (dejaba círculos en la costa) ni el fondo del cañón (abría pasos sin puente)
   for (const f of forts) if (f.moat) { const p = polar(f, cx, cz); if (p) { const rw = wallR(f, p[1]); if (p[0] > rw + 2.2 && p[0] < rw + 4.6 && !f.gates.some(ga => angDiff(p[1], ga) * p[0] < 2.4)) g = -1.6; } }
   return g;
@@ -270,14 +271,14 @@ export function generate(newSeed, tries = 0) {
   // sitio para un pueblo: la explanada (radio r) no puede tocar agua, ríos, rampas, puertos, vados, puentes, bosque, ruinas, hielo ni lava,
   // y todo el suelo que cubre está a la misma altura (±1): así un pueblo nunca rellena un río ni rompe el borde de la meseta o sube a ella por una rampa nueva
   const BAD = new Uint8Array(32); for (const t of [1, 2, 5, 6, 7, 9, 10, 12, 13, 14, 15, 16, 17]) BAD[t] = 1;
-  const keyPts = [...(geoR?.passes || []), ...(geoR?.bridges || []).map(b => [b[0], b[1]]), ...(geoR?.lavaEnds || []), ...(geoR?.volcano ? [geoR.volcano] : [])];
+  const keyPts = [...(geoR?.passes || []), ...(geoR?.keyPts || []), ...(geoR?.bridges || []).map(b => [b[0], b[1]]), ...(geoR?.lavaEnds || []), ...(geoR?.volcano ? [geoR.volcano] : [])];
   const siteOK = (x, z, r, key = true) => {
     x = Math.floor(x); z = Math.floor(z); if (x < 0 || z < 0 || x >= MW || z >= MD) return false; const h0 = HM[idx(x, z)]; if (h0 < 1) return false;
     if (key && keyPts.some(([px, pz]) => Math.hypot(px - x, pz - z) < r + 6)) return false;
     if (scen === 'rio' && Math.abs(x + .5 - RIVX[z]) < r + 6) return false;
     const R = Math.ceil(r);
     for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) { if (dx * dx + dz * dz > r * r) continue; const xx = x + dx, zz = z + dz;
-      if (xx < 0 || zz < 0 || xx >= MW || zz >= MD) return false; const j = idx(xx, zz); if (HM[j] < 1 || Math.abs(HM[j] - h0) > 1 || BAD[GEOT[j]]) return false; }
+      if (xx < 0 || zz < 0 || xx >= MW || zz >= MD) return false; const j = idx(xx, zz); if (HM[j] < 1 || Math.abs(HM[j] - h0) > 1 || BAD[GEOT[j]] || geoR?.lock?.[j]) return false; }
     return true;
   };
   const inside = i => HM[i] <= (scen === 'meseta' ? 12 : 7) && ![6, 7, 9, 10, 11, 13, 15].includes(GEOT[i]) && dry(i) && cellX(i) > 26 && cellX(i) < MW - 26 && cellZ(i) > 22 && cellZ(i) < MD - 22;

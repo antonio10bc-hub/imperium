@@ -138,7 +138,7 @@ const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const LM_FOOT = { lighthouse: 1.5, mill: 2, windmill: 1.3, menhirs: 3, shrine: 1.3, pyramid: 3.4, columns: 3.2, statue: 1.2, hut: 1.3, totem: 1.2, wreck: 2.2, haystack: .8, fishhut: 1.8,
   cascade: 2.6, colossus: 2.4, rockarch: 4, henge: 4.6, aqueduct: 5.6, ziggurat: 3.9, greattree: 4.6, bones: 6.6, obelisk: 1.6, icespire: 2.2, face: 2.8, galleon: 4.6, head: 3.6 };
 const footOK = (x, z, model, tol = 0) => { const r = LM_FOOT[model] || 1.5, R = Math.ceil(r), h0 = hAt(x, z);
-  for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) { if (dx * dx + dz * dz > (r + .5) ** 2) continue; const h = hAt(x + dx, z + dz); if (h < h0 - tol || h > h0 + 1) return false; } return true; };
+  for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) { if (dx * dx + dz * dz > (r + .5) ** 2) continue; const h = hAt(x + dx, z + dz); if (h < h0 - tol || h > h0 + 1 || geoR?.lock?.[idx(Math.min(MW - 1, Math.max(0, x + dx)), Math.min(MD - 1, Math.max(0, z + dz)))]) return false; } return true; };   // tampoco encima de una rampa
 const hAt = (x, z) => x < 0 || z < 0 || x >= MW || z >= MD ? 0 : HM[idx(x, z)];
 const nearWater = (x, z, r) => { for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) if (hAt(x + dx, z + dz) <= 0) return true; return false; };
 const flat = (x, z) => N4.every(([a, b]) => hAt(x + a, z + b) === hAt(x, z));
