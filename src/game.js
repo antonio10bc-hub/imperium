@@ -13,7 +13,7 @@ import { resetFog } from './fog.js';
 import { GEO } from './geo.js';
 import { refreshPanel, syncDiff, syncTools, updateCtx } from './hud.js';
 import { focusOn } from './input.js';
-import { citiesOf, homeOf, forts, generate, geoR, mapCode, paintRegion, regions, scen, spots } from './map.js';
+import { citiesOf, fortPt, homeOf, forts, generate, geoR, inGate, mapCode, paintRegion, regions, scen, spots, wallR } from './map.js';
 import { showPortraits, showVersus } from './menu.js';
 import { cellX, cellZ, fieldAround, nearestNode } from './nav.js';
 import { seed } from './noise.js';
@@ -239,6 +239,30 @@ function spawnGuards() {
 // campos de camino hacia cada sitio: se rehacen cuando una regla de la geografía abre o cierra casillas
 export function refreshFields() { fields = spots.map(sp => fieldAround(sp.x, sp.z, sp.kind === 'base' ? 5.6 : sp.kind === 'town' ? 2.6 : 3.2)); }
 export const capR = s => s.keep ? keepR(s) : s.fortified ? 5.7 : 3.9;   // radio del círculo de conquista
+// arqueros de la muralla en reposo: pasean un poco por su tramo (sin pisar las puertas), se paran unos segundos mirando hacia fuera
+// y respiran; al andar se balancean. Si acaban de disparar, se quedan quietos mirando a su blanco
+const WALK = .7, SPAN = 1.9;   // velocidad al pasear (casillas/s) y cuánto se alejan de su puesto a cada lado
+function wallArcherIdle(f, sh, dt) {
+  const a = sh.arch, now = performance.now() / 1000;
+  sh.th0 ??= sh.th; sh.ph ??= Math.random() * 6; sh.wait ??= Math.random() * 3; sh.goal ??= sh.th;
+  sh.y0 ??= a.g.position.y;
+  if (sh.busy > 0) { sh.busy -= dt; a.mesh.position.y = 0; a.mesh.scale.y = 1; return; }
+  const R = wallR(f, sh.th), out = Math.atan2(Math.cos(sh.th), Math.sin(sh.th));
+  let d = sh.goal - sh.th; const step = WALK / Math.max(1, R) * dt;
+  if (Math.abs(d) <= step) {   // parado: respira y mira hacia fuera; al rato elige otro punto de su tramo
+    sh.th = sh.goal; a.mesh.position.y = 0; a.mesh.scale.y = 1 + Math.sin(now * 2.2 + sh.ph) * .025;
+    a.g.rotation.y += (out + Math.sin(now * .5 + sh.ph) * .35 - a.g.rotation.y) * Math.min(1, dt * 3);
+    if ((sh.wait -= dt) <= 0) { sh.wait = 1.5 + Math.random() * 3.5;
+      for (let t = 0; t < 6; t++) { const g = sh.th0 + (Math.random() * 2 - 1) * SPAN / Math.max(1, R); if (!inGate(f, g, wallR(f, g))) { sh.goal = g; break; } } }
+    return;
+  }
+  const nt = sh.th + Math.sign(d) * step;
+  if (inGate(f, nt, wallR(f, nt))) { sh.goal = sh.th; return; }   // no pisa las puertas
+  sh.th = nt; const p = fortPt(f, wallR(f, nt) - .05, nt); sh.x = p.x; sh.z = p.z;
+  a.g.position.set(p.x, sh.y0, p.z); a.mesh.scale.y = 1;
+  a.mesh.position.y = Math.abs(Math.sin(now * 9 + sh.ph)) * .06;   // al andar, un pequeño bote
+  a.g.rotation.y = out + Math.sign(d) * Math.PI / 2 * -1;   // mira hacia donde va, a lo largo de la muralla
+}
 // arqueros en las murallas: varios puntos del recinto disparan a los enemigos que se acercan
 function castleDefense(dt) {
   for (const f of forts) {
@@ -246,11 +270,13 @@ function castleDefense(dt) {
     if (sideState[own]?.dead) continue;
     const lv = spots[f.side].wallLvl || 0, R = GAME.wallRange + WALL_LV.range[lv];
     for (const sh of f.shooters || []) {
+      wallArcherIdle(f, sh, dt);
       if ((sh.cd -= dt) > 0) continue;
       const foes = [];   // los enemigos más cercanos al alcance: cada andanada reparte flechas entre varios
       for (const u of UGRID.near(sh.x, sh.z, R, _nearWall)) if (u.side !== own) { const d = Math.hypot(u.pos.x - sh.x, u.pos.z - sh.z); if (d < R) foes.push([d, u]); }
-      if (!foes.length) { sh.cd = .35; sh.arch.g.rotation.y += (Math.atan2(Math.cos(sh.th), Math.sin(sh.th)) - sh.arch.g.rotation.y) * .3; continue; }
+      if (!foes.length) { sh.cd = .35; continue; }   // sin blanco: pasea (wallArcherIdle se ocupa de hacia dónde mira)
       foes.sort((a, b) => a[0] - b[0]); const best = foes[0][1];
+      sh.busy = 2.5;   // al disparar se queda quieto un rato, mirando a su blanco
       sh.cd = GAME.wallCd * WALL_LV.cd[lv]; const from = new THREE.Vector3(sh.x, sh.arch.g.position.y + 1, sh.z), src = { side: own, vis: seenAt(from), def: {} };
       sh.arch.g.rotation.y = Math.atan2(best.pos.x - sh.x, best.pos.z - sh.z);   // el arquero se gira hacia el más cercano
       for (const [, u] of foes.slice(0, WALL_LV.targets[lv])) { shoot(from, u.pos, 0); damage(src, u, GAME.wallDmg * WALL_LV.dmg[lv]); }
