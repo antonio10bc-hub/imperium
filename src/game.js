@@ -7,7 +7,7 @@ import { updateUnit } from './behavior.js';
 import { buildAltar, buildBarracks, buildCastle, buildFortDeco, buildWallArchers, keepR, wallLevelLook, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
 import { BONUS, bonusOf, civOf, resolveCivs, uname } from './civs.js';
 import { alarm, applyRank, corpses, damage, kill, raiseAlarm, shoot } from './combat.js';
-import { RANKS, WALL_LV, ALT0, BARR0, BASE0, BASE1, DIFF, GAME, MAP_SIZES, MAX_PLAYERS, NEU, NP, TEAM, TEMP0, TOWN0, UNITS, players, setPlayers } from './config.js';
+import { RANKS, WALL_LV, ALT0, BARR0, BASE0, BASE1, DIFF, GAME, MAP_SIZES, MAX_PLAYERS, MD, MW, NEU, NP, TEAM, TEMP0, TOWN0, UNITS, players, setPlayers } from './config.js';
 import { burst, dropBox, floatText, ping, seenAt } from './effects.js';
 import { resetFog } from './fog.js';
 import { GEO } from './geo.js';
@@ -149,7 +149,7 @@ function buildGame(s, keepCivs) {
     sideState.length = 0; for (const sd of players()) sideState.push({ gold: GAME.startGold, queue: [], heroQ: [], ritual: { state: 'none', t: 0 }, godQ: null, dead: false });
     sideState[0].ai = S.aiPlayer ? makeAI(0, S.aiPlayer.diff, S.aiPlayer.brain) : null; for (let sd = 1; sd < NP; sd++) sideState[sd].ai = makeAI(sd, S.diff, S.aiRival);   // el bando 0 lo juega la IA solo en pruebas
     elapsed = 0; lastFallen = null; S.city = null; S.groups = {}; resetStats(); resetEvents(); S.selBld = null; S.selSpot = null; Object.assign(alarm, { t: 0, pos: null, cool: 0 }); S.paused = false; S.speed = 1; syncTools();
-    focusOn(spots[BASE0].x, spots[BASE0].z, true);
+    focusOn(MW / 2, MD / 2, true);   // de fondo en el menú, el centro del mapa (desde tu fortaleza asomaba el borde); la presentación ya baja hasta tu ciudad
     $('mt').textContent = GAME.towns; $('cap').textContent = capOf(0);
     updateCtx(); syncDiff();
     $('loading').hidden = true; state = 'menu'; S.menuDirty = false;
