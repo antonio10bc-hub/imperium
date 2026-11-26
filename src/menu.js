@@ -40,6 +40,39 @@ function portrait(ci, side) {
     return (PORT[key] = url);
   } catch (e) { return ''; }
 }
+// héroe de una civilización, solo y grande, con el color de su bando y fondo transparente (para la pantalla de enfrentamiento)
+const HERO = {};
+function heroArt(civ, side) {
+  const key = civ.id + '_' + side; if (HERO[key]) return HERO[key];
+  try {
+    const r = offscreen(), w = 480, h = 520; r.setSize(w, h, false); r.setClearColor(0x000000, 0);
+    const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(26, w / h, .1, 300), f = side ? -1 : 1;
+    const key1 = new THREE.DirectionalLight(0xfff6e8, 2), rim = new THREE.DirectionalLight(0xffd890, .9);
+    key1.position.set(-3 * f, 7, 6); rim.position.set(5 * f, 3, -6); sc.add(key1, rim, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.05));
+    const g = new THREE.Group(); sc.add(g); civ.hero(CIV.grp(g, 0, 0, 0, 1), TEAM[side].c);
+    g.rotation.y = .62 * f;   // el tuyo mira a la derecha (hacia los rivales); los rivales, a la izquierda
+    const baked = bake(g); fitCam(cam, g, new THREE.Vector3(0, .32, 1), .9);
+    r.render(sc, cam); const url = r.domElement.toDataURL();
+    for (const m of baked) m.geometry.dispose();
+    return (HERO[key] = url);
+  } catch (e) { return ''; }
+}
+// Pantalla de enfrentamiento: al pulsar JUGAR, unos 3 s con todos los que compiten (tu carta a la izquierda, los rivales a la derecha,
+// el VS que cae en medio y la geografía debajo). Un clic o una tecla la saltan. done() arranca la presentación de la partida
+export function showVersus(info, done) {
+  const v = $('versus'), card = (p, i) => `<div class="vc${p.me ? ' me' : ''}" style="--c:${p.css};--d:${(.12 + i * .1).toFixed(2)}s">
+    <div class="vimg"><img alt="" src="${heroArt(p.civ, p.side)}"></div>
+    <div class="vt"><em>${p.me ? 'TÚ' : 'RIVAL'}</em><b>${p.civ.name}</b><small>${p.sub}</small></div></div>`;
+  const me = info.players[0], foes = info.players.slice(1);
+  v.className = 'n' + foes.length;
+  v.innerHTML = `<div class="vsl">${card(me, 0)}</div><div class="vsm"><b>VS</b><span>${info.geo}</span></div><div class="vsr">${foes.map((p, i) => card(p, i + 1)).join('')}</div>`;
+  v.hidden = false; void v.offsetWidth; v.classList.add('go'); sfx('charge');
+  let over = false;
+  const finish = () => { if (over) return; over = true; clearTimeout(t); window.removeEventListener('keydown', finish, true); v.removeEventListener('pointerdown', finish);
+    v.classList.add('out'); setTimeout(() => { v.hidden = true; v.className = ''; v.innerHTML = ''; }, 450); done(); };
+  const t = setTimeout(finish, 3000);
+  addEventListener('keydown', finish, true); v.addEventListener('pointerdown', finish);
+}
 // coloca la cámara en la dirección dada y a la distancia justa para que el modelo entero (todos sus vértices) llene el encuadre
 function fitCam(cam, obj, dir, fill) {
   obj.updateMatrixWorld(true);

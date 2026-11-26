@@ -14,7 +14,7 @@ import { GEO } from './geo.js';
 import { refreshPanel, syncDiff, syncTools, updateCtx } from './hud.js';
 import { focusOn } from './input.js';
 import { citiesOf, homeOf, forts, generate, geoR, mapCode, paintRegion, regions, scen, spots } from './map.js';
-import { showPortraits } from './menu.js';
+import { showPortraits, showVersus } from './menu.js';
 import { cellX, cellZ, fieldAround, nearestNode } from './nav.js';
 import { seed } from './noise.js';
 import { bakedGeos, world } from './render.js';
@@ -157,16 +157,21 @@ function buildGame(s, keepCivs) {
     S.genFails = 0;
   }
 }
-// presentación al empezar: la cámara empieza muy alta sobre tu ciudad y desciende hasta ella mientras aparece el duelo de civilizaciones (un clic o una tecla la saltan)
+// presentación al empezar: la cámara empieza muy alta sobre tu ciudad y desciende hasta ella (un clic o una tecla la saltan); el duelo de civilizaciones ya se vio antes, en la pantalla de enfrentamiento
 function startIntro() {
   const me = spots[BASE0], d = S.camDist;
   S.intro = { t: 0, dur: 3.4, a: { x: me.x, z: me.z, d: 230 }, b: { x: me.x, z: me.z, d } };
-  const v = $('vs'); v.innerHTML = `<b style="color:${TEAM[0].css}">${civOf(0).name}</b><i>CONTRA</i><b style="color:${TEAM[1].css}">${players().slice(1).map(sd => civOf(sd).name).join(' · ')}</b><small>${GEO.NAME[scen]}</small>${players().slice(1).map(sd => sideState[sd]?.ai ? `<em style="color:${TEAM[sd].css}">${leaderOf(sd)} · ${sideState[sd].ai.P?.name || ''}</em>` : '').join('')}`;
-  for (const sd of players().slice(1)) if (sideState[sd]?.ai?.P) toast(`LÍDER RIVAL: ${leaderOf(sd)} (${civOf(sd).name}) · ${sideState[sd].ai.P.name}`, 'bad');
-  v.hidden = false; v.classList.remove('go'); void v.offsetWidth; v.classList.add('go'); S.fade = 0;
+  S.fade = 0;
 }
 export function endIntro() { if (!S.intro) return; const b = S.intro.b; S.intro = null; focusOn(b.x, b.z, true); S.camGoal = S.camDist = b.d; $('vs').hidden = true; }
-export function startGame() { $('start').hidden = true; $('how').hidden = true; startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; startIntro(); $('miniWrap').dataset.tip = GEO.NAME[scen] + ': ' + (GEO.DESC[scen] || ''); toast('MAPA: ' + GEO.NAME[scen] + (geoR?.mix ? ': ' + geoR.mix.map(k => GEO.NAME[k]).join(' + ') : '')); { const b = BONUS[civOf(0).id]; if (b) toast(`${civOf(0).name} · ${b.name}: ${b.text.toUpperCase()}`, 'good'); } resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
+// al pulsar JUGAR: primero la pantalla de enfrentamiento y después la partida (con la cámara bajando hasta tu ciudad)
+export function startGame() {
+  $('start').hidden = true; $('how').hidden = true;
+  const players_ = players().map(sd => { const c = civOf(sd), b = BONUS[c.id], ai = sideState[sd]?.ai;
+    return { side: sd, civ: c, css: TEAM[sd].css, me: sd === 0, sub: sd === 0 ? (b ? b.name : '') : `${leaderOf(sd)}${ai?.P?.name ? ' · ' + ai.P.name : ''}` }; });
+  showVersus({ players: players_, geo: GEO.NAME[scen] }, beginGame);
+}
+function beginGame() { startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; startIntro(); $('miniWrap').dataset.tip = GEO.NAME[scen] + ': ' + (GEO.DESC[scen] || ''); toast('MAPA: ' + GEO.NAME[scen] + (geoR?.mix ? ': ' + geoR.mix.map(k => GEO.NAME[k]).join(' + ') : '')); { const b = BONUS[civOf(0).id]; if (b) toast(`${civOf(0).name} · ${b.name}: ${b.text.toUpperCase()}`, 'good'); } resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
 export function endGame(win, surrender = false) {
   state = 'end'; $('menu').hidden = true; S.menuOpen = false; $('ui').classList.add('hidden-ui'); $('toast').hidden = true; $('pause').hidden = true;
   const s = win ? (lastFallen || spots[BASE1]) : spots[BASE0];
