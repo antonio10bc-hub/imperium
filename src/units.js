@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { orderMove } from './behavior.js';
 import { CIV_SLOT, civOf, defOf } from './civs.js';
-import { ALT0, BARR0, GAME, MD, MW, NEU, RANKS, TEAM, TEMP0, TYPES, mixHex } from './config.js';
+import { ALT0, BARR0, CAN_GATE, GAME, MD, MW, NEU, RANKS, TEAM, TEMP0, TYPES, mixHex } from './config.js';
 import { GEOT, HM, cellOf, gateCell, gateList, roadCell, spots } from './map.js';
 import { NBO, cellX, cellZ, inMain, nearestNode, stepMask, walk } from './nav.js';
 import { BOX, FLASH, HULLMAT, VCMAT, basic, collectParts, discGeo, mergeBoxes, part, ring, ringGeo, world } from './render.js';
@@ -220,7 +220,7 @@ export function stepToward(u, tx, tz, s, dt) {
   const dx = tx - u.pos.x, dz = tz - u.pos.z, L = Math.hypot(dx, dz); if (L < 1e-4) return false;
   const st = Math.min(s * dt, L), nx = u.pos.x + dx / L * st, nz = u.pos.z + dz / L * st, b = cellOf(nx, nz), a = u.node;
   if (b !== a && !(walk[b] && inMain[b] && Math.abs(HM[a] - HM[b]) <= 1)) { u.block = 1; return false; }
-  if (b !== a && gateCell[b] >= 0) { const g = gateList[gateCell[b]]; if (g.hp > 0 && spots[g.f.side].side !== u.side) { u.block = 1; u.gateHit = g; u.gateHitT = .5; return false; } }   // puerta cerrada de una fortaleza ajena: hay que derribarla
+  if (b !== a && gateCell[b] >= 0) { const g = gateList[gateCell[b]]; if (g.hp > 0 && spots[g.f.side].side !== u.side) { u.block = 1; if (CAN_GATE(u.type)) { u.gateHit = g; u.gateHitT = .5; } return false; } }   // puerta cerrada de una fortaleza ajena: hay que derribarla
   u.pos.x = nx; u.pos.z = nz; u.node = b;
   u.fwd.x += (dx / L - u.fwd.x) * .35; u.fwd.z += (dz / L - u.fwd.z) * .35; u.fwd.normalize(); u.moving = true; return true;
 }

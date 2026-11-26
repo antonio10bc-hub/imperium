@@ -4,7 +4,7 @@ import { sfx } from './audio.js';
 import { orderMove } from './behavior.js';
 import { spotPos } from './buildings.js';
 import { alarm, assign, unassign } from './combat.js';
-import { GAME, MD, MW, SIEGE, TYPES } from './config.js';
+import { CAN_GATE, GAME, MD, MW, SIEGE, TYPES } from './config.js';
 import { ping } from './effects.js';
 import { exploredAt, toggleFog } from './fog.js';
 import { enqueue, heroesOf, newGame, startGame, startRitual, state, summonGod, summonHero, toast, upgradeWall } from './game.js';
@@ -100,8 +100,9 @@ export function command(x, y, attack = false, face = null) {
   if (own && own.type === 'hero' && list.length === 1 && list[0] === own) return;
   for (const u of list) unassign(u);
   const eu = pickEnemy(x, y), gt = pickGate(x, y);
-  if (gt && (list.some(u => u.def.siege) || !eu)) {   // derribar esa puerta (con asedio seleccionado, la puerta manda aunque haya enemigos delante)
-    const f = bfs([nearestNode(gt.x, gt.z)]); for (const u of list) u.order = { type: 'gate', g: gt, f };
+  const gk = list.filter(u => CAN_GATE(u.type)), gr = list.filter(u => !CAN_GATE(u.type));
+  if (gt && gk.length && (list.some(u => u.def.siege) || !eu)) {   // derribar esa puerta (con asedio seleccionado, la puerta manda aunque haya enemigos delante); solo arqueros y asedio la golpean, el resto va hasta ella
+    const f = bfs([nearestNode(gt.x, gt.z)]); for (const u of gk) u.order = { type: 'gate', g: gt, f }; if (gr.length) orderMove(gr, gt.x, gt.z, true, false);
     ping(new THREE.Vector3(gt.x, surfY(gt.x, gt.z) + .5, gt.z), '#d83a4a'); sfx('cmd'); track('order', { type: 'gate' }); return;
   }
   if (eu) { for (const u of list) u.order = { type: 'attack', target: eu }; ping(eu.pos, '#d83a4a'); sfx('cmd'); track('order', { type: 'attack' }); return; }

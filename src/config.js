@@ -36,6 +36,7 @@ export const RANKS = [{ name: '', kills: 0, mul: 1 }, { name: 'BRONCE', kills: 2
   { name: 'PLATA', kills: 5, mul: 1.25, hex: 0xb4afa2, css: '#b4afa2' }, { name: 'ORO', kills: 10, mul: 1.4, hex: 0xe8c870, css: '#e8c870' }];
 export const TYPES = ['sword', 'bow', 'horse'], SIEGE = ['ram', 'catapult'], ALLT = ['god', 'hero', 'titan', 'sword', 'bow', 'horse', 'harcher', 'ram', 'catapult'];
 export const RANGED = t => t === 'bow' || t === 'harcher' || t === 'catapult';
+export const CAN_GATE = t => RANGED(t) || t === 'ram';   // solo los de largo alcance y el asedio dañan las puertas; la infantería y la caballería no
 export const GAME = { startGold: 220, income: 1, townIncome: 1.3, townDecay: .08, townDecayMin: .45, richMul: 1.6, baseHp: 1500, capBase: 30, capTown: 6, capMax: 100, towns: 16, capture: 4, queueMax: 30, bounty: 6, maxHeroes: 3, wallShooters: 12, wallRange: 10, wallDmg: 10, wallCd: 1.6,
   campGen: 14, campMax: 20, campGuards: 6, fortGuards: 20, heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, ritualCost: 400, ritualTime: 60, godHeal: 5, godHealR: 10, godBounty: 150, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4,
   watchRange: 15, watchDmg: 13, watchCd: 1.1, watchVision: 32, keepGen: 22, keepMax: 10, keepGuards: 5,

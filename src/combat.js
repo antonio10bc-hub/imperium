@@ -1,7 +1,7 @@
 // Combate: daño, rangos, muertes, disparos y asedio.
 import { sfx } from './audio.js';
 import { spotPos } from './buildings.js';
-import { GAME, NEU, RANGED, RANKS, TEAM } from './config.js';
+import { CAN_GATE, GAME, NEU, RANGED, RANKS, TEAM } from './config.js';
 import { burst, floatText, ping, plume, seenAt, takeBox } from './effects.js';
 import { elapsed, fields, toast } from './game.js';
 import { updateCtx } from './hud.js';
@@ -104,6 +104,7 @@ export function shoot(from, toPos, lift = 1.1, stone = false) {   // stone: pied
 }
 // puertas: los enemigos que llegan a una puerta cerrada la golpean hasta derribarla (el ariete, mucho más fuerte)
 export function bashGate(u, g, dt) {
+  if (!CAN_GATE(u.type)) return;   // la infantería y la caballería no pueden con las puertas
   u.fwd.set(g.x - u.pos.x, 0, g.z - u.pos.z).normalize(); u.combatT = 2;
   if (u.cd > 0) return; u.cd = u.def.cd;
   if (RANGED(u.type)) { shoot(u.pos, new THREE.Vector3(g.x, HM[u.node] + 1, g.z), 1.1, u.type === 'catapult'); const big = u.type === 'catapult'; arrows[arrows.length - 1].onHit = () => gateImpact(g, big); }
