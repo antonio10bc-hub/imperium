@@ -358,3 +358,15 @@ body.touch #tools #fullBtn{display:flex}
 @media (max-width:700px) and (orientation:portrait){#versus.duel{grid-template-columns:1fr;grid-template-rows:1fr auto 1fr}.duel .vc{width:auto;height:100%;aspect-ratio:4/3}.duel .vgeo{display:none}}
 @media (max-height:560px) and (orientation:landscape){#versus.duel{padding:12px 16px;gap:12px}.duel .vc{width:auto;height:92%;max-width:100%;aspect-ratio:1}.vt{padding:6px 8px 8px;gap:3px}.vt b{font-size:16px}.vt em{font-size:9px}.duel .vsm b{font-size:56px}.duel .vgeo{width:80px}.ffa .vt small{display:none}.ffa .vgeo{height:70px}}
 @media (prefers-reduced-motion:reduce){#versus.go,#versus.go::after,.vc,.vimg img,.vsm b,.vgeo{animation-duration:.01s!important}}
+/* menú: un panel por rival (2 a 4 rivales: la mitad de abajo dividida) */
+.rivals{position:absolute;inset:0;display:grid;gap:3px;background:var(--ink)}
+.rivals.n2{grid-template-columns:1fr 1fr} .rivals.n3{grid-template-columns:repeat(3,1fr)} .rivals.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.rv{position:relative;overflow:hidden;background:repeating-linear-gradient(45deg,rgba(255,255,255,.08) 0 10px,transparent 10px 20px),radial-gradient(ellipse at 50% 58%,#f2ead6,#cdbb9c 80%)}
+.rv .tag .who{background:var(--c)}
+.rv .stage{animation:float 3.2s ease-in-out infinite;animation-delay:-1.6s}
+.rivals.n1 .rv .stage{top:4px;bottom:44px}
+.rivals:not(.n1) .rv .stage{top:22px;bottom:2px}
+.rivals:not(.n1) .tag{left:4px;top:4px;font-size:10px} .rivals:not(.n1) .tag>*{padding:4px 5px 3px}
+.rivals:not(.n1) .arr{width:26px;height:26px;margin-top:-13px;font-size:12px} .rivals:not(.n1) .arr.l{left:3px} .rivals:not(.n1) .arr.r{right:3px}
+.rivals.n3 .tag .who{display:none}
+.rivals.n3 .tag .nm{border-left:2px solid var(--ink);box-shadow:inset 4px 0 0 var(--c)}

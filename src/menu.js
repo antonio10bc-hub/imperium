@@ -181,8 +181,18 @@ function swapStage(stage, node, dir) {
   if (dir) { node.classList.add('enter'); stage.appendChild(node); requestAnimationFrame(() => requestAnimationFrame(() => node.classList.remove('enter'))); }
   else { for (const old of [...stage.children]) old.remove(); stage.appendChild(node); }
 }
+// rivales: la mitad de abajo se divide en un panel por rival (1 a 4), cada uno con su color de bando y sus flechas
+let rivalsN = 0;
+function buildRivals() {
+  const n = (S.players || 2) - 1, box = $('rivals'); if (!box || n === rivalsN) return; rivalsN = n;
+  box.className = 'rivals n' + n;
+  box.innerHTML = Array.from({ length: n }, (_, k) => { const sd = k + 1, nm = n > 1 ? 'RIVAL ' + sd : 'RIVAL';
+    return `<div class="rv" style="--c:${TEAM[sd].css}"><div class="stage" data-side="${sd}"></div><div class="tag"><span class="who">${nm}</span><span class="nm"></span></div>${n === 1 ? `<p class="civinfo" id="civInfo${sd}"></p>` : ''}
+      <button type="button" class="arr l" data-side="${sd}" data-d="-1" aria-label="${nm}: civilización anterior">◀</button><button type="button" class="arr r" data-side="${sd}" data-d="1" aria-label="${nm}: civilización siguiente">▶</button></div>`; }).join('');
+  showPortraits();
+}
 export function showPortraits(onlySide = -1, dir = 0) {
-  for (const sd of [0, 1]) {
+  for (let sd = 0; sd < (S.players || 2); sd++) {
     if (onlySide >= 0 && sd !== onlySide) continue;
     const val = civPick[sd], ci = CIVS.findIndex(c => c.id === val);
     for (const stage of document.querySelectorAll(`#start .stage[data-side="${sd}"]`)) {
@@ -191,7 +201,7 @@ export function showPortraits(onlySide = -1, dir = 0) {
       else { node = new Image(); node.alt = ''; node.src = portrait(ci, sd); }
       swapStage(stage, node, dir);
     }
-    for (const nm of document.querySelectorAll(`#start .s${sd} .nm`)) nm.textContent = ci < 0 ? 'ALEATORIA' : CIVS[ci].name;
+    for (const nm of document.querySelectorAll(`#start .stage[data-side="${sd}"] ~ .tag .nm`)) nm.textContent = ci < 0 ? 'ALEATORIA' : CIVS[ci].name;
     const b = ci < 0 ? null : BONUS[CIVS[ci].id], info = $('civInfo' + sd);   // ventaja de la civilización elegida
     if (info) info.innerHTML = b ? `<b>${b.name}</b> ${b.text}` : 'ventaja al azar';
   }
@@ -222,6 +232,7 @@ export function setSize(k, quiet = false) {
 export function setPlayersPick(n, quiet = false) {
   const max = MAX_PLAYERS[S.mapSize] || 2; n = Math.max(2, Math.min(n, max)); S.players = n; try { localStorage.setItem('imperium-players', n); } catch (e) {}
   document.querySelectorAll('#start [data-players]').forEach(b => { const v = +b.dataset.players; b.setAttribute('aria-pressed', String(v === n)); b.disabled = v > max; b.title = v > max ? 'Necesita un mapa más grande' : ''; });
+  buildRivals();
   if (!quiet) { sfx('ui'); S.menuDirty = true; }
 }
 export function init() {
@@ -231,10 +242,11 @@ export function init() {
   document.querySelectorAll('#start [data-players]').forEach(b => b.addEventListener('click', () => setPlayersPick(+b.dataset.players)));
   document.querySelectorAll('#start [data-size]').forEach(b => b.addEventListener('click', () => setSize(b.dataset.size)));
   setSize(S.mapSize, true);
-  document.querySelectorAll('#start .arr[data-side]').forEach(b => b.addEventListener('click', () => {
-    const sd = +b.dataset.side, d = +b.dataset.d, o = civOpts(), i = o.indexOf(civPick[sd]);
+  $('start').addEventListener('click', e => {   // flechas de civilización (los paneles de rivales se rehacen al cambiar el número de jugadores)
+    const b = e.target.closest('.arr[data-side]'); if (!b) return;
+    const sd = +b.dataset.side, d = +b.dataset.d, o = civOpts(), i = o.indexOf(civPick[sd] ?? 'random');
     setCiv(sd, o[(i + d + o.length) % o.length], d);
-  }));
+  });
   document.querySelectorAll('#start [data-geo]').forEach(b => b.addEventListener('click', () => { const d = +b.dataset.geo, o = ['random', ...GEO.keys], i = o.indexOf(S.wantScen); setGeo(o[(i + d + o.length) % o.length], d); }));
   setTimeout(() => showGeo(), 0);
   $('mapCode').addEventListener('input', e => {   // código de mapa: elige su geografía y su semilla
