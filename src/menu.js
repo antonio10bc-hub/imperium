@@ -57,15 +57,19 @@ function heroArt(civ, side) {
     return (HERO[key] = url);
   } catch (e) { return ''; }
 }
-// Pantalla de enfrentamiento: al pulsar JUGAR, unos 3 s con todos los que compiten (tu carta a la izquierda, los rivales a la derecha,
-// el VS que cae en medio y la geografía debajo). Un clic o una tecla la saltan. done() arranca la presentación de la partida
+// Pantalla de enfrentamiento: al pulsar JUGAR, unos 3 s con todos los que compiten y una captura de la geografía en medio.
+// Dos jugadores: cara a cara (tú a la izquierda). De 3 a 5: todos contra todos, todas las cartas iguales en fila. Un clic o una tecla la saltan
 export function showVersus(info, done) {
-  const v = $('versus'), card = (p, i) => `<div class="vc${p.me ? ' me' : ''}" style="--c:${p.css};--d:${(.12 + i * .1).toFixed(2)}s">
+  const v = $('versus'), P = info.players, ffa = P.length > 2;
+  const card = (p, i, pos = '') => `<div class="vc${p.me ? ' me' : ''}" style="--c:${p.css};--d:${(.12 + i * .1).toFixed(2)}s;${pos}">
     <div class="vimg"><img alt="" src="${heroArt(p.civ, p.side)}"></div>
     <div class="vt"><em>${p.me ? 'TÚ' : 'RIVAL'}</em><b>${p.civ.name}</b><small>${p.sub}</small></div></div>`;
-  const me = info.players[0], foes = info.players.slice(1);
-  v.className = 'n' + foes.length;
-  v.innerHTML = `<div class="vsl">${card(me, 0)}</div><div class="vsm"><b>VS</b><span>${info.geo}</span></div><div class="vsr">${foes.map((p, i) => card(p, i + 1)).join('')}</div>`;
+  const geo = `<div class="vgeo"><img alt="${info.geoName}" src="img/geo/${info.geo}.jpg" onerror="this.remove()"></div>`;
+  if (!ffa) { v.className = 'duel'; v.innerHTML = `<div class="vsl">${card(P[0], 0)}</div><div class="vsm"><b>VS</b>${geo}</div><div class="vsr">${card(P[1], 1)}</div>`; }
+  else {   // todos contra todos: las cartas en fila, iguales, con el título arriba y la geografía debajo; cada una cae desde arriba
+    v.className = 'ffa n' + P.length;
+    v.innerHTML = `<div class="vsm vtop"><b>TODOS CONTRA TODOS</b></div><div class="vrow">${P.map((p, i) => card(p, i, `--r:${i % 2 ? 1.5 : -1.5}deg`)).join('')}</div><div class="vsm vbot">${geo}</div>`;
+  }
   v.hidden = false; void v.offsetWidth; v.classList.add('go'); sfx('charge');
   let over = false;
   const finish = () => { if (over) return; over = true; clearTimeout(t); window.removeEventListener('keydown', finish, true); v.removeEventListener('pointerdown', finish);

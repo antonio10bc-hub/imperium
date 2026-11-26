@@ -169,7 +169,7 @@ export function startGame() {
   $('start').hidden = true; $('how').hidden = true;
   const players_ = players().map(sd => { const c = civOf(sd), b = BONUS[c.id], ai = sideState[sd]?.ai;
     return { side: sd, civ: c, css: TEAM[sd].css, me: sd === 0, sub: sd === 0 ? (b ? b.name : '') : `${leaderOf(sd)}${ai?.P?.name ? ' · ' + ai.P.name : ''}` }; });
-  showVersus({ players: players_, geo: GEO.NAME[scen] }, beginGame);
+  showVersus({ players: players_, geo: geoR?.mix ? geoR.mix[0] : scen, geoName: GEO.NAME[scen] }, beginGame);
 }
 function beginGame() { startMusic(); $('ui').classList.remove('hidden-ui'); state = 'play'; startIntro(); $('miniWrap').dataset.tip = GEO.NAME[scen] + ': ' + (GEO.DESC[scen] || ''); toast('MAPA: ' + GEO.NAME[scen] + (geoR?.mix ? ': ' + geoR.mix.map(k => GEO.NAME[k]).join(' + ') : '')); { const b = BONUS[civOf(0).id]; if (b) toast(`${civOf(0).name} · ${b.name}: ${b.text.toUpperCase()}`, 'good'); } resetFog(true); S.selBld = null; S.selSpot = null; updateCtx(); track('game_start', { seed, diff: S.diff, map: scen }); }
 export function endGame(win, surrender = false) {
