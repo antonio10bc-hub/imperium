@@ -312,9 +312,9 @@ body.touch #tools #fullBtn{display:flex}
   background:radial-gradient(ellipse at 50% 45%,#2a3040 0%,#161925 70%),#161925}
 #versus::before{content:'';position:absolute;inset:0;z-index:1;background:repeating-linear-gradient(-60deg,rgba(255,255,255,.025) 0 14px,transparent 14px 28px);pointer-events:none}
 #versus[hidden]{display:none}
-.vbg{position:absolute;inset:-4%;width:108%;height:108%;object-fit:cover;filter:brightness(.55) saturate(.9) blur(2px);animation:vbgIn 3.4s ease-out forwards;pointer-events:none}
+.vbg{position:fixed;inset:0;width:100vw;height:100vh;max-width:none;object-fit:cover;transform-origin:50% 50%;filter:brightness(.55) saturate(.9) blur(2px);animation:vbgIn 3.4s ease-out forwards;pointer-events:none}
 #versus>*:not(.vbg){position:relative;z-index:1}
-@keyframes vbgIn{from{transform:scale(1.08);opacity:0}25%{opacity:1}to{transform:scale(1)}}
+@keyframes vbgIn{from{transform:scale(1.14);opacity:0}25%{opacity:1}to{transform:scale(1.06)}}
 #versus::after{content:'';position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
 #versus.go{animation:vsShake .3s .62s steps(2) 1}
 #versus.go::after{animation:vsFlash .45s .6s ease-out 1}
