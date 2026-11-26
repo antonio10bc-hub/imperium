@@ -25,7 +25,7 @@ export const UNITS = {
   horse: { name: 'JINETE', cost: 80, time: 7, hp: 160, dmg: 18, range: 1.8, cd: 1.0, speed: 5.5, aggro: 9, vs: { bow: 1.7 } },
   harcher: { name: 'JINETE ARQUERO', cost: 0, time: 0, hp: 110, dmg: 10, range: 7.5, cd: 1.25, speed: 5.2, aggro: 10, vs: { sword: 1.3 } },
   hero:  { name: 'HÉROE',  cost: 200, time: 10, hp: 650, dmg: 32, range: 2.1, cd: .9, speed: 4.5, aggro: 9, vs: {} },
-  titan: { name: 'COLOSO', cost: 0, time: 0, hp: 620, dmg: 26, range: 1.9, cd: 1.4, speed: 2.1, aggro: 8, vs: {} },   // de la ciudadela central: lento, duro y cuerpo a cuerpo
+  titan: { name: 'COLOSO', cost: 0, time: 0, hp: 950, dmg: 32, range: 1.9, cd: 1.4, speed: 2.1, aggro: 8, vs: {} },   // de la ciudadela central: lento, duro y cuerpo a cuerpo
   cart:  { name: 'CARRO DE CARAVANA', cost: 0, time: 0, hp: 280, dmg: 0, range: 0, cd: 1, speed: 2.6, aggro: 0, vs: {} },   // evento de la caravana: no pelea
   // asedio (cuartel): el ariete apenas pelea pero derriba puertas y castillos; la catapulta dispara piedras muy lejos y hace daño en área
   ram:   { name: 'ARIETE', cost: 140, time: 12, hp: 560, dmg: 6, range: 1.9, cd: 2, speed: 2.3, aggro: 0, vs: {}, bld: 8, gate: 30, siege: true },
@@ -39,7 +39,7 @@ export const RANGED = t => t === 'bow' || t === 'harcher' || t === 'catapult';
 export const CAN_GATE = t => RANGED(t) || t === 'ram';   // solo los de largo alcance y el asedio dañan las puertas; la infantería y la caballería no
 export const GAME = { startGold: 220, income: 1, townIncome: 1.3, townDecay: .08, townDecayMin: .45, richMul: 1.6, baseHp: 1500, capBase: 30, capTown: 6, capMax: 100, towns: 16, capture: 4, queueMax: 30, bounty: 6, maxHeroes: 3, wallShooters: 12, wallRange: 10, wallDmg: 10, wallCd: 1.6,
   campGen: 14, campMax: 20, campGuards: 6, fortGuards: 20, heroRespawn: 30, escortMax: 50, escortBonus: 1.2, chargeCd: 20, chargeTime: 3, ritualCost: 400, ritualTime: 60, godHeal: 5, godHealR: 10, godBounty: 150, regen: 4, towerRange: 9, towerDmg: 8, towerCd: 1.4,
-  watchRange: 15, watchDmg: 13, watchCd: 1.1, watchVision: 32, keepGen: 22, keepMax: 10, keepGuards: 5,
+  watchRange: 15, watchDmg: 13, watchCd: 1.1, watchVision: 32, keepGen: 22, keepMax: 10, keepGuards: 8,
   gateHp: 3200, gateLvlHp: 1200, gateRepair: 80 };
 // muralla mejorable (desde la fortaleza): los arqueros de las almenas pasan a bronce, plata y oro; más daño, alcance y cadencia, y puertas más duras
 // targets: a cuántos enemigos distintos dispara cada arquero en cada andanada

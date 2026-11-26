@@ -4,7 +4,7 @@ import { leaderOf, makeAI, updateAIs } from './ai.js';
 import { raidersAt, resetEvents, updateEvents } from './events.js';
 import { sfx, startMenuMusic, startMusic } from './audio.js';
 import { updateUnit } from './behavior.js';
-import { arrangeFort, buildAltar, buildBarracks, buildCastle, buildFortDeco, buildWallArchers, keepR, wallLevelLook, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
+import { arrangeFort, buildAltar, buildBarracks, buildCastle, buildFortDeco, buildWallArchers, keepClear, keepR, wallLevelLook, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
 import { BONUS, bonusOf, civOf, resolveCivs, uname } from './civs.js';
 import { alarm, applyRank, corpses, damage, kill, raiseAlarm, shoot } from './combat.js';
 import { RANKS, WALL_LV, ALT0, BARR0, BASE0, BASE1, DIFF, GAME, MAP_SIZES, MAX_PLAYERS, MD, MW, NEU, NP, TEAM, TEMP0, TOWN0, UNITS, players, setPlayers } from './config.js';
@@ -222,7 +222,7 @@ export function campSpawn(s) {   // el campamento da jinetes arqueros a su dueñ
 export function keepSpawn(s) {   // la ciudadela da colosos a su dueño, hasta 10 vivos, alrededor del edificio
   const own = s.owner; if (own < 0) return;
   if (units.filter(u => u.keepOf === s && u.side === own).length >= GAME.keepMax || popOf(own) >= capOf(own)) return;
-  const a = Math.random() * 6.28, u = spawnAt(own, 'titan', s.x + Math.cos(a) * (keepR(s) + 1.5), s.z + Math.sin(a) * (keepR(s) + 1.5), a); u.keepOf = s;
+  const a = Math.random() * 6.28, r = Math.max(keepR(s) + 1.5, keepClear(s) + 1), u = spawnAt(own, 'titan', s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, a); u.keepOf = s;
   burst(u.pos, [0xffffff, 0xb8b0a0, TEAM[own].l], 10, 2, 2.5, .5, .2);
   if (own === 0) { floatText(spotPos(s, 6), 'COLOSO', '#8ad8f0', 10); refreshPanel(); }
 }
@@ -230,7 +230,7 @@ function spawnGuards() {
   const post = (s, x, z, type, a) => { const n = nearestNode(x, z), u = spawnAt(NEU, type, cellX(n), cellZ(n), a); u.home = s; u.post = [cellX(n), cellZ(n)]; s.guards = (s.guards || 0) + 1; return u; };
   for (const s of spots) {
     if (s.camp) for (let k = 0; k < GAME.campGuards; k++) { const a = k / GAME.campGuards * 6.28; post(s, s.x + Math.cos(a) * 2.2, s.z + Math.sin(a) * 2.2, k % 2 ? 'harcher' : 'sword', a); }
-    if (s.keep) for (let k = 0; k < GAME.keepGuards; k++) { const a = k / GAME.keepGuards * 6.28 + .3, r = keepR(s) - (s.narrow ? .8 : .4); post(s, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, 'titan', a); }
+    if (s.keep) for (let k = 0; k < GAME.keepGuards; k++) { const a = k / GAME.keepGuards * 6.28 + .3, r = keepClear(s); post(s, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, 'titan', a); }
     if (s.fortified) { const T = ['sword', 'bow', 'sword', 'horse', 'bow'];   // seis dentro y el resto en dos corros alrededor; muchos son veteranos
       for (let k = 0; k < GAME.fortGuards; k++) { const ring = k < 6 ? 0 : k < 14 ? 1 : 2, n = [6, 8, GAME.fortGuards - 14][ring], j = k - [0, 6, 14][ring], a = j / n * 6.28 + ring * .4, r = [2.6, 6.6, 9.2][ring];
         const u = post(s, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, T[k % 5], a); u.rank = k % 4 === 0 ? 2 : k % 2 ? 1 : 0; if (u.rank) { setMax(u); u.hp = u.maxHp; applyRank(u); } } }

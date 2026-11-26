@@ -36,7 +36,7 @@ const facing = (s, tx, tz) => Math.atan2(tx - s.x, tz - s.z);
 const local = (s, x, y, z) => s.group.localToWorld(new THREE.Vector3(x, y, z));
 // reparto de los edificios dentro de cada fortaleza: con su huella real (caja del modelo), los separa entre sí con aire (1,4 casillas)
 // y los aparta de la muralla más interior (1,8). El castillo casi no se mueve; el cuartel, el salón y el templo se desplazan lo justo
-const bldBox = s => { const hid = [s.sel, s.beam].filter(Boolean); hid.forEach(o => o.removeFromParent()); s.group.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(s.group); hid.forEach(o => s.group.add(o)); return { hx: (b.max.x - b.min.x) / 2, hz: (b.max.z - b.min.z) / 2, cx: (b.max.x + b.min.x) / 2 - s.x, cz: (b.max.z + b.min.z) / 2 - s.z }; };
+const bldBox = s => { const hid = [s.sel, s.beam, s.zone].filter(Boolean); hid.forEach(o => o.removeFromParent()); s.group.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(s.group); hid.forEach(o => s.group.add(o)); return { hx: (b.max.x - b.min.x) / 2, hz: (b.max.z - b.min.z) / 2, cx: (b.max.x + b.min.x) / 2 - s.x, cz: (b.max.z + b.min.z) / 2 - s.z }; };
 export function arrangeFort(f) {
   const L = spots.filter(s => s.kind !== 'town' && s.civ === f.side && s.group).map(s => ({ s, ...bldBox(s), dx: 0, dz: 0, w: s.kind === 'base' ? .15 : 1 })), M = 1.4, WALL = 1.8, q = Math.min(...f.rings);
   const X = o => o.s.x + o.dx + o.cx, Z = o => o.s.z + o.dz + o.cz;
@@ -138,6 +138,8 @@ function buildWatch(s) {
 }
 // radio del círculo de conquista de la ciudadela (mayor que el de un pueblo fortificado)
 export const keepR = s => s.narrow ? 6.6 : 8.2;
+// distancia al centro de la ciudadela a la que una tropa grande (coloso) ya no choca con el edificio: según su huella real
+export const keepClear = s => { if (s.clearR == null) { const b = bldBox(s); s.clearR = Math.hypot(b.hx, b.hz) + 1.4; } return s.clearR; };
 // ciudadela: torreón neutral (sin civilización) con cuatro torres y muralla; quien la conquista recibe colosos
 function buildKeep(s) {
   const g = new THREE.Group(), roofs = [], st = 0x8c8a92, st2 = 0x6c6a74, dark = 0x2a2a34;
