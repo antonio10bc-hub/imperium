@@ -10,7 +10,8 @@
     "smoke": "node tools/smoke.mjs",
     "bench": "node tools/bench.mjs",
     "balance": "node tools/balance.mjs",
-    "shots": "node tools/shots.mjs"
+    "shots": "node tools/shots.mjs",
+    "shots:ayuda": "node tools/shots-ayuda.mjs"
   },
   "devDependencies": {
     "acorn": "^8.14.0",
