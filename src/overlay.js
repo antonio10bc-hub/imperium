@@ -130,16 +130,30 @@ function groundRing(x, z, r, stroke, fill, dash) {
   if (fill) { octx.fillStyle = fill; octx.fill(); }
   if (dash) octx.setLineDash(dash); octx.lineWidth = 1.5; octx.strokeStyle = stroke; octx.stroke(); octx.setLineDash([]);
 }
-// flecha del clic derecho arrastrado: de dónde se colocan las tropas hacia dónde mirarán
+// flecha del clic derecho arrastrado: de dónde se colocan las tropas hacia dónde mirarán. Va pintada sobre el suelo (en perspectiva, como el resto),
+// con contorno de tinta y sombra desplazada como los botones, y unos galones que avanzan hacia la punta
 function faceArrow(x0, y0, x1, y1, attack) {
-  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy); if (L < 14) return;
-  const ux = dx / L, uy = dy / L, nx = -uy, ny = ux, hl = Math.min(18, L * .45), hw = hl * .62, bx = x1 - ux * hl, by = y1 - uy * hl, w = 3.2;
-  octx.beginPath();
-  octx.moveTo(x0 + nx * w, y0 + ny * w); octx.lineTo(bx + nx * w, by + ny * w); octx.lineTo(bx + nx * hw, by + ny * hw); octx.lineTo(x1, y1);
-  octx.lineTo(bx - nx * hw, by - ny * hw); octx.lineTo(bx - nx * w, by - ny * w); octx.lineTo(x0 - nx * w, y0 - ny * w); octx.closePath();
-  octx.lineJoin = 'round'; octx.lineWidth = 4; octx.strokeStyle = 'rgba(15,15,27,.85)'; octx.stroke();
-  octx.fillStyle = attack ? '#d83a4a' : '#9ad86a'; octx.fill(); octx.lineJoin = 'miter';
-  octx.beginPath(); octx.arc(x0, y0, 4.5, 0, 7); octx.fill(); octx.lineWidth = 2; octx.stroke();
+  const a = groundAt(x0, y0), b = groundAt(x1, y1); if (!a || !b) return;
+  const dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz); if (L < 1.2) return;
+  const ux = dx / L, uz = dz / L, nx = -uz, nz = ux, y = Math.max(0, surfY(a.x, a.z)) + .15;
+  const W = .55, HW = 1.5, HL = Math.min(2.8, L * .55), bl = L - HL;
+  const P = (t, k) => { const q = project(_g.set(a.x + ux * t + nx * k, y, a.z + uz * t + nz * k), _gp); return [q.x, q.y]; };
+  const shape = [P(0, W), P(bl, W), P(bl, HW), P(L, 0), P(bl, -HW), P(bl, -W), P(0, -W)];
+  const path = (pts, ox = 0, oy = 0) => { octx.beginPath(); pts.forEach(([px, py], i) => i ? octx.lineTo(px + ox, py + oy) : octx.moveTo(px + ox, py + oy)); octx.closePath(); };
+  const [fill, light] = attack ? ['#d83a4a', '#f08a90'] : ['#9ad86a', '#d4f4a8'];
+  octx.save(); octx.lineJoin = 'miter';
+  path(shape, 0, 4); octx.fillStyle = 'rgba(15,15,27,.35)'; octx.fill();   // sombra desplazada
+  path(shape); octx.lineWidth = 5; octx.strokeStyle = '#0f0f1b'; octx.stroke(); octx.fillStyle = fill; octx.fill();
+  octx.save(); path(shape); octx.clip();   // galones que avanzan por el astil
+  const ph = (performance.now() / 500) % 1; octx.lineWidth = 3; octx.strokeStyle = light; octx.lineCap = 'square';
+  for (let t = ph * 1.3 - 1.3; t < bl - .2; t += 1.3) { if (t < .2) continue; const p1 = P(t - .45, W * .85), p2 = P(t, 0), p3 = P(t - .45, -W * .85); octx.beginPath(); octx.moveTo(...p1); octx.lineTo(...p2); octx.lineTo(...p3); octx.stroke(); }
+  octx.restore();
+  path(shape); octx.lineWidth = 2; octx.strokeStyle = '#0f0f1b'; octx.stroke();
+  // base: rombo de tinta donde se colocan
+  const base = [P(0, .75), P(.75, 0), P(0, -.75), P(-.75, 0)];
+  path(base, 0, 3); octx.fillStyle = 'rgba(15,15,27,.35)'; octx.fill();
+  path(base); octx.lineWidth = 4; octx.strokeStyle = '#0f0f1b'; octx.stroke(); octx.fillStyle = '#e8c870'; octx.fill();
+  octx.restore();
 }
 // con tropas seleccionadas: sobre un pueblo ajeno, su círculo de conquista; junto al cursor, el aviso de la zona a la que irían
 function drawOrderHints() {
