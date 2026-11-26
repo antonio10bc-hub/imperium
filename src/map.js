@@ -541,7 +541,7 @@ function buildVoxels() {
 // Terreno vóxel como el de la partida (alturas, laderas, agua, bosque y arboledas) de la geografía de ejemplo,
 // sin edificios ni pueblos, con colores de hierba neutros. Construye solo la ventana [x0,x1)×[z0,z1).
 const PREV_GROUND = [0x6ea653, 0x7db45b, 0x8bbd61, 0x9fc56c];
-export function geoTerrain(key, x0, z0, x1, z1) {
+export function geoTerrain(key, x0, z0, x1, z1, bare = false) {   // bare: solo el relieve, sin árboles ni adornos
   const p = previewMap(key), grp = new THREE.Group(), L = new Chunk(), W = new Chunk();
   const H = (x, z) => { if (x < 0 || z < 0 || x >= MW || z >= MD) return 0; const g = p.HM[idx(x, z)]; return g >= .5 ? Math.max(1, Math.round(g)) : 0; };
   const H4 = [[1, 0, 0], [-1, 0, 1], [0, 1, 4], [0, -1, 5]];
@@ -549,7 +549,7 @@ export function geoTerrain(key, x0, z0, x1, z1) {
     const i = idx(x, z), h = H(x, z), cx = x + .5, cz = z + .5, t = p.TT[i];
     if (t === 9) { L.quad(2, x, x + 1, 4, 4, z, z + 1, (x % 2) ? 0xb0aca0 : 0x9a968c); for (const [a, b2, f] of H4) if (p.TT[idx(Math.min(MW - 1, Math.max(0, x + a)), Math.min(MD - 1, Math.max(0, z + b2)))] !== 9) L.quad(f, x, x + 1, 1, 4, z, z + 1, 0x8e8a80); continue; }   // tablero del puente (vista previa), con su costado
     if (h <= 0) { const nearLand = H4.some(([a, b]) => H(x + a, z + b) > 0); W.quad(2, x, x + 1, 0, 0, z, z + 1, nearLand ? TP.edge : -p.HM[i] < 2.2 ? TP.shallow : TP.deep); continue; }
-    const tree = t === 1 || t === 16 ? ((x + z) % 2 === 0 ? 2 : 0) : (t === 0 && h >= 2 && h <= 7 && n2(cx, cz, .055, 3, 22) > .6 && hash(x * 3, 1, z * 11) < .45) ? 1 : 0;
+    const tree = bare ? 0 : t === 1 || t === 16 ? ((x + z) % 2 === 0 ? 2 : 0) : (t === 0 && h >= 2 && h <= 7 && n2(cx, cz, .055, 3, 22) > .6 && hash(x * 3, 1, z * 11) < .45) ? 1 : 0;
     let col;
     if (t === 1 || tree) col = TP.lush;
     else if (t === 2) { const w = n2(cx, cz, .12, 2, 71) > .55; col = h <= 1 ? (w ? 0xb8ccc0 : 0xd6cca0) : (w ? 0x6c9a92 : 0x6a8a5a); }

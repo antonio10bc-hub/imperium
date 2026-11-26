@@ -310,8 +310,11 @@ body.touch #tools #fullBtn{display:flex}
 /* Pantalla de enfrentamiento (al pulsar JUGAR): colores sobrios; el color de cada bando, solo en su etiqueta y un toque en el fondo de su carta */
 #versus{position:fixed;inset:0;z-index:40;box-sizing:border-box;overflow:hidden;cursor:pointer;
   background:radial-gradient(ellipse at 50% 45%,#2a3040 0%,#161925 70%),#161925}
-#versus::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(-60deg,rgba(255,255,255,.025) 0 14px,transparent 14px 28px);pointer-events:none}
+#versus::before{content:'';position:absolute;inset:0;z-index:1;background:repeating-linear-gradient(-60deg,rgba(255,255,255,.025) 0 14px,transparent 14px 28px);pointer-events:none}
 #versus[hidden]{display:none}
+.vbg{position:absolute;inset:-4%;width:108%;height:108%;object-fit:cover;filter:brightness(.55) saturate(.9) blur(2px);animation:vbgIn 3.4s ease-out forwards;pointer-events:none}
+#versus>*:not(.vbg){position:relative;z-index:1}
+@keyframes vbgIn{from{transform:scale(1.08);opacity:0}25%{opacity:1}to{transform:scale(1)}}
 #versus::after{content:'';position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
 #versus.go{animation:vsShake .3s .62s steps(2) 1}
 #versus.go::after{animation:vsFlash .45s .6s ease-out 1}
@@ -337,7 +340,7 @@ body.touch #tools #fullBtn{display:flex}
 .duel .vsl .vc{animation:vcL .55s var(--d) cubic-bezier(.2,1.3,.4,1) forwards} .duel .vsr .vc{animation:vcR .55s var(--d) cubic-bezier(.2,1.3,.4,1) forwards}
 .duel .vgeo{width:clamp(90px,10vw,150px)}
 /* todos contra todos (3 a 5): todas las cartas iguales, en fila */
-#versus.ffa{display:grid;grid-template-rows:auto minmax(0,1fr) auto;justify-items:center;align-items:center;gap:clamp(10px,2.5vh,26px);padding:clamp(14px,3.5vh,40px) clamp(12px,3vw,48px)}
+#versus.ffa{display:grid;grid-template-rows:auto minmax(0,1fr);justify-items:center;align-items:center;gap:clamp(10px,2.5vh,26px);padding:clamp(14px,3.5vh,40px) clamp(12px,3vw,48px)}
 .ffa .vrow{display:flex;justify-content:center;align-items:center;gap:clamp(10px,1.6vw,26px);width:100%;height:100%;min-height:0}
 .ffa .vc{flex:0 1 280px;min-width:0;height:min(100%,400px);animation:vcF .6s var(--d) cubic-bezier(.2,1.3,.4,1) forwards}
 .ffa .vt b{font-size:clamp(13px,1.5vw,22px)} .ffa .vt{padding:7px 9px 9px;gap:4px}

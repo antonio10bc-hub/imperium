@@ -57,18 +57,18 @@ function heroArt(civ, side) {
     return (HERO[key] = url);
   } catch (e) { return ''; }
 }
-// Pantalla de enfrentamiento: al pulsar JUGAR, unos 3 s con todos los que compiten y una captura de la geografía en medio.
+// Pantalla de enfrentamiento: al pulsar JUGAR, unos 3 s con todos los que compiten sobre un fondo que dibuja, muy simplificada, la geografía.
 // Dos jugadores: cara a cara (tú a la izquierda). De 3 a 5: todos contra todos, todas las cartas iguales en fila. Un clic o una tecla la saltan
 export function showVersus(info, done) {
   const v = $('versus'), P = info.players, ffa = P.length > 2;
   const card = (p, i, pos = '') => `<div class="vc${p.me ? ' me' : ''}" style="--c:${p.css};--d:${(.12 + i * .1).toFixed(2)}s;${pos}">
     <div class="vimg"><img alt="" src="${heroArt(p.civ, p.side)}"></div>
     <div class="vt"><em>${p.me ? 'TÚ' : 'RIVAL'}</em><b>${p.civ.name}</b><small>${p.sub}</small></div></div>`;
-  const geo = `<div class="vgeo"><img alt="${info.geoName}" src="img/geo/${info.geo}.jpg" onerror="this.remove()"></div>`;
-  if (!ffa) { v.className = 'duel'; v.innerHTML = `<div class="vsl">${card(P[0], 0)}</div><div class="vsm"><b>VS</b>${geo}</div><div class="vsr">${card(P[1], 1)}</div>`; }
+  const src = versusRender(info.geo), bg = src ? `<img class="vbg" alt="" src="${src}">` : '';   // fondo: la geografía de ejemplo, solo relieve (no es el mapa que se jugará)
+  if (!ffa) { v.className = 'duel'; v.innerHTML = bg + `<div class="vsl">${card(P[0], 0)}</div><div class="vsm"><b>VS</b></div><div class="vsr">${card(P[1], 1)}</div>`; }
   else {   // todos contra todos: las cartas en fila, iguales, con el título arriba y la geografía debajo; cada una cae desde arriba
     v.className = 'ffa n' + P.length;
-    v.innerHTML = `<div class="vsm vtop"><b>TODOS CONTRA TODOS</b></div><div class="vrow">${P.map((p, i) => card(p, i, `--r:${i % 2 ? 1.5 : -1.5}deg`)).join('')}</div><div class="vsm vbot">${geo}</div>`;
+    v.innerHTML = bg + `<div class="vsm vtop"><b>TODOS CONTRA TODOS</b></div><div class="vrow">${P.map((p, i) => card(p, i, `--r:${i % 2 ? 1.5 : -1.5}deg`)).join('')}</div>`;
   }
   v.hidden = false; void v.offsetWidth; v.classList.add('go'); sfx('charge');
   let over = false;
@@ -147,6 +147,28 @@ function geoRender(key) {
     return (GEOIMG[key] = url);
   } catch (e) { return ''; }
 }
+// Fondo de la pantalla de enfrentamiento: el mapa de ejemplo de la geografía visto entero desde el sur, solo el relieve (sin árboles ni adornos)
+const VSIMG = {}, VS_W = 1280, VS_H = 720;
+export function versusRender(key) {
+  if (key in VSIMG) return VSIMG[key];
+  try {
+    const r = offscreen(); r.setSize(VS_W, VS_H, false);
+    const sc = new THREE.Scene(), SKY = new THREE.Color(0x8ad8f0); sc.background = SKY;
+    const sun = new THREE.DirectionalLight(0xfff6e8, 2.2); sun.position.set(-60, 120, 80); sc.add(sun, new THREE.HemisphereLight(0xe6eeff, 0x5a4aa8, 1.25));
+    const grp = geoTerrain(key, 0, 0, MW, MD, true); sc.add(grp);
+    const cx = MW / 2, cz = MD / 2, pitch = 52 * Math.PI / 180, cam = new THREE.PerspectiveCamera(32, VS_W / VS_H, 1, 3000);
+    // la distancia justa para que lo que se ve del suelo quede dentro del mapa (sin asomar los bordes)
+    const ray = new THREE.Raycaster(), pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1), hit = new THREE.Vector3();
+    for (let D = MD * 1.6; D > 30; D *= .94) {
+      cam.position.set(cx, D * Math.sin(pitch), cz + D * Math.cos(pitch)); cam.lookAt(cx, 0, cz); cam.updateMatrixWorld(); let ok = true;
+      for (const [nx, ny] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { ray.setFromCamera(new THREE.Vector2(nx, ny), cam); if (!ray.ray.intersectPlane(pl, hit) || hit.x < 4 || hit.x > MW - 4 || hit.z < 4 || hit.z > MD - 4) { ok = false; break; } }
+      if (ok) break;
+    }
+    r.render(sc, cam); const url = r.domElement.toDataURL('image/jpeg', .85);
+    grp.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+    return (VSIMG[key] = url);
+  } catch (e) { return (VSIMG[key] = ''); }
+}
 const civOpts = () => ['random', ...CIVS.map(c => c.id)];
 function setCiv(sd, val, dir) {
   civPick[sd] = val; try { localStorage.setItem('imperium-civs', JSON.stringify(civPick)); } catch (e) {}
@@ -186,7 +208,7 @@ function showGeo(dir = 0) {
 function setGeo(v, dir, keepCode = false) {
   if (!keepCode) { S.codeSeed = null; $('mapCode').value = ''; $('mapCode').className = ''; }
   S.wantScen = v; try { localStorage.setItem('imperium-geo', v); } catch (e) {}
-  sfx('ui'); S.menuDirty = true; showGeo(dir);
+  sfx('ui'); S.menuDirty = true; showGeo(dir); if (GEO.LIST[v]) setTimeout(() => versusRender(v), 400);   // se prepara ya el fondo del enfrentamiento
 }
 
 // tamaño del mapa: pequeño, normal o grande
