@@ -4,7 +4,7 @@ import { leaderOf, makeAI, updateAIs } from './ai.js';
 import { raidersAt, resetEvents, updateEvents } from './events.js';
 import { sfx, startMenuMusic, startMusic } from './audio.js';
 import { updateUnit } from './behavior.js';
-import { buildAltar, buildBarracks, buildCastle, buildFortDeco, buildWallArchers, keepR, wallLevelLook, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
+import { arrangeFort, buildAltar, buildBarracks, buildCastle, buildFortDeco, buildWallArchers, keepR, wallLevelLook, buildTemple, buildTown, buildWalls, decos, setOwner, spotPos, townLevelLook } from './buildings.js';
 import { BONUS, bonusOf, civOf, resolveCivs, uname } from './civs.js';
 import { alarm, applyRank, corpses, damage, kill, raiseAlarm, shoot } from './combat.js';
 import { RANKS, WALL_LV, ALT0, BARR0, BASE0, BASE1, DIFF, GAME, MAP_SIZES, MAX_PLAYERS, MD, MW, NEU, NP, TEAM, TEMP0, TOWN0, UNITS, players, setPlayers } from './config.js';
@@ -141,7 +141,7 @@ function buildGame(s, keepCivs) {
     if (!keepCivs) resolveCivs(true);
     generate(s); resetFog(false); UGRID.resize();
     for (const sp of spots) BUILD[sp.kind](sp);
-    for (const f of forts) { buildWalls(f); buildFortDeco(f); buildWallArchers(f); }
+    for (const f of forts) { arrangeFort(f); buildWalls(f); buildFortDeco(f); buildWallArchers(f); }
     setupRules(); setupAmbient();
     spawnGuards(); makeThumbs();
     regions.forEach((_, r) => paintRegion(r));

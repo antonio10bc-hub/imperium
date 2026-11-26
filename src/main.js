@@ -117,7 +117,7 @@ function mapShot(w = 1536) {
 window.__game = { mapShot, WEATHER: WEA, ambientInfo, S, gl, units, triggerEvent, ev, R, buildBridge, breakBridge, startChop, get scen() { return scen; },
   // pruebas: pone un cerebro de IA en un bando (diff: dificultad base; over: ajustes que la sobrescriben) o se lo quita con diff = null
   setAI(sd, diff, brain, over) { sideState[sd].ai = diff ? makeAI(sd, diff, brain, over?.persona) : null; if (over && sideState[sd].ai) { const A = sideState[sd].ai; A.Df = { ...A.Df, ...over }; if (over.inc != null) A.inc = over.inc; } }, get spots() { return spots; }, sideState, enqueue, summonHero, assign, heroOf, sel, command, setSelection, setOwner, get state() { return state; },
-  step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) S.camGoal = S.camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, get stats() { return STATS; }, civs: () => [0, 1].map(sd => civOf(sd).id), spawnAt, dbg: () => ({ geoR, world, roadCell, fields, walk, HM, GEOT, MW, wallHit, promote, gateList, pickGate, gateLook }) };
+  step(n) { for (let i = 0; i < n && state === 'play'; i++) updateGame(.05); }, cam(x, z, d) { focusOn(x, z, true); if (d) S.camGoal = S.camDist = d; }, orderMove, upgradeTown, selectSpot, layout, get corpses() { return corpses; }, get stats() { return STATS; }, civs: () => [0, 1].map(sd => civOf(sd).id), spawnAt, dbg: () => ({ geoR, world, roadCell, fields, walk, HM, GEOT, MW, wallHit, promote, gateList, pickGate, gateLook, THREE }) };
 makeThumbs();
 // ?mapa=RIO-48213 en la dirección abre ese mapa
 { let c = null; try { c = parseCode(new URLSearchParams(location.search).get('mapa')); } catch (e) {}

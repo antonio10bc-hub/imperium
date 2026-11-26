@@ -70,6 +70,8 @@ function shapeRadius(pts, ang) {
 export function wallR(f, th) { const n = f.rw.length, t = (((th / (Math.PI * 2)) % 1) + 1) % 1 * n, i = Math.floor(t), k = t - i; return f.rw[i % n] * (1 - k) + f.rw[(i + 1) % n] * k; }
 export const inGate = (f, th, r) => f.gates.some(g => angDiff(th, g) * r < 1.8);
 export const fortPt = (f, r, th) => ({ x: f.x + Math.cos(th) * r, z: f.z + Math.sin(th) * r });
+// giro de una pieza de puerta para que vaya a lo largo de la muralla (su tangente), no perpendicular al radio: así cuadra en los lados rectos
+export function gateRot(f, ga, q = 1) { const a = fortPt(f, wallR(f, ga - .03) * q, ga - .03), b = fortPt(f, wallR(f, ga + .03) * q, ga + .03); return Math.atan2(-(b.z - a.z), b.x - a.x); }
 export function wallHit(x, z) { for (const f of forts) { const p = polar(f, x, z); if (!p) continue; for (const q of f.rings) if (Math.abs(p[0] - wallR(f, p[1]) * q) < .85 && !inGate(f, p[1], p[0])) return true; } return false; }
 // ---------- Regiones ----------
 export let regions = [], regionCell = null;
@@ -245,7 +247,11 @@ export function generate(newSeed, tries = 0) {
     const x = cellX(i), z = cellZ(i), tb = Math.atan2(MD / 2 - z, MW / 2 - x), M = civOf(side).map, pts = M.shape();
     const maxR = Math.max(...pts.map(([a, b]) => Math.hypot(a, b))), k = 12.3 * FORT_K / maxR, n = 96;
     const rw = Array.from({ length: n }, (_, j) => shapeRadius(pts, j / n * Math.PI * 2 - tb + Math.PI / 2) * k);
-    return { side, x, z, tb, rw, k, rings: M.rings || [1], moat: !!M.moat, gates: [tb, tb + 2.1, tb - 2.1], h: plateau(x, z, 16) };
+    // puertas: al frente y a ±120°; en las fortalezas rectangulares, cada una en el centro del lado más cercano (si no, caían junto a una esquina)
+    let gates = [tb, tb + 2.1, tb - 2.1];
+    if (pts.length === 4) { const mids = pts.map((p, i) => { const q = pts[(i + 1) % 4]; return Math.atan2((p[1] + q[1]) / 2, (p[0] + q[0]) / 2) + tb - Math.PI / 2; }), used = new Set();
+      gates = gates.map(g => { let bi = 0, bd = 9; mids.forEach((m, i) => { const d = angDiff(m, g); if (!used.has(i) && d < bd) { bd = d; bi = i; } }); used.add(bi); return mids[bi]; }); }
+    return { side, x, z, tb, rw, k, rings: M.rings || [1], moat: !!M.moat, gates, h: plateau(x, z, 16) };
   };
   // con 3 a 5 jugadores, las fortalezas se reparten alrededor del mapa (la tuya, al oeste)
   const at = [A, B];

@@ -329,7 +329,7 @@ function chariot(g, T, hc, king) {
       altar(g, T) { P(g, 2, .3, 2, 0xd8d0bc, 0, .15, 0); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; P(g, .2, 1.2, .2, WHITE, Math.cos(a) * .75, .9, Math.sin(a) * .75); } P(g, 1.9, .2, 1.9, 0xd8d0bc, 0, 1.6, 0); steps(g, 3, 1.6, .2, 1.6, .5, 0xb5562f, 0, 1.7, 0); P(g, .3, .4, .3, T, 0, .5, 0); } },
     cartago: { ground: [0xb9b06a, 0xc4b878, 0xa9a45e, 0xd0c08a], lush: 0x9a9a58, sand: 0xe6d29c, road: 0xd8c496, trees: ['palm', 'olive'], treeCol: 0x4f8a3a, dens: .6, feature: 'salt',
       plaza: 0xe0c896, wallbase: 0xc8ae7c, path: 0xd8c08a, between: 0xd0b480,
-      shape: () => blob(7, 5.6, 14, .28, 7), rings: [1, .74], wall: { h: 2.8, t: .9, cren: true, tower: true, every: 4, gate: gateTowers(0xd9b27a, 0xc49a62, 2.8) },
+      shape: () => blob(7, 5.6, 14, .28, 7), wall: { h: 2.8, t: .9, cren: true, tower: true, every: 4, gate: gateTowers(0xd9b27a, 0xc49a62, 2.8) },
       layout: { castle: [0, -1.2, 0, .95], barracks: [-4.6, 3.4, .4, .95], altar: [4.6, -3.4, 0, 1.3], temple: [2.2, 2.8, 0, 1.3] },
       altar(g, T) { P(g, 2, .2, 1.6, 0xc9a26a, 0, .1, 0); for (let i = 0; i < 5; i++) { const h = .6 + hsh(i, 5) * .5; P(g, .25, h, .14, 0xe0cfa8, -.7 + i * .35, h / 2 + .2, (i % 2) * .4 - .2); } P(g, .5, .2, .1, T, 0, 1.3, -.2); P(g, .2, .2, .1, T, 0, 1.5, -.2); } },
     china: { ground: [0x6e9a50, 0x7aa858, 0x5f8c48, 0x88b060], lush: 0x5a8a44, sand: 0xd2c69a, road: 0xb8b0a0, trees: ['bamboo', 'pine'], treeCol: 0x3a7a3a, dens: .9, feature: 'paddy',

@@ -7,8 +7,9 @@ import { burst, floatText, fxRand, ping, plume, seenAt } from './effects.js';
 import { visibleAt } from './fog.js';
 import { campSpawn, keepSpawn, toast, townIncNow } from './game.js';
 import { sideState, wallArcher } from './units.js';
-import { fortPt, gateList, inGate, paintRegion, sideAt, spots, surfY, wallR } from './map.js';
+import { fortPt, gateList, gateRot, inGate, paintRegion, sideAt, spots, surfY, wallR } from './map.js';
 import { hash } from './noise.js';
+import { nearestNode } from './nav.js';
 import { BOX, bake, basic, discGeo, mat, part, ring, world } from './render.js';
 import { track } from './state.js';
 import { addMoment, statCapture } from './stats.js';
@@ -33,6 +34,28 @@ function addFlag(s, m, dir = 1) { s.flags.push({ m, w: m.scale.x, px: m.position
 const camFace = (s, spread) => (hash(s.x | 0, 3, s.z | 0) - .5) * spread;
 const facing = (s, tx, tz) => Math.atan2(tx - s.x, tz - s.z);
 const local = (s, x, y, z) => s.group.localToWorld(new THREE.Vector3(x, y, z));
+// reparto de los edificios dentro de cada fortaleza: con su huella real (caja del modelo), los separa entre sí con aire (1,4 casillas)
+// y los aparta de la muralla más interior (1,8). El castillo casi no se mueve; el cuartel, el salón y el templo se desplazan lo justo
+const bldBox = s => { const hid = [s.sel, s.beam].filter(Boolean); hid.forEach(o => o.removeFromParent()); s.group.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(s.group); hid.forEach(o => s.group.add(o)); return { hx: (b.max.x - b.min.x) / 2, hz: (b.max.z - b.min.z) / 2, cx: (b.max.x + b.min.x) / 2 - s.x, cz: (b.max.z + b.min.z) / 2 - s.z }; };
+export function arrangeFort(f) {
+  const L = spots.filter(s => s.kind !== 'town' && s.civ === f.side && s.group).map(s => ({ s, ...bldBox(s), dx: 0, dz: 0, w: s.kind === 'base' ? .15 : 1 })), M = 1.4, WALL = 1.8, q = Math.min(...f.rings);
+  const X = o => o.s.x + o.dx + o.cx, Z = o => o.s.z + o.dz + o.cz;
+  for (let it = 0; it < 80; it++) {
+    let moved = false;
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+      const a = L[i], b = L[j], ddx = X(b) - X(a), ddz = Z(b) - Z(a), ox = a.hx + b.hx + M - Math.abs(ddx), oz = a.hz + b.hz + M - Math.abs(ddz);
+      if (ox <= 0 || oz <= 0) continue; moved = true; const wa = a.w / (a.w + b.w), wb = b.w / (a.w + b.w);
+      if (ox < oz) { const sg = ddx >= 0 ? 1 : -1; a.dx -= sg * ox * wa * .6; b.dx += sg * ox * wb * .6; } else { const sg = ddz >= 0 ? 1 : -1; a.dz -= sg * oz * wa * .6; b.dz += sg * oz * wb * .6; }
+    }
+    for (const o of L) for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {   // dentro de la muralla
+      const x = X(o) + sx * o.hx, z = Z(o) + sz * o.hz, th = Math.atan2(z - f.z, x - f.x), r = Math.hypot(x - f.x, z - f.z), lim = wallR(f, th) * q - WALL;
+      if (r > lim) { const k = (r - lim) * .6; o.dx -= Math.cos(th) * k; o.dz -= Math.sin(th) * k; moved = true; }
+    }
+    if (!moved) break;
+  }
+  for (const o of L) { const s = o.s; if (Math.abs(o.dx) + Math.abs(o.dz) < .01) continue;
+    s.x += o.dx; s.z += o.dz; s.group.position.x += o.dx; s.group.position.z += o.dz; s.base.copy(s.group.position); if (s.shadow) { s.shadow.position.x += o.dx; s.shadow.position.z += o.dz; } s.node = nearestNode(s.x, s.z); }
+}
 export function buildCastle(s) {
   const g = new THREE.Group(); s.civ ??= s.side;
   civOf(s.civ).castle(CIV.grp(g, 0, 0, 0, s.sc), TEAM[s.side].c); bake(g);
@@ -223,11 +246,11 @@ export function buildWalls(f) {
     }
     closeArc();
     if (S.gate) f.gates.forEach((ga, gi) => {   // puertas: torres, pilono, puerta de madera… según la civilización
-      const p = fortPt(f, wallR(f, ga) * q, ga), g = new THREE.Group(); g.position.set(p.x, hr, p.z); g.rotation.y = Math.atan2(-Math.cos(ga), -Math.sin(ga));
+      const p = fortPt(f, wallR(f, ga) * q, ga), g = new THREE.Group(); g.position.set(p.x, hr, p.z); g.rotation.y = gateRot(f, ga, q);
       S.gate(g, T.c, gi === 0 && !ri); if (ri) g.scale.setScalar(.8); add(g);
     });
     f.gates.forEach((ga, gi) => {   // hojas de la puerta (se derriban): madera con herrajes y el color del bando
-      const p = fortPt(f, wallR(f, ga) * q, ga), d = new THREE.Group(), hd = Math.min(H * .85, 2.4); d.position.set(p.x, hr, p.z); d.rotation.y = Math.atan2(-Math.cos(ga), -Math.sin(ga));
+      const p = fortPt(f, wallR(f, ga) * q, ga), d = new THREE.Group(), hd = Math.min(H * .85, 2.4); d.position.set(p.x, hr, p.z); d.rotation.y = gateRot(f, ga, q);
       part(d, 3.5, hd, .3, 0x6a4224, 0, hd / 2 - 1.05, 0); for (const y of [.3, .7]) part(d, 3.56, .14, .36, 0x3a3a44, 0, hd * y - 1.05, 0); part(d, .08, hd, .34, 0x3a2414, 0, hd / 2 - 1.05, 0); part(d, .7, .5, .36, T.c, 0, hd * .5 - 1.05, 0);
       add(d); const gt = gateList.find(o => o.f === f && o.gi === gi); if (gt) gt.doors.push(d);
     });
