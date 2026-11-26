@@ -34,9 +34,11 @@ const FOCUS = `(key) => { const g = __game, d = g.dbg(), R = d.geoR, sp = g.spot
     case 'lago': return [...R.volcano, 140];
     case 'helado': return [...centroid(15), 125];
     case 'canon': return [...R.confluence, 125];
-    case 'costa': {   // la orilla del mar (junto al galeón varado, si lo hay): abajo el mar, arriba la playa y un poco del llano
-      const gal = g.ambientInfo().landmarks.find(l => l[2] === 'galleon'), x = Math.round(gal ? gal[0] : MW / 2); let z = MD - 1; while (z > 0 && d.HM[z * MW + x] <= 0) z--;
-      return [x, z - 9, 100]; }
+    case 'costa': {   // el pueblo más cerca del mar (lejos del galeón varado) y, debajo, la playa y el mar
+      const gal = g.ambientInfo().landmarks.find(l => l[2] === 'galleon'), shore = x => { let z = MD - 1; while (z > 0 && d.HM[z * MW + Math.round(x)] <= 0) z--; return z; };
+      const t = T.filter(s => (!gal || Math.abs(s.x - gal[0]) > 30) && s.x > 50 && s.x < MW - 50).sort((a, b) => (shore(a.x) - a.z) - (shore(b.x) - b.z))[0];
+      if (!t) { const x = MW / 2; return [x, shore(x) - 9, 100]; }
+      return [t.x, Math.min((t.z + shore(t.x)) / 2 + 4, shore(t.x) - 10), 100]; }
     case 'ruinas': return [...near(C, R.treasures), 100];
   } return [...C, 130]; }`;
 
